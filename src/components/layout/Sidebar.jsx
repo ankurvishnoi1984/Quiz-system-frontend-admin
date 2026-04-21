@@ -26,9 +26,13 @@ function Sidebar({ collapsed, onToggle }) {
     >
       <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
         <div className={`flex items-center gap-2 overflow-hidden ${collapsed ? 'w-0' : 'w-auto'}`}>
-          <div className="grid size-9 place-items-center rounded-xl bg-linear-to-br from-cyan-400 to-blue-500 text-navy-950">
-            Q
-          </div>
+  <div className="grid size-12 place-items-center rounded-xl bg-white/10 p-1">
+  <img
+    src="/icon.png"
+    alt="Logo"
+    className="h-full w-full object-contain"
+  />
+</div>
           {!collapsed && (
             <div>
               <p className="text-sm font-bold text-white">Quiz Host</p>

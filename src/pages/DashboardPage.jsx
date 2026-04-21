@@ -1,46 +1,15 @@
 import { Plus, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import SessionCard from '../components/dashboard/SessionCard'
 import StatCard from '../components/dashboard/StatCard'
 import Tabs from '../components/dashboard/Tabs'
 import Modal from '../components/ui/Modal'
 import { useShell } from '../context/ShellContext'
+import { useSessions } from '../context/SessionsContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 
 const tabItems = ['All', 'Draft', 'Live', 'Completed']
-
-const initialSessions = [
-  {
-    id: 'S-1001',
-    title: 'Q2 Townhall Pulse',
-    date: '2026-04-10',
-    status: 'Live',
-    participants: 218,
-    progress: 62,
-    tags: ['Poll'],
-    department: 'Engineering',
-  },
-  {
-    id: 'S-1002',
-    title: 'Sales Onboarding Quiz',
-    date: '2026-04-08',
-    status: 'Draft',
-    participants: 0,
-    progress: 0,
-    tags: ['Quiz'],
-    department: 'Sales',
-  },
-  {
-    id: 'S-1003',
-    title: 'Product Beta Survey',
-    date: '2026-04-01',
-    status: 'Completed',
-    participants: 162,
-    progress: 100,
-    tags: ['Survey'],
-    department: 'Operations',
-  },
-]
 
 function randomSparkline(seed = 4, len = 10) {
   const points = []
@@ -54,7 +23,8 @@ function randomSparkline(seed = 4, len = 10) {
 
 function DashboardPage() {
   const { department: globalDepartment, departments } = useShell()
-  const [sessions, setSessions] = useState(initialSessions)
+  const { sessions, deleteSession, duplicateSession, createSession } = useSessions()
+  const navigate = useNavigate()
   const [tab, setTab] = useState('All')
   const [search, setSearch] = useState('')
   const [fromDate, setFromDate] = useState('')
@@ -105,22 +75,24 @@ function DashboardPage() {
 
   const handleAction = (action, session) => {
     if (action === 'delete') {
-      setSessions((prev) => prev.filter((s) => s.id !== session.id))
+      deleteSession(session.id)
       return
     }
     if (action === 'duplicate') {
-      setSessions((prev) => [
-        {
-          ...session,
-          id: `S-${Math.floor(1000 + Math.random() * 9000)}`,
-          title: `${session.title} (Copy)`,
-          status: 'Draft',
-          participants: 0,
-          progress: 0,
-          date: new Date().toISOString().slice(0, 10),
-        },
-        ...prev,
-      ])
+      const id = duplicateSession(session)
+      navigate(`/builder?session=${encodeURIComponent(id)}`)
+      return
+    }
+    if (action === 'edit') {
+      navigate(`/builder?session=${encodeURIComponent(session.id)}`)
+      return
+    }
+    if (action === 'analytics') {
+      navigate('/analytics')
+      return
+    }
+    if (action === 'launch') {
+      navigate('/live')
       return
     }
     alert(`${action.toUpperCase()}: ${session.title}`)
@@ -133,23 +105,13 @@ function DashboardPage() {
     const type = String(form.get('type') ?? 'Quiz')
     const dept = String(form.get('department') ?? globalDepartment)
     const date = String(form.get('date') ?? new Date().toISOString().slice(0, 10))
+    const joinRequirement = String(form.get('joinRequirement') ?? 'name')
 
     if (!title) return
 
-    setSessions((prev) => [
-      {
-        id: `S-${Math.floor(1000 + Math.random() * 9000)}`,
-        title,
-        date,
-        status: 'Draft',
-        participants: 0,
-        progress: 0,
-        tags: [type],
-        department: dept,
-      },
-      ...prev,
-    ])
+    const sessionId = createSession({ title, type, department: dept, date, joinRequirement })
     setCreateOpen(false)
+    navigate(`/builder?session=${encodeURIComponent(sessionId)}`)
   }
 
   return (
@@ -284,6 +246,18 @@ function DashboardPage() {
           <div>
             <label className="text-sm font-semibold text-slate-700">Created date</label>
             <input name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="text-sm font-semibold text-slate-700">Join requirements</label>
+            <select
+              name="joinRequirement"
+              defaultValue="name"
+              className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+            >
+              <option value="anonymous">Anonymous (no name/email)</option>
+              <option value="name">Name only</option>
+              <option value="name_email">Name + Email</option>
+            </select>
           </div>
           <div className="flex items-end gap-2 md:justify-end md:col-span-2">
             <button type="button" onClick={() => setCreateOpen(false)} className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50">

@@ -3,6 +3,10 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import HostLayout from './layouts/HostLayout'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
+import BuilderPage from './pages/BuilderPage'
+import LivePage from './pages/LivePage'
+import AnalyticsPage from './pages/AnalyticsPage'
+import ReportsPage from './pages/ReportsPage'
 import SectionPage from './pages/SectionPage'
 
 function App() {
@@ -20,10 +24,10 @@ function App() {
           element={isLoggedIn ? <HostLayout onLogout={() => setIsLoggedIn(false)} /> : <Navigate to="/login" replace />}
         >
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/builder" element={<SectionPage title="Question Builder" subtitle="Create and organize quiz, poll, and survey questions visually." />} />
-          <Route path="/live" element={<SectionPage title="Live Present Mode (Host View)" subtitle="Control question flow and monitor live participation in real time." />} />
-          <Route path="/analytics" element={<SectionPage title="Session Analytics" subtitle="Track response rates, engagement insights, and outcome trends." />} />
-          <Route path="/reports" element={<SectionPage title="Reports" subtitle="Generate and download detailed reports." />} />
+          <Route path="/builder" element={<BuilderPage />} />
+          <Route path="/live" element={<LivePage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to={isLoggedIn ? '/dashboard' : '/login'} replace />} />

@@ -1,5 +1,6 @@
 import { BarChart3, Copy, Pencil, Rocket, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import KebabMenu from '../ui/KebabMenu'
 
 function StatusBadge({ status }) {
   const styles = {
@@ -68,25 +69,24 @@ function SessionCard({ session, onAction }) {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <button type="button" className="rounded-xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50" onClick={() => onAction('launch', session)}>
+        <div className="flex flex-col items-end gap-2">
+          <button
+            type="button"
+            className="rounded-xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+            onClick={() => onAction('launch', session)}
+          >
             <Rocket className="mr-2 inline size-4" />
             Launch
           </button>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="rounded-xl border border-blue-200/70 bg-white p-2 text-slate-700 transition hover:bg-blue-50" onClick={() => onAction('edit', session)} aria-label="Edit">
-              <Pencil className="size-4" />
-            </button>
-            <button type="button" className="rounded-xl border border-blue-200/70 bg-white p-2 text-slate-700 transition hover:bg-blue-50" onClick={() => onAction('analytics', session)} aria-label="Analytics">
-              <BarChart3 className="size-4" />
-            </button>
-            <button type="button" className="rounded-xl border border-blue-200/70 bg-white p-2 text-slate-700 transition hover:bg-blue-50" onClick={() => onAction('duplicate', session)} aria-label="Duplicate">
-              <Copy className="size-4" />
-            </button>
-            <button type="button" className="rounded-xl border border-red-200 bg-white p-2 text-red-700 transition hover:bg-red-50" onClick={() => onAction('delete', session)} aria-label="Delete">
-              <Trash2 className="size-4" />
-            </button>
-          </div>
+
+          <KebabMenu
+            items={[
+              { id: 'edit', label: 'Edit', icon: Pencil, onClick: () => onAction('edit', session) },
+              { id: 'analytics', label: 'Analytics', icon: BarChart3, onClick: () => onAction('analytics', session) },
+              { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onAction('duplicate', session) },
+              { id: 'delete', label: 'Delete', icon: Trash2, variant: 'danger', onClick: () => onAction('delete', session) },
+            ]}
+          />
         </div>
       </div>
 
