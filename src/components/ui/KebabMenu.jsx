@@ -14,7 +14,7 @@ function KebabMenu({ items, align = 'right' }) {
   }, [])
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className={`relative ${open ? 'z-[120]' : 'z-10'}`}>
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
@@ -26,7 +26,7 @@ function KebabMenu({ items, align = 'right' }) {
 
       {open && (
         <div
-          className={`absolute z-50 mt-2 w-48 rounded-2xl border border-blue-200/70 bg-white p-1 shadow-2xl shadow-blue-900/20 ${
+          className={`absolute z-[130] mt-2 w-48 rounded-2xl border border-blue-200/70 bg-white p-1 shadow-2xl shadow-blue-900/20 ${
             align === 'left' ? 'left-0' : 'right-0'
           }`}
         >

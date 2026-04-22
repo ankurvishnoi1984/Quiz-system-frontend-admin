@@ -7,32 +7,36 @@ import BuilderPage from './pages/BuilderPage'
 import LivePage from './pages/LivePage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import ReportsPage from './pages/ReportsPage'
-import SectionPage from './pages/SectionPage'
+import ParticipantSessionPage from './pages/ParticipantSessionPage'
+import { SessionsProvider } from './context/SessionsContext'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          path="/login"
-          element={isLoggedIn ? <Navigate to="/dashboard" replace /> : <LoginPage onLogin={() => setIsLoggedIn(true)} />}
-        />
+    <SessionsProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/join/:sessionId" element={<ParticipantSessionPage />} />
+          <Route
+            path="/login"
+            element={isLoggedIn ? <Navigate to="/dashboard" replace /> : <LoginPage onLogin={() => setIsLoggedIn(true)} />}
+          />
 
-        <Route
-          element={isLoggedIn ? <HostLayout onLogout={() => setIsLoggedIn(false)} /> : <Navigate to="/login" replace />}
-        >
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/builder" element={<BuilderPage />} />
-          <Route path="/live" element={<LivePage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-        </Route>
+          <Route
+            element={isLoggedIn ? <HostLayout onLogout={() => setIsLoggedIn(false)} /> : <Navigate to="/login" replace />}
+          >
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/builder" element={<BuilderPage />} />
+            <Route path="/live" element={<LivePage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to={isLoggedIn ? '/dashboard' : '/login'} replace />} />
-      </Routes>
-    </BrowserRouter>
+          <Route path="*" element={<Navigate to={isLoggedIn ? '/dashboard' : '/login'} replace />} />
+        </Routes>
+      </BrowserRouter>
+    </SessionsProvider>
   )
 }
 

@@ -1,6 +1,7 @@
 import { Plus, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import QRCode from 'qrcode'
 import SessionCard from '../components/dashboard/SessionCard'
 import StatCard from '../components/dashboard/StatCard'
 import Tabs from '../components/dashboard/Tabs'
@@ -31,12 +32,27 @@ function DashboardPage() {
   const [toDate, setToDate] = useState('')
   const [department, setDepartment] = useState(globalDepartment)
   const [createOpen, setCreateOpen] = useState(false)
+  const [shareSession, setShareSession] = useState(null)
+  const [qrDataUrl, setQrDataUrl] = useState('')
 
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
 
   useEffect(() => {
     setDepartment(globalDepartment)
   }, [globalDepartment])
+
+  useEffect(() => {
+    const makeQr = async () => {
+      if (!shareSession) {
+        setQrDataUrl('')
+        return
+      }
+      const link = `${window.location.origin}/join/${shareSession.id}`
+      const data = await QRCode.toDataURL(link, { margin: 1, width: 280 })
+      setQrDataUrl(data)
+    }
+    makeQr()
+  }, [shareSession])
 
   const filtered = useMemo(() => {
     return sessions
@@ -93,6 +109,10 @@ function DashboardPage() {
     }
     if (action === 'launch') {
       navigate('/live')
+      return
+    }
+    if (action === 'share') {
+      setShareSession(session)
       return
     }
     alert(`${action.toUpperCase()}: ${session.title}`)
@@ -268,6 +288,47 @@ function DashboardPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal open={Boolean(shareSession)} title="Share Session" onClose={() => setShareSession(null)}>
+        {shareSession && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Session</p>
+              <p className="mt-1 text-lg font-bold text-navy-900">{shareSession.title}</p>
+              <p className="mt-1 text-sm text-slate-600">
+                Link for participants to join session {shareSession.id}
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-[1fr_280px]">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Share link</label>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={`${window.location.origin}/join/${shareSession.id}`}
+                    className="h-11 flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(`${window.location.origin}/join/${shareSession.id}`)}
+                    className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-blue-200/70 bg-white p-3">
+                {qrDataUrl ? (
+                  <img src={qrDataUrl} alt="Session QR" className="mx-auto h-[240px] w-[240px]" />
+                ) : (
+                  <div className="grid h-[240px] place-items-center text-sm text-slate-500">Generating QR...</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </section>
   )

@@ -1,5 +1,5 @@
-import { BarChart3, Copy, Pencil, Rocket, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { BarChart3, Copy, Pencil, Rocket, Share2, Trash2 } from 'lucide-react'
+import { useMemo } from 'react'
 import KebabMenu from '../ui/KebabMenu'
 
 function StatusBadge({ status }) {
@@ -31,25 +31,14 @@ function ProgressPill({ value }) {
 }
 
 function SessionCard({ session, onAction }) {
-  const [menu, setMenu] = useState(null)
-
   const preview = useMemo(() => {
     const labels = session.tags?.join(', ') || 'Quiz'
     return `${labels} • ${session.participants} participants • Status: ${session.status}`
   }, [session.participants, session.status, session.tags])
 
-  const handleContextMenu = (event) => {
-    event.preventDefault()
-    setMenu({ x: event.clientX, y: event.clientY })
-  }
-
-  const closeMenu = () => setMenu(null)
-
   return (
     <div
-      className="group relative overflow-hidden rounded-2xl border border-blue-200/70 bg-white/85 p-4 shadow-sm shadow-blue-900/5 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-900/10"
-      onContextMenu={handleContextMenu}
-      onMouseLeave={closeMenu}
+      className="group relative z-0 overflow-visible rounded-2xl border border-blue-200/70 bg-white/85 p-4 shadow-sm shadow-blue-900/5 backdrop-blur transition hover:z-20 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-900/10"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -81,6 +70,7 @@ function SessionCard({ session, onAction }) {
 
           <KebabMenu
             items={[
+              { id: 'share', label: 'Share', icon: Share2, onClick: () => onAction('share', session) },
               { id: 'edit', label: 'Edit', icon: Pencil, onClick: () => onAction('edit', session) },
               { id: 'analytics', label: 'Analytics', icon: BarChart3, onClick: () => onAction('analytics', session) },
               { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onAction('duplicate', session) },
@@ -93,34 +83,6 @@ function SessionCard({ session, onAction }) {
       <div className="pointer-events-none absolute left-4 top-2 hidden max-w-[70%] rounded-xl border border-blue-200/70 bg-white/95 px-3 py-2 text-xs text-slate-700 shadow-lg shadow-blue-900/10 group-hover:block">
         Quick preview: {preview}
       </div>
-
-      {menu && (
-        <div className="fixed z-50" style={{ left: menu.x, top: menu.y }} onMouseLeave={closeMenu}>
-          <div className="w-44 rounded-xl border border-blue-200/70 bg-white p-1 shadow-2xl shadow-blue-900/20">
-            {[
-              ['Launch', 'launch'],
-              ['Edit', 'edit'],
-              ['Analytics', 'analytics'],
-              ['Duplicate', 'duplicate'],
-              ['Delete', 'delete'],
-            ].map(([label, action]) => (
-              <button
-                key={action}
-                type="button"
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition ${
-                  action === 'delete' ? 'text-red-700 hover:bg-red-50' : 'text-slate-700 hover:bg-blue-50'
-                }`}
-                onClick={() => {
-                  onAction(action, session)
-                  closeMenu()
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

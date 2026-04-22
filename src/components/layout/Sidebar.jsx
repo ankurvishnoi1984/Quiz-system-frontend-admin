@@ -35,7 +35,6 @@ function Sidebar({ collapsed, onToggle }) {
 </div>
           {!collapsed && (
             <div>
-              <p className="text-sm font-bold text-white">Quiz Host</p>
               <p className="text-xs text-blue-200/80">Admin Portal</p>
             </div>
           )}
