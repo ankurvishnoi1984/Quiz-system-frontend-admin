@@ -1,14 +1,22 @@
 import { Plus, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import SessionCard from '../components/dashboard/SessionCard'
 import StatCard from '../components/dashboard/StatCard'
 import Tabs from '../components/dashboard/Tabs'
 import Modal from '../components/ui/Modal'
-import { useShell } from '../context/ShellContext'
-import { useSessions } from '../context/SessionsContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { useAuthStore } from '../store/authStore'
+import {
+  archiveSessionApi,
+  createSessionApi,
+  getSessionQrApi,
+  listDepartmentsApi,
+  listDepartmentSessionsApi,
+  transitionSessionApi,
+} from '../services/dashboardApi'
 
 const tabItems = ['All', 'Draft', 'Live', 'Completed']
 
@@ -23,23 +31,101 @@ function randomSparkline(seed = 4, len = 10) {
 }
 
 function DashboardPage() {
-  const { department: globalDepartment, departments } = useShell()
-  const { sessions, deleteSession, duplicateSession, createSession } = useSessions()
+  const accessToken = useAuthStore((state) => state.accessToken)
+  const user = useAuthStore((state) => state.user)
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [tab, setTab] = useState('All')
   const [search, setSearch] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  const [department, setDepartment] = useState(globalDepartment)
+  const [department, setDepartment] = useState('')
+  const [selectedDeptId, setSelectedDeptId] = useState(user?.dept_id ? String(user.dept_id) : '')
   const [createOpen, setCreateOpen] = useState(false)
   const [shareSession, setShareSession] = useState(null)
   const [qrDataUrl, setQrDataUrl] = useState('')
+  const [dashboardError, setDashboardError] = useState('')
 
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
 
+  const departmentsQuery = useQuery({
+    queryKey: ['departments', user?.client_id ?? null],
+    queryFn: () => listDepartmentsApi(accessToken, user?.client_id ?? null),
+    enabled: Boolean(accessToken),
+  })
+
+  const sessionsQuery = useQuery({
+    queryKey: ['dashboard-sessions', selectedDeptId],
+    queryFn: () => listDepartmentSessionsApi(accessToken, selectedDeptId),
+    enabled: Boolean(accessToken && selectedDeptId),
+  })
+
   useEffect(() => {
-    setDepartment(globalDepartment)
-  }, [globalDepartment])
+    if (user?.dept_id) {
+      setSelectedDeptId(String(user.dept_id))
+    }
+  }, [user?.dept_id])
+
+  useEffect(() => {
+    if (!department && departmentsQuery.data?.length) {
+      setDepartment(departmentsQuery.data[0].name)
+    }
+  }, [department, departmentsQuery.data])
+
+  const createMutation = useMutation({
+    mutationFn: (payload) => createSessionApi(accessToken, payload.deptId, payload.input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
+      setDashboardError('')
+    },
+    onError: (error) => {
+      setDashboardError(error.message || 'Unable to create session')
+    },
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: (sessionId) => archiveSessionApi(accessToken, sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
+      setDashboardError('')
+    },
+    onError: (error) => {
+      setDashboardError(error.message || 'Unable to archive session')
+    },
+  })
+
+  const transitionMutation = useMutation({
+    mutationFn: ({ sessionId, action }) => transitionSessionApi(accessToken, sessionId, action),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
+      setDashboardError('')
+    },
+    onError: (error) => {
+      setDashboardError(error.message || 'Unable to update session status')
+    },
+  })
+
+  const duplicateMutation = useMutation({
+    mutationFn: ({ deptId, session }) =>
+      createSessionApi(accessToken, deptId, {
+        host_id: user?.user_id,
+        title: `${session.title} (Copy)`,
+        description: session.description || '',
+        is_anonymous_default: Boolean(session.is_anonymous_default),
+        max_participants: session.max_participants || 500,
+        show_results_to_participants: Boolean(session.show_results_to_participants),
+        allow_late_join: Boolean(session.allow_late_join),
+        leaderboard_enabled: Boolean(session.leaderboard_enabled),
+      }),
+    onSuccess: (createdSession) => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
+      setDashboardError('')
+      navigate(`/builder?session=${encodeURIComponent(createdSession?.session_id)}`)
+    },
+    onError: (error) => {
+      setDashboardError(error.message || 'Unable to duplicate session')
+    },
+  })
 
   useEffect(() => {
     const makeQr = async () => {
@@ -47,12 +133,43 @@ function DashboardPage() {
         setQrDataUrl('')
         return
       }
-      const link = `${window.location.origin}/join/${shareSession.id}`
+      let link = `${window.location.origin}/join/${shareSession.id}`
+      if (accessToken && shareSession?.id) {
+        try {
+          const qrPayload = await getSessionQrApi(accessToken, shareSession.id)
+          if (qrPayload?.join_url) link = qrPayload.join_url
+        } catch {
+          // Fall back to local join link shape if QR endpoint fails.
+        }
+      }
       const data = await QRCode.toDataURL(link, { margin: 1, width: 280 })
       setQrDataUrl(data)
     }
     makeQr()
-  }, [shareSession])
+  }, [shareSession, accessToken])
+
+  const sessions = useMemo(() => {
+    const statusLabel = {
+      draft: 'Draft',
+      live: 'Live',
+      paused: 'Live',
+      completed: 'Completed',
+      archived: 'Completed',
+    }
+
+    const departmentsById = new Map((departmentsQuery.data || []).map((dept) => [String(dept.dept_id), dept.name]))
+
+    return (sessionsQuery.data || []).map((session) => ({
+      ...session,
+      id: session.session_id,
+      date: (session.created_at || '').slice(0, 10),
+      status: statusLabel[session.status] || 'Draft',
+      participants: session.participants_count ?? 0,
+      progress: session.status === 'completed' ? 100 : session.status === 'live' ? 60 : 0,
+      tags: ['Quiz'],
+      department: departmentsById.get(String(session.dept_id)) || `Department ${session.dept_id}`,
+    }))
+  }, [sessionsQuery.data, departmentsQuery.data])
 
   const filtered = useMemo(() => {
     return sessions
@@ -91,12 +208,11 @@ function DashboardPage() {
 
   const handleAction = (action, session) => {
     if (action === 'delete') {
-      deleteSession(session.id)
+      archiveMutation.mutate(session.id)
       return
     }
     if (action === 'duplicate') {
-      const id = duplicateSession(session)
-      navigate(`/builder?session=${encodeURIComponent(id)}`)
+      duplicateMutation.mutate({ deptId: session.dept_id || selectedDeptId, session })
       return
     }
     if (action === 'edit') {
@@ -108,6 +224,9 @@ function DashboardPage() {
       return
     }
     if (action === 'launch') {
+      if (session.status === 'Draft') {
+        transitionMutation.mutate({ sessionId: session.id, action: 'start' })
+      }
       navigate('/live')
       return
     }
@@ -123,15 +242,25 @@ function DashboardPage() {
     const form = new FormData(event.currentTarget)
     const title = String(form.get('title') ?? '').trim()
     const type = String(form.get('type') ?? 'Quiz')
-    const dept = String(form.get('department') ?? globalDepartment)
-    const date = String(form.get('date') ?? new Date().toISOString().slice(0, 10))
+    const dept = String(form.get('department') || selectedDeptId || user?.dept_id || '')
     const joinRequirement = String(form.get('joinRequirement') ?? 'name')
 
     if (!title) return
 
-    const sessionId = createSession({ title, type, department: dept, date, joinRequirement })
+    createMutation.mutate({
+      deptId: dept,
+      input: {
+        host_id: user?.user_id,
+        title,
+        description: `${type} session`,
+        is_anonymous_default: joinRequirement === 'anonymous',
+        max_participants: 300,
+        show_results_to_participants: true,
+        allow_late_join: true,
+        leaderboard_enabled: true,
+      },
+    })
     setCreateOpen(false)
-    navigate(`/builder?session=${encodeURIComponent(sessionId)}`)
   }
 
   return (
@@ -184,6 +313,12 @@ function DashboardPage() {
         />
       </div>
 
+      {dashboardError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {dashboardError}
+        </div>
+      ) : null}
+
       <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4 shadow-sm shadow-blue-900/5 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs items={tabItems} active={tab} onChange={setTab} />
@@ -218,15 +353,27 @@ function DashboardPage() {
               className="h-10 rounded-xl border border-blue-200/70 bg-white/90 px-3 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
               aria-label="Department filter"
             >
-              {departments.map((name) => (
-                <option key={name} value={name}>
-                  {name}
+              {(departmentsQuery.data || []).map((dept) => (
+                <option key={dept.dept_id} value={dept.name}>
+                  {dept.name}
                 </option>
               ))}
             </select>
           </div>
         </div>
       </div>
+
+      {sessionsQuery.isLoading ? (
+        <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-8 text-center text-slate-600">
+          Loading sessions...
+        </div>
+      ) : null}
+
+      {sessionsQuery.error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-red-700">
+          {sessionsQuery.error.message || 'Failed to load sessions'}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {filtered.map((session) => (
@@ -255,17 +402,13 @@ function DashboardPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700">Department</label>
-            <select name="department" defaultValue={globalDepartment} className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15">
-              {departments.map((name) => (
-                <option key={name} value={name}>
-                  {name}
+            <select name="department" defaultValue={selectedDeptId} className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15">
+              {(departmentsQuery.data || []).map((dept) => (
+                <option key={dept.dept_id} value={dept.dept_id}>
+                  {dept.name}
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Created date</label>
-            <input name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15" />
           </div>
           <div className="md:col-span-2">
             <label className="text-sm font-semibold text-slate-700">Join requirements</label>
