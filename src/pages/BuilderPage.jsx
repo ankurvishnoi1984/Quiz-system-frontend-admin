@@ -217,7 +217,8 @@ function OptionsEditor({ question, quizMode, onChange }) {
     if (!quizMode) return
     onChange({
       ...question,
-      options: question.options.map((o) => (o.id === id ? { ...o, isCorrect: !o.isCorrect } : o)),
+      // MCQ supports a single correct answer at a time.
+      options: question.options.map((o) => ({ ...o, isCorrect: o.id === id })),
     })
   }
 
@@ -497,6 +498,19 @@ function BuilderPage() {
     () => questions.find((q) => q.id === selectedId) ?? questions[0],
     [questions, selectedId],
   )
+  const sessionQuestionType = questions[0]?.type ?? null
+  const hasMixedQuestionTypes = useMemo(() => {
+    if (questions.length <= 1) return false
+    const firstType = questions[0]?.type
+    return questions.some((q) => q.type !== firstType)
+  }, [questions])
+
+  useEffect(() => {
+    if (!selected || !sessionQuestionType) return
+    if (selected.type === sessionQuestionType) return
+    const firstMatching = questions.find((q) => q.type === sessionQuestionType)
+    if (firstMatching) setSelectedId(firstMatching.id)
+  }, [selected, sessionQuestionType, questions])
 
   const updateQuestion = (next) => {
     setDirty(true)
@@ -505,6 +519,11 @@ function BuilderPage() {
 
   const addQuestion = (type) => {
     if (!session || session.rawStatus !== 'draft') return
+    if (sessionQuestionType && sessionQuestionType !== type) {
+      setSaveError(`Only one question type is allowed per session. This session is using ${sessionQuestionType}.`)
+      return
+    }
+    setSaveError('')
     setDirty(true)
     const q = {
       id: uid('q'),
@@ -567,6 +586,9 @@ function BuilderPage() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!session) return
+      if (hasMixedQuestionTypes) {
+        throw new Error('Only one question type is allowed per session. Please keep all questions the same type before saving.')
+      }
       const sessionNumericId = Number(session.id)
 
       const removedIds = initialQuestionIds.filter(
@@ -746,6 +768,12 @@ function BuilderPage() {
       {saveError ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</div>
       ) : null}
+      {hasMixedQuestionTypes ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          This session contains mixed question types from older data. Keep only <strong>{sessionQuestionType}</strong>{' '}
+          questions to continue.
+        </div>
+      ) : null}
       {saveSuccess ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           {saveSuccess}
@@ -757,18 +785,35 @@ function BuilderPage() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
             <p className="text-sm font-semibold text-navy-900">Add question</p>
+            <p className="mt-1 text-xs text-slate-600">
+              {sessionQuestionType ? `Session type locked to: ${sessionQuestionType}` : 'Choose a type to lock this session.'}
+            </p>
             <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
               {QUESTION_TYPES.map((t) => {
                 const Icon = t.icon
+                const isDisabled = Boolean(sessionQuestionType && sessionQuestionType !== t.type)
                 return (
                   <button
                     key={t.type}
                     type="button"
                     onClick={() => addQuestion(t.type)}
-                    className="flex items-center gap-3 rounded-2xl border border-blue-200/70 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
-                    title={t.description}
+                    disabled={isDisabled}
+                    className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
+                      isDisabled
+                        ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                        : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                    }`}
+                    title={
+                      isDisabled
+                        ? `Session locked to ${sessionQuestionType}. Remove existing questions to switch type.`
+                        : t.description
+                    }
                   >
-                    <span className="grid size-9 place-items-center rounded-2xl bg-linear-to-br from-navy-900 to-blue-700 text-white">
+                    <span
+                      className={`grid size-9 place-items-center rounded-2xl ${
+                        isDisabled ? 'bg-slate-300 text-white' : 'bg-linear-to-br from-navy-900 to-blue-700 text-white'
+                      }`}
+                    >
                       <Icon className="size-4" />
                     </span>
                     <span className="min-w-0 truncate">{t.type}</span>
@@ -796,10 +841,20 @@ function BuilderPage() {
                     {questions.map((q, idx) => (
                       <div key={q.id} className={`rounded-2xl ${q.id === selectedId ? 'ring-2 ring-blue-500/25' : ''}`}>
                         <SortableRow id={q.id} className="border-blue-200/70">
+                          {(() => {
+                            const isTypeMismatch = Boolean(sessionQuestionType && q.type !== sessionQuestionType)
+                            return (
                           <button
                             type="button"
-                            onClick={() => setSelectedId(q.id)}
-                            className="flex w-full items-start justify-between gap-3 rounded-xl px-2 py-2 text-left"
+                            onClick={() => {
+                              if (isTypeMismatch) return
+                              setSelectedId(q.id)
+                            }}
+                            className={`flex w-full items-start justify-between gap-3 rounded-xl px-2 py-2 text-left ${
+                              isTypeMismatch ? 'cursor-not-allowed opacity-60' : ''
+                            }`}
+                            disabled={isTypeMismatch}
+                            title={isTypeMismatch ? `Session locked to ${sessionQuestionType}.` : undefined}
                           >
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
@@ -830,6 +885,8 @@ function BuilderPage() {
                               <Trash2 className="size-4" />
                             </button>
                           </button>
+                            )
+                          })()}
                         </SortableRow>
                       </div>
                     ))}
