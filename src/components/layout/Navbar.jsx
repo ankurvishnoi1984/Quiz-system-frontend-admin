@@ -2,6 +2,7 @@ import { ChevronDown, LogOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useShell } from '../../context/ShellContext'
+import { useAuthStore } from '../../store/authStore'
 
 const pageTitles = {
   '/dashboard': 'Admin Dashboard',
@@ -11,11 +12,22 @@ const pageTitles = {
   '/reports': 'Reports',
 }
 
-function Navbar({ onLogout }) {
+function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
   const { pathname } = useLocation()
   const { client, setClient, clients, department, setDepartment, departments } = useShell()
+  const user = useAuthStore((state) => state.user)
+  const logout = useAuthStore((state) => state.logout)
+
+  const initials = user?.full_name
+    ? user.full_name
+        .split(' ')
+        .map((part) => part[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : 'US'
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -70,9 +82,9 @@ function Navbar({ onLogout }) {
           className="inline-flex items-center gap-2 rounded-xl border border-blue-200/70 bg-white/90 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5 transition hover:bg-blue-50"
         >
           <span className="grid size-7 place-items-center rounded-full bg-linear-to-br from-navy-900 to-blue-700 text-xs font-semibold text-white">
-            SU
+            {initials}
           </span>
-          Suraj
+          {user?.full_name || 'User'}
           <ChevronDown className="size-4" />
         </button>
 
@@ -80,7 +92,7 @@ function Navbar({ onLogout }) {
           <div className="absolute right-0 mt-2 w-44 rounded-xl border border-blue-200/70 bg-white p-1 shadow-xl shadow-blue-900/15">
             <button
               type="button"
-              onClick={onLogout}
+              onClick={logout}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
             >
               <LogOut className="size-4" />

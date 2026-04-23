@@ -1,21 +1,35 @@
 import { Eye, EyeOff, LoaderCircle, Lock, User } from 'lucide-react'
 import { useState } from 'react'
+import { useAuthStore } from '../store/authStore'
 
-function LoginPage({ onLogin }) {
+function LoginPage() {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const login = useAuthStore((state) => state.login)
+  const loading = useAuthStore((state) => state.isLoading)
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    setLoading(true)
+    setSubmitError('')
 
-    setTimeout(() => {
-      setLoading(false)
-      onLogin()
-    }, 900)
+    // Previous mock-only flow retained for reference while integrating APIs.
+    // setLoading(true)
+    // setTimeout(() => {
+    //   setLoading(false)
+    //   onLogin()
+    // }, 900)
+
+    try {
+      await login({
+        email: identifier,
+        password,
+      })
+    } catch (error) {
+      setSubmitError(error.message || 'Unable to login')
+    }
   }
 
   return (
@@ -105,6 +119,7 @@ function LoginPage({ onLogin }) {
               'Login'
             )}
           </button>
+          {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
         </form>
       </section>
     </main>
