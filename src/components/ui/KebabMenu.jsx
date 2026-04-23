@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from 'react'
 
 function KebabMenu({ items, align = 'right' }) {
   const [open, setOpen] = useState(false)
+  const [openUp, setOpenUp] = useState(false)
   const ref = useRef(null)
+  const menuRef = useRef(null)
 
   useEffect(() => {
     const onMouseDown = (event) => {
@@ -13,8 +15,32 @@ function KebabMenu({ items, align = 'right' }) {
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [])
 
+  useEffect(() => {
+    if (!open) return
+
+    const updateDirection = () => {
+      if (!ref.current || !menuRef.current) return
+      const triggerRect = ref.current.getBoundingClientRect()
+      const menuRect = menuRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - triggerRect.bottom
+      const spaceAbove = triggerRect.top
+
+      // Open upward when there is not enough space below and more room above.
+      setOpenUp(spaceBelow < menuRect.height + 12 && spaceAbove > spaceBelow)
+    }
+
+    const frameId = requestAnimationFrame(updateDirection)
+    window.addEventListener('resize', updateDirection)
+    window.addEventListener('scroll', updateDirection, true)
+    return () => {
+      cancelAnimationFrame(frameId)
+      window.removeEventListener('resize', updateDirection)
+      window.removeEventListener('scroll', updateDirection, true)
+    }
+  }, [open, items.length])
+
   return (
-    <div ref={ref} className={`relative ${open ? 'z-[120]' : 'z-10'}`}>
+    <div ref={ref} className={`relative ${open ? 'z-50' : 'z-10'}`}>
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
@@ -26,7 +52,10 @@ function KebabMenu({ items, align = 'right' }) {
 
       {open && (
         <div
-          className={`absolute z-[130] mt-2 w-48 rounded-2xl border border-blue-200/70 bg-white p-1 shadow-2xl shadow-blue-900/20 ${
+          ref={menuRef}
+          className={`absolute z-50 w-48 rounded-2xl border border-blue-200/70 bg-white p-1 shadow-2xl shadow-blue-900/20 ${
+            openUp ? 'bottom-full mb-2' : 'top-full mt-2'
+          } ${
             align === 'left' ? 'left-0' : 'right-0'
           }`}
         >

@@ -180,8 +180,8 @@ function ReportsPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto overflow-y-visible rounded-2xl border border-blue-200/70 bg-white/85 shadow-sm shadow-blue-900/5 backdrop-blur">
-        <div className="grid min-w-[860px] grid-cols-[1.6fr_0.8fr_0.8fr_0.8fr_1fr] gap-3 border-b border-blue-100 bg-white px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <div className="relative z-0 overflow-visible  rounded-2xl border border-blue-200/70 bg-white/85 shadow-sm shadow-blue-900/5 backdrop-blur">
+        <div className="grid min-w-[900px] grid-cols-[minmax(240px,1.6fr)_minmax(90px,0.8fr)_minmax(90px,0.8fr)_minmax(140px,0.8fr)_96px] gap-3 border-b border-blue-100 bg-white pl-5 pr-8 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
           <div>Session</div>
           <div>Status</div>
           <div>Participants</div>
@@ -192,7 +192,7 @@ function ReportsPage() {
         {filtered.map((s) => (
           <div
             key={s.id}
-            className="grid min-w-[860px] grid-cols-[1.6fr_0.8fr_0.8fr_0.8fr_1fr] gap-3 border-b border-blue-50 px-5 py-4 last:border-b-0"
+            className="grid min-w-[900px] grid-cols-[minmax(240px,1.6fr)_minmax(90px,0.8fr)_minmax(90px,0.8fr)_minmax(140px,0.8fr)_96px] gap-3 border-b border-blue-50 pl-5 pr-8 py-4 last:border-b-0"
           >
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-navy-900">{s.title}</p>
@@ -221,7 +221,7 @@ function ReportsPage() {
               </span>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end pr-1">
               <KebabMenu
                 items={[
                   { id: 'view', label: 'View (Analytics)', icon: ExternalLink, onClick: () => navigate(`/analytics?session=${encodeURIComponent(s.id)}`) },
