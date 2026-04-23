@@ -216,6 +216,10 @@ function DashboardPage() {
       return
     }
     if (action === 'edit') {
+      if (session.status !== 'Draft') {
+        setDashboardError('Only draft sessions can be edited in Question Builder')
+        return
+      }
       navigate(`/builder?session=${encodeURIComponent(session.id)}`)
       return
     }
@@ -241,7 +245,7 @@ function DashboardPage() {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     const title = String(form.get('title') ?? '').trim()
-    const type = String(form.get('type') ?? 'Quiz')
+    const description = String(form.get('description') ?? '').trim()
     const dept = String(form.get('department') || selectedDeptId || user?.dept_id || '')
     const joinRequirement = String(form.get('joinRequirement') ?? 'name')
 
@@ -252,9 +256,8 @@ function DashboardPage() {
       input: {
         host_id: user?.user_id,
         title,
-        description: `${type} session`,
+        description: description || null,
         is_anonymous_default: joinRequirement === 'anonymous',
-        max_participants: 300,
         show_results_to_participants: true,
         allow_late_join: true,
         leaderboard_enabled: true,
@@ -393,12 +396,12 @@ function DashboardPage() {
             <input name="title" className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15" placeholder="e.g., Weekly Pulse Check" />
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700">Type</label>
-            <select name="type" className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15">
-              <option>Quiz</option>
-              <option>Poll</option>
-              <option>Survey</option>
-            </select>
+            <label className="text-sm font-semibold text-slate-700">Description</label>
+            <input
+              name="description"
+              className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+              placeholder="e.g., Friday live polling session"
+            />
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700">Department</label>

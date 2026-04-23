@@ -19,9 +19,20 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Modal from '../components/ui/Modal'
-import { useSessions } from '../context/SessionsContext'
+import { useAuthStore } from '../store/authStore'
+import {
+  createQuestionApi,
+  deleteQuestionApi,
+  getSessionDetailApi,
+  listDepartmentSessionsApi,
+  listSessionQuestionsApi,
+  reorderQuestionsApi,
+  updateQuestionApi,
+  updateSessionApi,
+} from '../services/builderApi'
 
 const QUESTION_TYPES = [
   { type: 'MCQ', icon: ListChecks, description: 'Multiple choice with options' },
@@ -337,36 +348,139 @@ function ParticipantPreview({ question, quizMode }) {
 
 function BuilderPage() {
   const [searchParams] = useSearchParams()
-  const sessionId = searchParams.get('session')
+  const sessionId = searchParams.get('session') || ''
   const navigate = useNavigate()
-  const { sessions, getSession, updateSession, saveSession } = useSessions()
+  const accessToken = useAuthStore((state) => state.accessToken)
+  const queryClient = useQueryClient()
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  const session = sessionId ? getSession(sessionId) : null
-  const [selectedId, setSelectedId] = useState(session?.questions?.[0]?.id)
+  const [selectedId, setSelectedId] = useState(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [questions, setQuestions] = useState([])
+  const [settings, setSettings] = useState({ anonymous: false, leaderboard: true, maxParticipants: 300, password: '' })
+  const [joinRequirement, setJoinRequirement] = useState('name')
+  const [saveError, setSaveError] = useState('')
+  const [saveSuccess, setSaveSuccess] = useState('')
+  const [lastSavedLabel, setLastSavedLabel] = useState('Never')
+  const [initialQuestionIds, setInitialQuestionIds] = useState([])
+
+  const sessionQuery = useQuery({
+    queryKey: ['builder-session', sessionId],
+    queryFn: () => getSessionDetailApi(accessToken, sessionId),
+    enabled: Boolean(accessToken && sessionId),
+  })
+
+  const questionsQuery = useQuery({
+    queryKey: ['builder-questions', sessionId],
+    queryFn: () => listSessionQuestionsApi(accessToken, sessionId),
+    enabled: Boolean(accessToken && sessionId),
+  })
+
+  const deptSessionsQuery = useQuery({
+    queryKey: ['builder-dept-sessions', sessionQuery.data?.dept_id],
+    queryFn: () => listDepartmentSessionsApi(accessToken, sessionQuery.data?.dept_id),
+    enabled: Boolean(accessToken && sessionQuery.data?.dept_id),
+  })
+
+  const apiToUiType = (apiType) => {
+    const mapping = {
+      mcq: 'MCQ',
+      word_cloud: 'Word Cloud',
+      rating: 'Rating',
+      open_text: 'Text',
+      true_false: 'True/False',
+      ranking: 'Ranking',
+      fill_blank: 'Text',
+    }
+    return mapping[apiType] || 'Text'
+  }
+
+  const uiToApiType = (uiType) => {
+    const mapping = {
+      MCQ: 'mcq',
+      'Word Cloud': 'word_cloud',
+      Rating: 'rating',
+      Text: 'open_text',
+      'True/False': 'true_false',
+      Ranking: 'ranking',
+    }
+    return mapping[uiType] || 'open_text'
+  }
+
+  const mapQuestionFromApi = (question) => ({
+    id: String(question.question_id),
+    questionId: question.question_id,
+    type: apiToUiType(question.question_type),
+    text: question.question_text || '',
+    media: question.media_url
+      ? {
+          url: question.media_url,
+          kind: question.media_type?.includes('video') ? 'video' : 'image',
+          file: null,
+        }
+      : null,
+    points: question.points_value ?? 10,
+    options: (question.question_options || []).map((option) => ({
+      id: String(option.option_id),
+      optionId: option.option_id,
+      text: option.option_text,
+      isCorrect: Boolean(option.is_correct),
+    })),
+  })
 
   useEffect(() => {
-    setSelectedId(session?.questions?.[0]?.id)
+    if (!questionsQuery.data) return
+    const mapped = questionsQuery.data.map(mapQuestionFromApi)
+    setQuestions(mapped)
+    setSelectedId(mapped[0]?.id ?? null)
+    setInitialQuestionIds(mapped.map((item) => item.questionId))
     setDirty(false)
-  }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
+    setSaveError('')
+  }, [questionsQuery.data])
 
-  const questions = session?.questions ?? []
-  const quizMode = session?.quizMode ?? true
-  const settings = session?.settings ?? { anonymous: true, leaderboard: true, maxParticipants: 300, password: '' }
-  const joinRequirement = session?.joinRequirement ?? 'name'
-  const timeLimitSeconds = session?.timeLimitSeconds ?? 30
+  useEffect(() => {
+    if (!sessionQuery.data) return
+    setSettings({
+      anonymous: Boolean(sessionQuery.data.is_anonymous_default),
+      leaderboard: Boolean(sessionQuery.data.leaderboard_enabled),
+      maxParticipants: Number(sessionQuery.data.max_participants || 300),
+      password: '',
+    })
+    setJoinRequirement(sessionQuery.data.is_anonymous_default ? 'anonymous' : 'name')
+  }, [sessionQuery.data])
+
+  const session = useMemo(() => {
+    if (!sessionQuery.data) return null
+    const statusMap = {
+      draft: 'Draft',
+      live: 'Live',
+      paused: 'Live',
+      completed: 'Completed',
+      archived: 'Completed',
+    }
+    return {
+      id: String(sessionQuery.data.session_id),
+      title: sessionQuery.data.title,
+      status: statusMap[sessionQuery.data.status] || 'Draft',
+      rawStatus: sessionQuery.data.status,
+      date: (sessionQuery.data.created_at || '').slice(0, 10),
+      timeLimitSeconds: 30,
+    }
+  }, [sessionQuery.data])
+
+  const quizMode = true
+  const timeLimitSeconds = 30
   const [timeLimitMode, setTimeLimitMode] = useState('30s')
   const [customTime, setCustomTime] = useState(45)
 
   useEffect(() => {
-    if (!session) return
+    if (!sessionId) return
     if (timeLimitSeconds === 0) setTimeLimitMode('Off')
     else if (timeLimitSeconds === 15) setTimeLimitMode('15s')
     else if (timeLimitSeconds === 30) setTimeLimitMode('30s')
@@ -385,16 +499,16 @@ function BuilderPage() {
   )
 
   const updateQuestion = (next) => {
-    if (!session) return
     setDirty(true)
-    updateSession(session.id, { questions: questions.map((q) => (q.id === next.id ? next : q)) })
+    setQuestions((prev) => prev.map((q) => (q.id === next.id ? next : q)))
   }
 
   const addQuestion = (type) => {
-    if (!session) return
+    if (!session || session.rawStatus !== 'draft') return
     setDirty(true)
     const q = {
       id: uid('q'),
+      questionId: null,
       type,
       text: '',
       media: null,
@@ -402,33 +516,33 @@ function BuilderPage() {
       options:
         type === 'MCQ'
           ? [
-              { id: uid('opt'), text: 'Option 1', isCorrect: false },
-              { id: uid('opt'), text: 'Option 2', isCorrect: false },
+              { id: uid('opt'), optionId: null, text: 'Option 1', isCorrect: false },
+              { id: uid('opt'), optionId: null, text: 'Option 2', isCorrect: false },
             ]
           : [],
     }
-    updateSession(session.id, { questions: [q, ...questions] })
+    setQuestions((prev) => [q, ...prev])
     setSelectedId(q.id)
   }
 
   const deleteQuestion = (id) => {
-    if (!session) return
+    if (!session || session.rawStatus !== 'draft') return
     setDirty(true)
     const remaining = questions.filter((q) => q.id !== id)
-    updateSession(session.id, { questions: remaining })
+    setQuestions(remaining)
     if (selectedId === id) {
       setSelectedId(remaining[0]?.id)
     }
   }
 
   const onQuestionsDragEnd = (event) => {
-    if (!session) return
+    if (!session || session.rawStatus !== 'draft') return
     setDirty(true)
     const { active, over } = event
     if (!over || active.id === over.id) return
     const oldIndex = questions.findIndex((q) => q.id === active.id)
     const newIndex = questions.findIndex((q) => q.id === over.id)
-    updateSession(session.id, { questions: arrayMove(questions, oldIndex, newIndex) })
+    setQuestions((prev) => arrayMove(prev, oldIndex, newIndex))
   }
 
   const effectiveTimeLimitSeconds =
@@ -446,12 +560,86 @@ function BuilderPage() {
 
   useEffect(() => {
     if (!session) return
-    if (effectiveTimeLimitSeconds !== timeLimitSeconds) {
-      setDirty(true)
-      updateSession(session.id, { timeLimitSeconds: effectiveTimeLimitSeconds })
-    }
+    if (effectiveTimeLimitSeconds !== timeLimitSeconds) setDirty(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTimeLimitSeconds])
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!session) return
+      const sessionNumericId = Number(session.id)
+
+      const removedIds = initialQuestionIds.filter(
+        (questionId) => !questions.some((item) => item.questionId === questionId),
+      )
+      for (const questionId of removedIds) {
+        await deleteQuestionApi(accessToken, questionId)
+      }
+
+      const orderedIds = []
+      for (let index = 0; index < questions.length; index += 1) {
+        const question = questions[index]
+        const payload = {
+          question_type: uiToApiType(question.type),
+          question_text: question.text || 'Untitled question',
+          is_quiz_mode: quizMode,
+          points_value: Number(question.points || 0),
+          time_limit_seconds: effectiveTimeLimitSeconds || null,
+          allow_multiple_select: false,
+          options:
+            question.type === 'MCQ'
+              ? (question.options || []).map((option, optionIndex) => ({
+                  option_text: option.text || `Option ${optionIndex + 1}`,
+                  is_correct: Boolean(option.isCorrect),
+                  display_order: optionIndex + 1,
+                }))
+              : [],
+          display_order: index + 1,
+        }
+
+        if (question.questionId) {
+          const updated = await updateQuestionApi(accessToken, question.questionId, payload)
+          orderedIds.push(updated.question_id)
+        } else {
+          const created = await createQuestionApi(accessToken, sessionNumericId, payload)
+          orderedIds.push(created.question_id)
+        }
+      }
+
+      if (orderedIds.length > 0) {
+        await reorderQuestionsApi(accessToken, sessionNumericId, orderedIds)
+      }
+
+      await updateSessionApi(accessToken, sessionNumericId, {
+        is_anonymous_default: settings.anonymous,
+        leaderboard_enabled: settings.leaderboard,
+        max_participants: settings.maxParticipants,
+      })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
+      await queryClient.invalidateQueries({ queryKey: ['builder-session', sessionId] })
+      setDirty(false)
+      setSaveError('')
+      setSaveSuccess('Questions saved successfully')
+      setLastSavedLabel(
+        new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      )
+    },
+    onError: (error) => {
+      setSaveError(error.message || 'Unable to save builder changes')
+      setSaveSuccess('')
+    },
+  })
+
+  useEffect(() => {
+    if (!saveSuccess) return
+    const timer = window.setTimeout(() => setSaveSuccess(''), 2600)
+    return () => window.clearTimeout(timer)
+  }, [saveSuccess])
 
   if (!session) {
     return (
@@ -461,9 +649,23 @@ function BuilderPage() {
     )
   }
 
-  if (!selected) return null
+  if (session.rawStatus !== 'draft') {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-10 text-center text-amber-800 shadow-sm">
+        This session is in <strong>{session.status}</strong> state. Question Builder editing is allowed only for
+        <strong> Draft</strong> sessions.
+      </div>
+    )
+  }
 
-  const filteredSessions = sessions
+  const mappedDeptSessions = (deptSessionsQuery.data || []).map((item) => ({
+    id: String(item.session_id),
+    title: item.title,
+    date: (item.created_at || '').slice(0, 10),
+    status: item.status,
+  }))
+
+  const filteredSessions = mappedDeptSessions
     .filter((s) => {
       if (!fromDate && !toDate) return true
       const d = new Date(s.date ?? '').getTime()
@@ -472,10 +674,6 @@ function BuilderPage() {
       return d >= from && d <= to
     })
     .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
-
-  const lastSavedLabel = session.lastSavedAt
-    ? new Date(session.lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : 'Never'
 
   return (
     <section className="space-y-6">
@@ -527,12 +725,11 @@ function BuilderPage() {
           <button
             type="button"
             onClick={() => {
-              saveSession(session.id)
-              setDirty(false)
+              saveMutation.mutate()
             }}
             className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
           >
-            Save
+            {saveMutation.isPending ? 'Saving...' : 'Save'}
           </button>
 
           <button
@@ -545,6 +742,15 @@ function BuilderPage() {
           </button>
         </div>
       </div>
+
+      {saveError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</div>
+      ) : null}
+      {saveSuccess ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {saveSuccess}
+        </div>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[440px_minmax(560px,1fr)_360px]">
         {/* Left: Question list */}
@@ -637,6 +843,13 @@ function BuilderPage() {
         {/* Center: Editor */}
         <div className="space-y-4">
           <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-6 shadow-sm shadow-blue-900/5 backdrop-blur">
+            {!selected ? (
+              <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-8 text-center text-slate-600">
+                No questions in this session yet. Use <strong>Add question</strong> from the left panel, then click
+                <strong> Save</strong>.
+              </div>
+            ) : (
+              <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Editing</p>
@@ -648,7 +861,6 @@ function BuilderPage() {
                   type="button"
                   onClick={() => {
                     setDirty(true)
-                    updateSession(session.id, { quizMode: !quizMode })
                   }}
                   className="inline-flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
                 >
@@ -728,6 +940,8 @@ function BuilderPage() {
                 </p>
               </div>
             </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -746,10 +960,8 @@ function BuilderPage() {
                   onChange={(e) => {
                     const next = e.target.value
                     setDirty(true)
-                    updateSession(session.id, {
-                      joinRequirement: next,
-                      settings: { ...settings, anonymous: next === 'anonymous' },
-                    })
+                    setJoinRequirement(next)
+                    setSettings((prev) => ({ ...prev, anonymous: next === 'anonymous' }))
                   }}
                   className="mt-2 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
                 >
@@ -769,7 +981,7 @@ function BuilderPage() {
                   checked={settings.anonymous}
                   onChange={(e) => {
                     setDirty(true)
-                    updateSession(session.id, { settings: { ...settings, anonymous: e.target.checked } })
+                    setSettings((prev) => ({ ...prev, anonymous: e.target.checked }))
                   }}
                   className="h-5 w-5 rounded border-slate-300 text-blue-700 focus:ring-blue-500/40"
                 />
@@ -785,7 +997,7 @@ function BuilderPage() {
                   checked={settings.leaderboard}
                   onChange={(e) => {
                     setDirty(true)
-                    updateSession(session.id, { settings: { ...settings, leaderboard: e.target.checked } })
+                    setSettings((prev) => ({ ...prev, leaderboard: e.target.checked }))
                   }}
                   className="h-5 w-5 rounded border-slate-300 text-blue-700 focus:ring-blue-500/40"
                 />
@@ -799,7 +1011,7 @@ function BuilderPage() {
                   value={settings.maxParticipants}
                   onChange={(e) => {
                     setDirty(true)
-                    updateSession(session.id, { settings: { ...settings, maxParticipants: Number(e.target.value || 1) } })
+                    setSettings((prev) => ({ ...prev, maxParticipants: Number(e.target.value || 1) }))
                   }}
                   className="mt-2 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
                 />
@@ -812,7 +1024,7 @@ function BuilderPage() {
                   value={settings.password}
                   onChange={(e) => {
                     setDirty(true)
-                    updateSession(session.id, { settings: { ...settings, password: e.target.value } })
+                    setSettings((prev) => ({ ...prev, password: e.target.value }))
                   }}
                   placeholder="Optional"
                   className="mt-2 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
@@ -828,7 +1040,13 @@ function BuilderPage() {
       </div>
 
       <Modal open={previewOpen} title="Preview Participant View" onClose={() => setPreviewOpen(false)}>
-        <ParticipantPreview question={selected} quizMode={quizMode} />
+        {selected ? (
+          <ParticipantPreview question={selected} quizMode={quizMode} />
+        ) : (
+          <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-6 text-center text-slate-600">
+            Add at least one question to open preview.
+          </div>
+        )}
       </Modal>
     </section>
   )
