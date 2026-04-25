@@ -5,7 +5,7 @@ import KebabMenu from '../ui/KebabMenu'
 function StatusBadge({ status }) {
   const styles = {
     Draft: 'bg-slate-100 text-slate-700 border-slate-200',
-    Live: 'bg-red-50 text-red-700 border-red-200',
+    Live: 'bg-red-50 text-red-700 border-red-200 animate-pulse',
     Completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   }
   return (
@@ -19,11 +19,14 @@ function Tag({ children }) {
   return <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">{children}</span>
 }
 
-function ProgressPill({ value }) {
+function ProgressPill({ value, isLive }) {
   return (
     <div className="flex items-center gap-2">
       <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full bg-linear-to-r from-blue-600 to-indigo-600" style={{ width: `${Math.max(2, Math.min(100, value))}%` }} />
+        <div 
+          className={`h-full bg-linear-to-r from-blue-600 to-indigo-600 transition-all duration-500 ${isLive ? 'animate-pulse' : ''}`} 
+          style={{ width: `${Math.max(2, Math.min(100, value))}%` }} 
+        />
       </div>
       <span className="text-xs font-semibold text-slate-600">{value}%</span>
     </div>
@@ -36,6 +39,8 @@ function SessionCard({ session, onAction }) {
     return `${labels} • ${session.participants} participants • Status: ${session.status}`
   }, [session.participants, session.status, session.tags])
 
+  const isLive = session.status === 'Live'
+
   return (
     <div
       className="group relative z-0 overflow-visible rounded-2xl border border-blue-200/70 bg-white/85 p-4 shadow-sm shadow-blue-900/5 backdrop-blur transition hover:z-20 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-900/10"
@@ -45,16 +50,24 @@ function SessionCard({ session, onAction }) {
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-base font-semibold text-navy-900">{session.title}</p>
             <StatusBadge status={session.status} />
+            {isLive && (
+              <span className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                Live
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm text-slate-600">Created: {session.date}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {(session.tags ?? []).map((tag) => (
               <Tag key={tag}>{tag}</Tag>
             ))}
-            <span className="ml-auto text-sm font-semibold text-slate-700">{session.participants} participants</span>
+            <span className="ml-auto text-sm font-semibold text-slate-700">
+              {session.participants} participants
+            </span>
           </div>
           <div className="mt-3">
-            <ProgressPill value={session.progress ?? 0} />
+            <ProgressPill value={session.progress ?? 0} isLive={isLive} />
           </div>
         </div>
 
@@ -88,4 +101,3 @@ function SessionCard({ session, onAction }) {
 }
 
 export default SessionCard
-

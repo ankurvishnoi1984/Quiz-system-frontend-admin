@@ -9,6 +9,7 @@ import Tabs from '../components/dashboard/Tabs'
 import Modal from '../components/ui/Modal'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useAuthStore } from '../store/authStore'
+import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 import {
   archiveSessionApi,
   createSessionApi,
@@ -45,6 +46,7 @@ function DashboardPage() {
   const [shareSession, setShareSession] = useState(null)
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [dashboardError, setDashboardError] = useState('')
+  const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
 
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
 
@@ -148,6 +150,61 @@ function DashboardPage() {
     makeQr()
   }, [shareSession, accessToken])
 
+  useEffect(() => {
+    const liveSessions = (sessionsQuery.data || []).filter((session) => session.status === 'live' && session.session_code)
+    if (!liveSessions.length || !accessToken) return
+
+    const clients = liveSessions.map((session) => {
+      const client = createRealtimeClient('', {
+        session: session.session_code,
+        token: accessToken,
+        role: 'host',
+      })
+
+      const unsubResponse = client.on(RealtimeEvent.RESPONSE_RECEIVED, (payload) => {
+        setLiveSessionMetrics((prev) => {
+          const existing = prev[session.session_id] || {}
+          return {
+            ...prev,
+            [session.session_id]: {
+              ...existing,
+              // Fallback approximation until session_progress arrives.
+              participants_count: Math.max(
+                Number(existing.participants_count || 0),
+                Number(payload?.results?.total_responses || 0),
+              ),
+            },
+          }
+        })
+      })
+
+      const unsubProgress = client.on('session_progress', (payload) => {
+        setLiveSessionMetrics((prev) => ({
+          ...prev,
+          [session.session_id]: {
+            participants_count: payload.participants_count ?? prev[session.session_id]?.participants_count ?? 0,
+            completed_participants: payload.completed_participants ?? prev[session.session_id]?.completed_participants ?? 0,
+            completion_progress: payload.completion_progress ?? prev[session.session_id]?.completion_progress ?? 0,
+          },
+        }))
+      })
+
+      client.connect()
+      return {
+        client,
+        cleanup: () => {
+          unsubResponse()
+          unsubProgress()
+          client.disconnect()
+        },
+      }
+    })
+
+    return () => {
+      clients.forEach(({ cleanup }) => cleanup())
+    }
+  }, [sessionsQuery.data, accessToken])
+
   const sessions = useMemo(() => {
     const statusLabel = {
       draft: 'Draft',
@@ -164,12 +221,15 @@ function DashboardPage() {
       id: session.session_id,
       date: (session.created_at || '').slice(0, 10),
       status: statusLabel[session.status] || 'Draft',
-      participants: session.participants_count ?? 0,
-      progress: session.status === 'completed' ? 100 : session.status === 'live' ? 60 : 0,
+      participants: liveSessionMetrics[session.session_id]?.participants_count ?? session.participants_count ?? 0,
+      progress:
+        session.status === 'completed'
+          ? 100
+          : liveSessionMetrics[session.session_id]?.completion_progress ?? session.completion_progress ?? 0,
       tags: ['Quiz'],
       department: departmentsById.get(String(session.dept_id)) || `Department ${session.dept_id}`,
     }))
-  }, [sessionsQuery.data, departmentsQuery.data])
+  }, [sessionsQuery.data, departmentsQuery.data, liveSessionMetrics])
 
   const filtered = useMemo(() => {
     return sessions
@@ -231,7 +291,7 @@ function DashboardPage() {
       if (session.status === 'Draft') {
         transitionMutation.mutate({ sessionId: session.id, action: 'start' })
       }
-      navigate('/live')
+      navigate(`/live?session=${encodeURIComponent(session.id)}`)
       return
     }
     if (action === 'share') {
