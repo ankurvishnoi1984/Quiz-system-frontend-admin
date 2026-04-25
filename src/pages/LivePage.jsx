@@ -1,265 +1,302 @@
-import {
-  Bar,
-  BarChart,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import {
-  ChevronLeft,
-  ChevronRight,
-  Crown,
-  Eye,
-  MessageSquare,
-  Pin,
-  Play,
-  Square,
-  ThumbsDown,
-  ThumbsUp,
-  Trophy,
-  Users,
-  X,
-} from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { ChevronLeft, ChevronRight, Crown, Eye, Play, Square, ThumbsDown, ThumbsUp, Trophy, Users, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Modal from '../components/ui/Modal'
-import { useSessions } from '../context/SessionsContext'
+import { useAuthStore } from '../store/authStore'
+import {
+  getQuestionResultsApi,
+  getSessionDetailApi,
+  getSessionResponsesApi,
+  listDepartmentSessionsApi,
+  listQaQuestionsApi,
+  listSessionQuestionsApi,
+  qaModerateApi,
+  setQuestionLiveStateApi,
+  transitionSessionApi,
+} from '../services/liveApi'
+import { useRealtimeSession } from '../services/realtimeClient'
+
 
 const COLORS = ['#1d4ed8', '#2563eb', '#4f46e5', '#0891b2', '#0ea5e9', '#6366f1']
 
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n))
+
+function mapQuestionType(type) {
+  const map = {
+    mcq: 'MCQ',
+    word_cloud: 'Word Cloud',
+    rating: 'Rating',
+    open_text: 'Text',
+    true_false: 'True/False',
+    ranking: 'Ranking',
+  }
+  return map[type] || type
 }
 
-function makeOptionData(question) {
-  if (question?.type !== 'MCQ') return []
-  const opts = question.options ?? []
-  const values = opts.map((o) => ({ name: o.text, value: clamp(10 + Math.round(Math.random() * 70), 1, 100) }))
-  const sum = values.reduce((a, b) => a + b.value, 0) || 1
-  return values.map((v) => ({ ...v, value: Math.round((v.value / sum) * 100) }))
-}
-
-function makeParticipantList(count) {
-  const first = ['Aarav', 'Priya', 'Isha', 'Kabir', 'Neha', 'Rohan', 'Anaya', 'Vihaan', 'Meera', 'Arjun', 'Sana', 'Dev', 'Irfan', 'Riya', 'Karan']
-  const last = ['Sharma', 'Patel', 'Singh', 'Gupta', 'Khan', 'Das', 'Nair', 'Iyer', 'Jain', 'Mehta', 'Roy', 'Kapoor']
-  const out = []
-  for (let i = 0; i < count; i++) {
-    const fn = first[i % first.length]
-    const ln = last[i % last.length]
-    const name = `${fn} ${ln}`
-    const email = `${fn.toLowerCase()}.${ln.toLowerCase()}${(i % 9) + 1}@example.com`
-    out.push({ id: `P-${String(i + 1).padStart(3, '0')}`, name, email })
-  }
-  return out
-}
-
-function makeResponse(question) {
-  if (!question) return ''
-  if (question.type === 'MCQ') {
-    const opts = question.options ?? []
-    return opts.length ? opts[Math.floor(Math.random() * opts.length)].text : '—'
-  }
-  if (question.type === 'Rating') return String(1 + Math.floor(Math.random() * 5))
-  if (question.type === 'Text') {
-    const samples = ['Aligned', 'Need clarity on scope', 'Shipping soon', 'Blocked by dependency', 'All good', 'Working on fixes']
-    return samples[Math.floor(Math.random() * samples.length)]
-  }
-  if (question.type === 'True/False') return Math.random() < 0.5 ? 'True' : 'False'
-  if (question.type === 'Ranking') return 'Rank submitted'
-  if (question.type === 'Word Cloud') return 'Word submitted'
-  return 'Submitted'
-}
 
 function LivePage() {
   const [searchParams] = useSearchParams()
-  const sessionId = searchParams.get('session')
   const navigate = useNavigate()
-  const { sessions, getSession, updateSession } = useSessions()
+  const queryClient = useQueryClient()
+  const accessToken = useAuthStore((state) => state.accessToken)
+  const sessionId = searchParams.get('session') || ''
 
-  const defaultSessionId =
-    sessionId ||
-    sessions.find((s) => s.status === 'Live')?.id ||
-    sessions[0]?.id ||
-    null
-
-  useEffect(() => {
-    if (!sessionId && defaultSessionId) {
-      navigate(`/live?session=${encodeURIComponent(defaultSessionId)}`, { replace: true })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, defaultSessionId])
-
-  const session = defaultSessionId ? getSession(defaultSessionId) : null
 
   const [questionIndex, setQuestionIndex] = useState(0)
-  const [active, setActive] = useState(true)
-  const [chartMode, setChartMode] = useState('Bar') // Bar | Pie
   const [qaOpen, setQaOpen] = useState(true)
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false)
-  const [notesOpen, setNotesOpen] = useState(false)
-  const [notes, setNotes] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [socketStatus, setSocketStatus] = useState('disconnected')
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false)
 
-  const [participants, setParticipants] = useState(session?.participants ?? 0)
-  const [responded, setResponded] = useState(Math.min(session?.participants ?? 0, Math.round((session?.participants ?? 0) * 0.62)))
-  const respondedRef = useRef(responded)
-  respondedRef.current = responded
 
-  const question = useMemo(() => session?.questions?.[questionIndex] ?? null, [session?.questions, questionIndex])
-  const optionData = useMemo(() => makeOptionData(question), [question?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const sessionQuery = useQuery({
+    queryKey: ['live-session', sessionId],
+    queryFn: () => getSessionDetailApi(accessToken, sessionId),
+    enabled: Boolean(accessToken && sessionId),
+  })
 
-  const joinRequirement = session?.joinRequirement ?? 'name'
-  const showEmail = joinRequirement === 'name_email'
-  const showIdentity = joinRequirement !== 'anonymous'
 
-  const [participantList, setParticipantList] = useState(() => makeParticipantList(Math.min(24, session?.participants ?? 12)))
-  const [responsesByQuestion, setResponsesByQuestion] = useState({})
+  const questionsQuery = useQuery({
+    queryKey: ['live-questions', sessionId],
+    queryFn: () => listSessionQuestionsApi(accessToken, sessionId),
+    enabled: Boolean(accessToken && sessionId),
+  })
 
-  useEffect(() => {
-    if (!session) return
-    setParticipantList(makeParticipantList(Math.min(24, session.participants ? Math.max(12, Math.min(24, session.participants)) : 12)))
-    setResponsesByQuestion({})
-    setQuestionIndex(0)
-  }, [session?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const qaItems = session?.qaItems ?? []
+  const responsesQuery = useQuery({
+    queryKey: ['live-responses', sessionId],
+    queryFn: () => getSessionResponsesApi(accessToken, sessionId),
+    enabled: Boolean(accessToken && sessionId),
+    refetchInterval: 10000,
+  })
 
-  const leaderboard = useMemo(
-    () => [
-      { name: 'Aarav', score: 1240 },
-      { name: 'Priya', score: 1188 },
-      { name: 'Isha', score: 1101 },
-      { name: 'Kabir', score: 1034 },
-      { name: 'Neha', score: 998 },
-      { name: 'Rohan', score: 941 },
-      { name: 'Anaya', score: 910 },
-      { name: 'Vihaan', score: 872 },
-      { name: 'Meera', score: 841 },
-      { name: 'Arjun', score: 799 },
-    ],
-    [],
+
+  const qaQuery = useQuery({
+    queryKey: ['live-qa', sessionId],
+    queryFn: () => listQaQuestionsApi(accessToken, sessionId),
+    enabled: Boolean(accessToken && sessionId),
+  })
+
+
+  const deptSessionsQuery = useQuery({
+    queryKey: ['live-dept-sessions', sessionQuery.data?.dept_id],
+    queryFn: () => listDepartmentSessionsApi(accessToken, sessionQuery.data?.dept_id),
+    enabled: Boolean(accessToken && sessionQuery.data?.dept_id),
+  })
+
+
+  const mappedQuestions = useMemo(
+    () =>
+      (questionsQuery.data || []).map((q) => ({
+        id: q.question_id,
+        text: q.question_text,
+        type: mapQuestionType(q.question_type),
+        rawType: q.question_type,
+        isLive: Boolean(q.is_live),
+        options: q.question_options || [],
+      })),
+    [questionsQuery.data],
   )
 
+
+  const activeQuestion = mappedQuestions[questionIndex] || null
+
+
+  const questionResultsQuery = useQuery({
+    queryKey: ['live-question-results', activeQuestion?.id],
+    queryFn: () => getQuestionResultsApi(accessToken, activeQuestion.id),
+    enabled: Boolean(accessToken && activeQuestion?.id),
+    refetchInterval: activeQuestion?.isLive ? 5000 : false,
+  })
+
+
   useEffect(() => {
-    if (!session) return
-    setParticipants(session.participants ?? 0)
-  }, [session?.participants, session?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    setQuestionIndex(0)
+  }, [sessionId])
 
-  // Auto-update responded count + chart values while active.
+
   useEffect(() => {
-    if (!session || !active) return
-    const id = setInterval(() => {
-      setParticipants((p) => p + (Math.random() < 0.05 ? 1 : 0))
-      setResponded((r) => clamp(r + (Math.random() < 0.7 ? 1 : 0), 0, participants || 1))
+    const sessionCode = sessionQuery.data?.session_code
+    if (!sessionCode || !accessToken) return
 
-      setResponsesByQuestion((prev) => {
-        if (!question) return prev
-        const qid = question.id
-        const existing = prev[qid] ?? {}
-        const pending = participantList.filter((p) => !existing[p.id])
-        if (!pending.length) return prev
-        if (Math.random() < 0.55) return prev
-        const pick = pending[Math.floor(Math.random() * pending.length)]
-        const next = {
-          ...existing,
-          [pick.id]: { response: makeResponse(question), at: Date.now() },
-        }
-        return { ...prev, [qid]: next }
-      })
-    }, 900)
-    return () => clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.id, active])
 
+    const client = useRealtimeSession(sessionCode, accessToken)
+    const offOpen = client.on('open', () => setSocketStatus('connected'))
+    const offClose = client.on('close', () => setSocketStatus('disconnected'))
+    const offResp = client.on('response_received', () => {
+      queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
+      queryClient.invalidateQueries({ queryKey: ['live-responses', sessionId] })
+    })
+    const offSession = client.on('session_updated', () => {
+      queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+    })
+    const offQuestion = client.on('question_changed', () => {
+      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+    })
+
+
+    client.connect()
+    return () => {
+      offOpen()
+      offClose()
+      offResp()
+      offSession()
+      offQuestion()
+      client.disconnect()
+    }
+  }, [sessionQuery.data?.session_code, accessToken, queryClient, sessionId])
+
+
+  const transitionMutation = useMutation({
+    mutationFn: ({ action }) => transitionSessionApi(accessToken, sessionId, action),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] }),
+    onError: (error) => setErrorMessage(error.message || 'Unable to update session state'),
+  })
+
+
+  const questionLiveMutation = useMutation({
+    mutationFn: ({ questionId, isLive }) => setQuestionLiveStateApi(accessToken, questionId, isLive),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
+    },
+    onError: (error) => setErrorMessage(error.message || 'Unable to update question live state'),
+  })
+
+
+  const qaMutation = useMutation({
+    mutationFn: ({ qaId, action, body }) => qaModerateApi(accessToken, qaId, action, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['live-qa', sessionId] }),
+    onError: (error) => setErrorMessage(error.message || 'Unable to update Q&A state'),
+  })
+
+
+  const participants = useMemo(() => {
+    const unique = new Set((responsesQuery.data || []).map((r) => r.participant_id))
+    return unique.size
+  }, [responsesQuery.data])
+
+
+  const currentResponses = useMemo(
+    () => (responsesQuery.data || []).filter((r) => Number(r.question_id) === Number(activeQuestion?.id)),
+    [responsesQuery.data, activeQuestion?.id],
+  )
+  const responded = currentResponses.length
   const responseRate = participants ? Math.round((responded / participants) * 100) : 0
 
-  const goPrev = () => setQuestionIndex((i) => clamp(i - 1, 0, (session?.questions?.length ?? 1) - 1))
-  const goNext = () => setQuestionIndex((i) => clamp(i + 1, 0, (session?.questions?.length ?? 1) - 1))
 
-  const endSession = () => {
-    if (!session) return
-    updateSession(session.id, { status: 'Completed', progress: 100 })
-    setActive(false)
-  }
+  const optionData = useMemo(() => {
+    const byOption = questionResultsQuery.data?.by_option || {}
+    return (activeQuestion?.options || []).map((option) => ({
+      name: option.option_text,
+      value: Number(byOption[String(option.option_id)] || 0),
+    }))
+  }, [questionResultsQuery.data, activeQuestion?.options])
 
-  const onQaAction = (id, action) => {
-    if (!session) return
-    const next = qaItems.map((q) => {
-      if (q.id !== id) return q
-      if (action === 'approve') return { ...q, moderationStatus: 'approved' }
-      if (action === 'reject') return { ...q, moderationStatus: 'rejected' }
-      if (action === 'pin') return { ...q, pinned: !q.pinned }
-      if (action === 'answered') return { ...q, answerStatus: 'answered' }
-      if (action === 'pending') return { ...q, answerStatus: 'pending' }
-      return q
+
+  const attemptsRows = useMemo(
+    () =>
+      currentResponses.slice(0, 100).map((row) => ({
+        id: row.response_id,
+        participant: row.participant?.nickname || `Participant ${row.participant_id}`,
+        response:
+          row.question_option?.option_text ||
+          row.text_response ||
+          (row.rating_value !== null && row.rating_value !== undefined ? String(row.rating_value) : '—'),
+        submittedAt: row.submitted_at ? new Date(row.submitted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—',
+      })),
+    [currentResponses],
+  )
+
+
+  const leaderboard = useMemo(() => {
+    const scoreByParticipant = new Map()
+    ;(responsesQuery.data || []).forEach((row) => {
+      const key = row.participant_id
+      const existing = scoreByParticipant.get(key) || {
+        participant_id: row.participant_id,
+        name: row.participant?.nickname || `Participant ${row.participant_id}`,
+        score: 0,
+        attempts: 0,
+      }
+      existing.score += Number(row.points_earned || 0)
+      existing.attempts += 1
+      scoreByParticipant.set(key, existing)
     })
-    updateSession(session.id, { qaItems: next })
-  }
+    return Array.from(scoreByParticipant.values())
+      .sort((a, b) => b.score - a.score || b.attempts - a.attempts)
+      .slice(0, 10)
+  }, [responsesQuery.data])
 
-  if (!session) {
+
+  const session = sessionQuery.data
+  const statusLabel = session?.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : '—'
+  const canEditLive = session?.status === 'live'
+
+
+  if (!sessionId) {
     return (
       <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-10 text-center text-slate-600 shadow-sm">
-        No session selected. Go to <strong>Dashboard</strong> and click <strong>Launch</strong>.
+        No session selected. Open Dashboard and click <strong>Launch</strong>.
       </div>
     )
   }
 
-  const filteredSessions = sessions
-    .filter((s) => {
-      if (!fromDate && !toDate) return true
-      const d = new Date(s.date ?? '').getTime()
-      const from = fromDate ? new Date(fromDate).getTime() : -Infinity
-      const to = toDate ? new Date(toDate).getTime() : Infinity
-      return d >= from && d <= to
-    })
-    .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
+
+  if (sessionQuery.isLoading || questionsQuery.isLoading) {
+    return <div className="rounded-2xl border border-blue-200 bg-white p-8 text-center text-slate-600">Loading live session...</div>
+  }
+
+
+  if (!session) {
+    return <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-red-700">Session not found.</div>
+  }
+
 
   return (
-    <section className="min-h-[calc(100vh-6rem)] space-y-4">
-      {/* Top strip */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white/70 p-4 shadow-sm shadow-blue-900/5 backdrop-blur">
-        <div className="min-w-[240px]">
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
+        <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-800">Live Present Mode</p>
           <p className="mt-1 text-lg font-bold text-navy-900">{session.title}</p>
           <p className="mt-1 text-xs text-slate-600">
-            Session {session.id} • {session.status}
+            Session {session.session_id} • {statusLabel} • Socket: {socketStatus}
           </p>
         </div>
-
         <div className="flex flex-wrap items-center gap-2">
           <select
-            value={session.id}
+            value={String(session.session_id)}
             onChange={(e) => navigate(`/live?session=${encodeURIComponent(e.target.value)}`)}
-            className="h-11 rounded-2xl border border-blue-200/70 bg-white/90 px-3 text-sm font-semibold text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-            aria-label="Select session"
+            className="h-11 rounded-2xl border border-blue-200/70 bg-white px-3 text-sm"
           >
-            {filteredSessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title} ({s.id})
+            {(deptSessionsQuery.data || []).map((s) => (
+              <option key={s.session_id} value={s.session_id}>
+                {s.title} ({s.session_id})
               </option>
             ))}
           </select>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="hidden h-11 rounded-2xl border border-blue-200/70 bg-white/90 px-3 text-sm text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 lg:block"
-            aria-label="From date"
-          />
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="hidden h-11 rounded-2xl border border-blue-200/70 bg-white/90 px-3 text-sm text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 lg:block"
-            aria-label="To date"
-          />
-
+          <button
+            type="button"
+            onClick={() => transitionMutation.mutate({ action: session.status === 'live' ? 'pause' : 'resume' })}
+            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200 bg-white px-4 text-sm font-semibold text-slate-700"
+          >
+            {session.status === 'live' ? <Square className="size-4" /> : <Play className="size-4" />}
+            {session.status === 'live' ? 'Pause' : 'Resume'}
+          </button>
+          <button
+            type="button"
+            onClick={() => transitionMutation.mutate({ action: 'end' })}
+            className="h-11 rounded-2xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700"
+          >
+            End Session
+          </button>
+          <span className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white">
+            <Users className="size-4" />
+            {participants} participants
+          </span>
           <button
             type="button"
             onClick={() => setLeaderboardOpen((p) => !p)}
@@ -270,340 +307,167 @@ function LivePage() {
             <Trophy className="size-4" />
             Leaderboard
           </button>
-
-          <button
-            type="button"
-            onClick={() => setNotesOpen((p) => !p)}
-            className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition ${
-              notesOpen ? 'border-indigo-200 bg-indigo-50 text-indigo-900' : 'border-blue-200/70 bg-white/90 text-slate-700 hover:bg-blue-50'
-            }`}
-          >
-            <MessageSquare className="size-4" />
-            Notes
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setPreviewOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
-          >
-            <Eye className="size-4" />
-            Preview
-          </button>
-
-          <span className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25">
-            <Users className="size-4" />
-            {participants} live
-          </span>
         </div>
       </div>
 
-      <div className="grid gap-6 2xl:grid-cols-[1.05fr_1fr]">
-        {/* Left controls + question */}
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-6 shadow-sm shadow-blue-900/5 backdrop-blur">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Current question</p>
-                <h3 className="mt-2 text-xl font-bold leading-snug text-navy-900">
-                  {question?.text?.trim() ? question.text : 'Untitled question'}
-                </h3>
-                <p className="mt-2 text-sm text-slate-600">
-                  {questionIndex + 1} / {session.questions?.length ?? 0} • {question?.type ?? '—'}
-                </p>
-              </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={goPrev}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-50"
-                  disabled={questionIndex === 0}
-                >
-                  <ChevronLeft className="size-4" />
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActive((p) => !p)}
-                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow-lg transition ${
-                    active ? 'bg-linear-to-r from-emerald-600 to-teal-600 shadow-emerald-900/15' : 'bg-linear-to-r from-slate-700 to-navy-900 shadow-blue-900/10'
-                  }`}
-                >
-                  {active ? <Square className="size-4" /> : <Play className="size-4" />}
-                  {active ? 'Deactivate' : 'Activate'}
-                </button>
-                <button
-                  type="button"
-                  onClick={goNext}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-50"
-                  disabled={questionIndex >= (session.questions?.length ?? 1) - 1}
-                >
-                  Next
-                  <ChevronRight className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={endSession}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-50"
-                >
-                  End Session
-                </button>
-              </div>
+      {errorMessage ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>
+      ) : null}
+
+
+      <div className="grid gap-6 2xl:grid-cols-[1.1fr_1fr]">
+        <div className="space-y-4 rounded-2xl border border-blue-200/70 bg-white/85 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Current question</p>
+              <h3 className="mt-1 text-xl font-bold text-navy-900">{activeQuestion?.text || 'No question selected'}</h3>
+              <p className="text-sm text-slate-600">
+                {activeQuestion ? `${questionIndex + 1} / ${mappedQuestions.length} • ${activeQuestion.type}` : 'Add questions in Builder first'}
+              </p>
             </div>
-
-            {question?.media?.url && question.media.kind === 'image' && (
-              <img
-                src={question.media.url}
-                alt="Question media"
-                className="mt-5 max-h-[420px] w-full rounded-2xl border border-blue-100 bg-slate-50 object-contain"
-              />
-            )}
-            {question?.media?.url && question.media.kind === 'video' && (
-              <video
-                src={question.media.url}
-                controls
-                className="mt-5 max-h-[420px] w-full rounded-2xl border border-blue-100 bg-slate-50"
-              />
-            )}
-
-            <div className="mt-5 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-navy-900">Response rate</p>
-                <p className="text-sm font-semibold text-slate-700">
-                  {responded} / {participants} ({responseRate}%)
-                </p>
-              </div>
-              <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full bg-linear-to-r from-blue-600 to-indigo-600" style={{ width: `${responseRate}%` }} />
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-navy-900">Attempts & responses</p>
-                  <p className="text-xs text-slate-600">
-                    Showing latest responses for this question {showIdentity ? '' : '(anonymous mode)'}
-                  </p>
-                </div>
-                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                  {Object.keys(responsesByQuestion[question?.id] ?? {}).length} responded
-                </span>
-              </div>
-
-              <div className="mt-4 max-h-[320px] overflow-auto rounded-2xl border border-blue-200/70 bg-white">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-white">
-                    <tr className="border-b border-blue-100">
-                      {showIdentity && <th className="px-4 py-3 font-semibold text-slate-700">Name</th>}
-                      {showEmail && <th className="px-4 py-3 font-semibold text-slate-700">Email</th>}
-                      <th className="px-4 py-3 font-semibold text-slate-700">Response</th>
-                      <th className="px-4 py-3 font-semibold text-slate-700">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {participantList.map((p) => {
-                      const entry = (responsesByQuestion[question?.id] ?? {})[p.id]
-                      return (
-                        <tr key={p.id} className="border-b border-blue-50 last:border-b-0">
-                          {showIdentity && <td className="px-4 py-3 text-slate-700">{p.name}</td>}
-                          {showEmail && <td className="px-4 py-3 text-slate-600">{p.email}</td>}
-                          <td className="px-4 py-3 text-slate-700">
-                            {entry ? (
-                              <span className="font-semibold text-navy-900">{entry.response}</span>
-                            ) : (
-                              <span className="text-slate-400">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">
-                            {entry ? new Date(entry.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setQuestionIndex((i) => Math.max(0, i - 1))} disabled={questionIndex === 0} className="rounded-xl border border-blue-200 bg-white p-2 disabled:opacity-50">
+                <ChevronLeft className="size-4" />
+              </button>
+              <button type="button" onClick={() => setQuestionIndex((i) => Math.min(mappedQuestions.length - 1, i + 1))} disabled={questionIndex >= mappedQuestions.length - 1} className="rounded-xl border border-blue-200 bg-white p-2 disabled:opacity-50">
+                <ChevronRight className="size-4" />
+              </button>
+              <button type="button" onClick={() => setPreviewOpen(true)} className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+                <Eye className="mr-2 inline size-4" />
+                Preview
+              </button>
             </div>
           </div>
 
-          {/* Presenter notes */}
-          {notesOpen && (
-            <div className="rounded-2xl border border-indigo-200/70 bg-white/85 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-navy-900">Presenter notes</p>
-                <button
-                  type="button"
-                  onClick={() => setNotesOpen(false)}
-                  className="rounded-xl border border-indigo-200/70 p-2 text-slate-600 transition hover:bg-indigo-50"
-                  aria-label="Close notes"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Notes only you can see..."
-                className="mt-3 h-28 w-full resize-none rounded-2xl border border-indigo-200/70 bg-white p-3 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/15"
-              />
+
+          {activeQuestion ? (
+            <button
+              type="button"
+              disabled={!canEditLive}
+              onClick={() => questionLiveMutation.mutate({ questionId: activeQuestion.id, isLive: !activeQuestion.isLive })}
+              className="rounded-2xl bg-linear-to-r from-emerald-600 to-teal-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {activeQuestion.isLive ? 'Deactivate Question' : 'Activate Question'}
+            </button>
+          ) : null}
+
+
+          <div className="rounded-2xl border border-blue-200 bg-white p-4">
+            <div className="flex items-center justify-between text-sm font-semibold text-slate-700">
+              <span>Response rate</span>
+              <span>
+                {responded} / {participants} ({responseRate}%)
+              </span>
             </div>
-          )}
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full bg-linear-to-r from-blue-600 to-indigo-600" style={{ width: `${responseRate}%` }} />
+            </div>
+          </div>
+
+
+          <div className="rounded-2xl border border-blue-200 bg-white p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-navy-900">Attempts & responses</p>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{attemptsRows.length}</span>
+            </div>
+            <div className="mt-3 max-h-[280px] overflow-auto rounded-xl border border-blue-100">
+              <table className="w-full text-left text-sm">
+                <thead className="sticky top-0 bg-white">
+                  <tr className="border-b border-blue-100">
+                    <th className="px-3 py-2 font-semibold text-slate-700">Participant</th>
+                    <th className="px-3 py-2 font-semibold text-slate-700">Response</th>
+                    <th className="px-3 py-2 font-semibold text-slate-700">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attemptsRows.map((row) => (
+                    <tr key={row.id} className="border-b border-blue-50 last:border-b-0">
+                      <td className="px-3 py-2 text-slate-700">{row.participant}</td>
+                      <td className="px-3 py-2 text-slate-700">{row.response}</td>
+                      <td className="px-3 py-2 text-slate-600">{row.submittedAt}</td>
+                    </tr>
+                  ))}
+                  {!attemptsRows.length ? (
+                    <tr>
+                      <td className="px-3 py-4 text-slate-500" colSpan={3}>
+                        No responses yet for this question.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
-        {/* Right: live chart + QA */}
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Live chart</p>
-                <p className="mt-1 text-sm text-slate-600">Auto-updates while active</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {['Bar', 'Pie'].map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setChartMode(m)}
-                    className={`rounded-2xl px-3 py-2 text-sm font-semibold transition ${
-                      chartMode === m ? 'bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 text-white shadow' : 'border border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
 
-            <div className="mt-4">
-              <div className="h-[340px] rounded-2xl border border-blue-200/70 bg-white/85 p-3">
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartMode === 'Pie' ? (
-                    <PieChart>
-                      <Tooltip />
-                      <Pie data={optionData} dataKey="value" nameKey="name" outerRadius={120} innerRadius={60}>
-                        {optionData.map((entry, idx) => (
-                          <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  ) : (
-                    <BarChart data={optionData}>
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="value" radius={[10, 10, 0, 0]}>
-                        {optionData.map((entry, idx) => (
-                          <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  )}
-                </ResponsiveContainer>
-              </div>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Live chart</p>
+            <div className="mt-3 h-[300px] rounded-2xl border border-blue-200 bg-white p-3">
+              <ResponsiveContainer width="100%" height="100%">
+                {activeQuestion?.rawType === 'mcq' ? (
+                  <BarChart data={optionData}>
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                      {optionData.map((entry, idx) => (
+                        <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                ) : (
+                  <PieChart>
+                    <Tooltip />
+                    <Pie data={[{ name: 'Responses', value: responded || 0 }]} dataKey="value" nameKey="name" outerRadius={100}>
+                      <Cell fill="#2563eb" />
+                    </Pie>
+                  </PieChart>
+                )}
+              </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Floating Q&A panel */}
-          <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-navy-900">Q&A panel</p>
-                <p className="text-xs text-slate-600">Approve / reject / pin incoming questions</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setQaOpen((p) => !p)}
-                className="rounded-2xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
-              >
+
+          <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-navy-900">Q&A panel</p>
+              <button type="button" onClick={() => setQaOpen((p) => !p)} className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm">
                 {qaOpen ? 'Collapse' : 'Expand'}
               </button>
             </div>
-
-            {qaOpen && (
-              <div className="mt-4 space-y-2">
-                {qaItems
-                  .slice()
-                  .sort((a, b) => Number(b.pinned) - Number(a.pinned))
-                  .map((q) => (
-                    <div key={q.id} className="rounded-2xl border border-blue-200/70 bg-white p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            {q.pinned && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                                <Pin className="size-3" /> Pinned
-                              </span>
-                            )}
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                q.moderationStatus === 'approved'
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : q.moderationStatus === 'rejected'
-                                    ? 'bg-red-50 text-red-700'
-                                    : 'bg-slate-100 text-slate-700'
-                              }`}
-                            >
-                              {q.moderationStatus}
-                            </span>
-                            {q.moderationStatus === 'approved' && (
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                  q.answerStatus === 'answered' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-800'
-                                }`}
-                              >
-                                {q.answerStatus}
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-2 text-sm font-semibold text-navy-900">{q.text}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => onQaAction(q.id, 'approve')}
-                            className="rounded-xl border border-emerald-200 bg-white p-2 text-emerald-700 transition hover:bg-emerald-50"
-                            aria-label="Approve"
-                          >
-                            <ThumbsUp className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onQaAction(q.id, 'reject')}
-                            className="rounded-xl border border-red-200 bg-white p-2 text-red-700 transition hover:bg-red-50"
-                            aria-label="Reject"
-                          >
-                            <ThumbsDown className="size-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onQaAction(q.id, 'pin')}
-                            className="rounded-xl border border-amber-200 bg-white p-2 text-amber-800 transition hover:bg-amber-50"
-                            aria-label="Pin"
-                          >
-                            <Pin className="size-4" />
-                          </button>
-                          {q.moderationStatus === 'approved' && (
-                            <button
-                              type="button"
-                              onClick={() => onQaAction(q.id, q.answerStatus === 'answered' ? 'pending' : 'answered')}
-                              className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-800 transition hover:bg-blue-50"
-                            >
-                              {q.answerStatus === 'answered' ? 'Mark pending' : 'Mark answered'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
+            {qaOpen ? (
+              <div className="mt-3 space-y-2">
+                {(qaQuery.data || []).map((q) => (
+                  <div key={q.qa_id} className="rounded-xl border border-blue-200 bg-white p-3">
+                    <p className="text-sm font-semibold text-navy-900">{q.question_text}</p>
+                    <p className="mt-1 text-xs text-slate-600">Status: {q.status}</p>
+                    <div className="mt-2 flex gap-2">
+                      <button type="button" onClick={() => qaMutation.mutate({ qaId: q.qa_id, action: 'approve' })} className="rounded-lg border border-emerald-200 px-2 py-1 text-emerald-700">
+                        <ThumbsUp className="size-4" />
+                      </button>
+                      <button type="button" onClick={() => qaMutation.mutate({ qaId: q.qa_id, action: 'reject' })} className="rounded-lg border border-red-200 px-2 py-1 text-red-700">
+                        <ThumbsDown className="size-4" />
+                      </button>
                     </div>
-                  ))}
+                  </div>
+                ))}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
 
-      {/* Leaderboard overlay */}
+
+      <Modal open={previewOpen} title="Preview Participant View" onClose={() => setPreviewOpen(false)}>
+        <div className="rounded-xl border border-blue-200 bg-white p-4">
+          <h3 className="text-lg font-bold text-navy-900">{activeQuestion?.text || 'No question selected'}</h3>
+          <p className="mt-1 text-sm text-slate-600">Type: {activeQuestion?.type || '—'}</p>
+        </div>
+      </Modal>
+
       {leaderboardOpen && (
         <div className="fixed inset-0 z-40">
           <button
@@ -630,7 +494,7 @@ function LivePage() {
 
             <div className="mt-4 space-y-2">
               {leaderboard.map((row, idx) => (
-                <div key={row.name} className="flex items-center justify-between rounded-2xl border border-amber-200/60 bg-amber-50/40 px-4 py-3">
+                <div key={row.participant_id} className="flex items-center justify-between rounded-2xl border border-amber-200/60 bg-amber-50/40 px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="grid size-9 place-items-center rounded-2xl bg-linear-to-br from-amber-400 to-amber-600 text-white">
                       {idx === 0 ? <Crown className="size-4" /> : idx + 1}
@@ -640,21 +504,16 @@ function LivePage() {
                   <p className="text-sm font-bold text-navy-900">{row.score}</p>
                 </div>
               ))}
+              {!leaderboard.length ? (
+                <p className="text-sm text-slate-500 text-center py-4">Leaderboard will appear once responses start coming in.</p>
+              ) : null}
             </div>
           </div>
         </div>
       )}
-
-      <Modal open={previewOpen} title="Preview Participant View" onClose={() => setPreviewOpen(false)}>
-        <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Participant View</p>
-          <h3 className="mt-2 text-lg font-bold text-navy-900">{question?.text?.trim() ? question.text : 'Untitled question'}</h3>
-          <p className="mt-1 text-sm text-slate-600">Type: {question?.type ?? '—'}</p>
-        </div>
-      </Modal>
     </section>
   )
 }
 
-export default LivePage
 
+export default LivePage
