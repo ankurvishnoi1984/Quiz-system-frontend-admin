@@ -35,6 +35,11 @@ export async function listDepartmentsApi(accessToken, clientId) {
   return data?.departments || []
 }
 
+export async function listClientsApi(accessToken) {
+  const data = await authRequest('/clients', accessToken)
+  return data?.clients || []
+}
+
 export async function listDepartmentSessionsApi(accessToken, deptId) {
   const data = await authRequest(`/departments/${deptId}/sessions`, accessToken)
   return data?.sessions || []

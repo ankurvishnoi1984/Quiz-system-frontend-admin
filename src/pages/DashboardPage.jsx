@@ -9,12 +9,12 @@ import Tabs from '../components/dashboard/Tabs'
 import Modal from '../components/ui/Modal'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useAuthStore } from '../store/authStore'
+import { useShell } from '../context/ShellContext'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 import {
   archiveSessionApi,
   createSessionApi,
   getSessionQrApi,
-  listDepartmentsApi,
   listDepartmentSessionsApi,
   transitionSessionApi,
 } from '../services/dashboardApi'
@@ -40,39 +40,20 @@ function DashboardPage() {
   const [search, setSearch] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  const [department, setDepartment] = useState('')
-  const [selectedDeptId, setSelectedDeptId] = useState(user?.dept_id ? String(user.dept_id) : '')
   const [createOpen, setCreateOpen] = useState(false)
   const [shareSession, setShareSession] = useState(null)
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [dashboardError, setDashboardError] = useState('')
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
 
+  const { departmentId, departments } = useShell()
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
 
-  const departmentsQuery = useQuery({
-    queryKey: ['departments', user?.client_id ?? null],
-    queryFn: () => listDepartmentsApi(accessToken, user?.client_id ?? null),
-    enabled: Boolean(accessToken),
-  })
-
   const sessionsQuery = useQuery({
-    queryKey: ['dashboard-sessions', selectedDeptId],
-    queryFn: () => listDepartmentSessionsApi(accessToken, selectedDeptId),
-    enabled: Boolean(accessToken && selectedDeptId),
+    queryKey: ['dashboard-sessions', departmentId],
+    queryFn: () => listDepartmentSessionsApi(accessToken, departmentId),
+    enabled: Boolean(accessToken && departmentId),
   })
-
-  useEffect(() => {
-    if (user?.dept_id) {
-      setSelectedDeptId(String(user.dept_id))
-    }
-  }, [user?.dept_id])
-
-  useEffect(() => {
-    if (!department && departmentsQuery.data?.length) {
-      setDepartment(departmentsQuery.data[0].name)
-    }
-  }, [department, departmentsQuery.data])
 
   const createMutation = useMutation({
     mutationFn: (payload) => createSessionApi(accessToken, payload.deptId, payload.input),
@@ -214,7 +195,7 @@ function DashboardPage() {
       archived: 'Completed',
     }
 
-    const departmentsById = new Map((departmentsQuery.data || []).map((dept) => [String(dept.dept_id), dept.name]))
+    const departmentsById = new Map(departments.map((d) => [String(d.dept_id), d.name]))
 
     return (sessionsQuery.data || []).map((session) => ({
       ...session,
@@ -229,12 +210,11 @@ function DashboardPage() {
       tags: ['Quiz'],
       department: departmentsById.get(String(session.dept_id)) || `Department ${session.dept_id}`,
     }))
-  }, [sessionsQuery.data, departmentsQuery.data, liveSessionMetrics])
+  }, [sessionsQuery.data, departments, liveSessionMetrics])
 
   const filtered = useMemo(() => {
     return sessions
       .filter((s) => (tab === 'All' ? true : s.status === tab))
-      .filter((s) => (department ? s.department === department : true))
       .filter((s) => (debouncedSearch ? s.title.toLowerCase().includes(debouncedSearch) : true))
       .filter((s) => {
         if (!fromDate && !toDate) return true
@@ -244,7 +224,7 @@ function DashboardPage() {
         return d >= from && d <= to
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [sessions, tab, department, debouncedSearch, fromDate, toDate])
+  }, [sessions, tab, debouncedSearch, fromDate, toDate])
 
   const stats = useMemo(() => {
     const month = new Date().getMonth()
@@ -272,7 +252,7 @@ function DashboardPage() {
       return
     }
     if (action === 'duplicate') {
-      duplicateMutation.mutate({ deptId: session.dept_id || selectedDeptId, session })
+      duplicateMutation.mutate({ deptId: session.dept_id || departmentId, session })
       return
     }
     if (action === 'edit') {
@@ -306,7 +286,7 @@ function DashboardPage() {
     const form = new FormData(event.currentTarget)
     const title = String(form.get('title') ?? '').trim()
     const description = String(form.get('description') ?? '').trim()
-    const dept = String(form.get('department') || selectedDeptId || user?.dept_id || '')
+    const dept = String(form.get('department') || departmentId || user?.dept_id || '')
     const joinRequirement = String(form.get('joinRequirement') ?? 'name')
 
     if (!title) return
@@ -409,19 +389,7 @@ function DashboardPage() {
               onChange={(e) => setToDate(e.target.value)}
               className="h-10 rounded-xl border border-blue-200/70 bg-white/90 px-3 text-sm text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
               aria-label="To date"
-            />
-            <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="h-10 rounded-xl border border-blue-200/70 bg-white/90 px-3 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-              aria-label="Department filter"
-            >
-              {(departmentsQuery.data || []).map((dept) => (
-                <option key={dept.dept_id} value={dept.name}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
+            />         
           </div>
         </div>
       </div>
@@ -465,8 +433,8 @@ function DashboardPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700">Department</label>
-            <select name="department" defaultValue={selectedDeptId} className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15">
-              {(departmentsQuery.data || []).map((dept) => (
+            <select name="department" defaultValue={departmentId} className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15">
+              {departments.map((dept) => (
                 <option key={dept.dept_id} value={dept.dept_id}>
                   {dept.name}
                 </option>

@@ -16,7 +16,7 @@ function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
   const { pathname } = useLocation()
-  const { client, setClient, clients, department, setDepartment, departments } = useShell()
+  const { client, setClient, clientId, setClientId, department, setDepartment, departmentId, setDepartmentId, clients, departments, isSuperAdmin, clientsLoading, departmentsLoading } = useShell()
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
 
@@ -49,30 +49,46 @@ function Navbar() {
 
       <div className="flex items-center gap-3">
         <div className="hidden items-center gap-3 md:flex">
-          <select
-            value={client}
-            onChange={(event) => setClient(event.target.value)}
-            className="h-10 rounded-xl border border-blue-200/70 bg-white/90 px-3 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-            aria-label="Client"
-          >
-            {clients.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={department}
-            onChange={(event) => setDepartment(event.target.value)}
-            className="h-10 rounded-xl border border-blue-200/70 bg-white/90 px-3 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-            aria-label="Department"
-          >
-            {departments.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+          {isSuperAdmin && !clientsLoading && clients.length > 0 && (
+            <select
+              value={clientId}
+              onChange={(event) => {
+                const selectedClient = clients.find(c => String(c.client_id) === event.target.value)
+                if (selectedClient) {
+                  setClientId(String(selectedClient.client_id))
+                  setClient(selectedClient.name)
+                }
+              }}
+              className="h-10 rounded-xl border border-blue-200/70 bg-white/90 px-3 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+              aria-label="Client"
+            >
+              {clients.map((c) => (
+                <option key={c.client_id} value={c.client_id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {!departmentsLoading && departments.length > 0 && (
+            <select
+              value={departmentId}
+              onChange={(event) => {
+                const selectedDept = departments.find(d => String(d.dept_id) === event.target.value)
+                if (selectedDept) {
+                  setDepartmentId(String(selectedDept.dept_id))
+                  setDepartment(selectedDept.name)
+                }
+              }}
+              className="h-10 rounded-xl border border-blue-200/70 bg-white/90 px-3 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+              aria-label="Department"
+            >
+              {departments.map((d) => (
+                <option key={d.dept_id} value={d.dept_id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
       <div ref={menuRef} className="relative">
