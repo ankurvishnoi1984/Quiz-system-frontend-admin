@@ -85,7 +85,7 @@ function ParticipantSessionPage() {
         rawType: q.question_type,
         isLive: Boolean(q.is_live),
         options: q.question_options || [],
-        timeLimit: q.time_limit || 0,
+        timeLimit: q.time_limit_seconds || 0,
       })),
     [questionsQuery.data],
   )
