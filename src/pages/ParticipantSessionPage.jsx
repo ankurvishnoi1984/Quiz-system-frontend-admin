@@ -41,13 +41,10 @@ function ParticipantSessionPage() {
   const [joinError, setJoinError] = useState('')
   const [transitioningLive, setTransitioningLive] = useState(false)
   const [questionIndex, setQuestionIndex] = useState(0)
+  const [liveQuestionId, setLiveQuestionId] = useState(null)
   const [timer, setTimer] = useState(0)
   const [submitted, setSubmitted] = useState(false)
-  const [textResponse, setTextResponse] = useState('')
-  const [selectedOption, setSelectedOption] = useState('')
-  const [rating, setRating] = useState(0)
   const [tagsInput, setTagsInput] = useState('')
-  const [tags, setTags] = useState([])
   const [showLiveResult, setShowLiveResult] = useState(true)
 
   const [askText, setAskText] = useState('')
@@ -55,6 +52,7 @@ function ParticipantSessionPage() {
   const [upvotes, setUpvotes] = useState({})
   const [ownQuestions, setOwnQuestions] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [responses, setResponses] = useState({})
 
   const sessionQuery = useQuery({
     queryKey: ['participant-session', sessionId],
@@ -90,13 +88,15 @@ function ParticipantSessionPage() {
     [questionsQuery.data],
   )
 
-  const currentLiveQuestion = useMemo(
-    () => mappedQuestions.find((q) => q.isLive) || null,
-    [mappedQuestions],
-  )
+  // const currentLiveQuestion = useMemo(
+  //   () => mappedQuestions.find((q) => q.isLive) || null,
+  //   [mappedQuestions],
+  // )
 
   const session = sessionQuery.data
-  const question = currentLiveQuestion || mappedQuestions[questionIndex]
+  const question = liveQuestionId
+  ? mappedQuestions.find((q) => q.id === liveQuestionId)
+  : mappedQuestions[questionIndex]
   const joinRequirement = session?.is_anonymous_default ? 'anonymous' : 'name'
   const timeLimit = question?.timeLimit || 0
   const dbSessionId = session?.session_id
@@ -104,44 +104,66 @@ function ParticipantSessionPage() {
   const client = useRealtimeParticipant(sessionId, participantToken)
 
   useEffect(() => {
-    if (!sessionId || !participantToken) return
+  if (!sessionId || !participantToken || !dbSessionId) return
 
-    const offOpen = client.on('open', () => {})
-    const offClose = client.on('close', () => {})
-    const offSession = client.on('session_updated', (data) => {
-      if (data.status === 'live') {
-        queryClient.invalidateQueries({ queryKey: ['participant-session', sessionId] })
-        queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
-      }
-    })
-    const offQuestion = client.on('question_changed', (data) => {
+  const offOpen = client.on('open', () => {})
+  const offClose = client.on('close', () => {})
+
+  const offSession = client.on('session_updated', (data) => {
+    if (data.status === 'live') {
+      queryClient.invalidateQueries({ queryKey: ['participant-session', sessionId] })
       queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
-      if (data.is_live && data.question_id) {
-        const q = mappedQuestions.find((q) => q.id === data.question_id)
-        if (q) {
-          setQuestionIndex(mappedQuestions.indexOf(q))
-          setSubmitted(false)
-          setSelectedOption('')
-          setTextResponse('')
-          setRating(0)
-          setTags([])
-        }
-      }
-    })
-    const offResp = client.on('response_received', () => {
-      queryClient.invalidateQueries({ queryKey: ['participant-qa', dbSessionId] })
-    })
-
-    client.connect()
-    return () => {
-      offOpen()
-      offClose()
-      offSession()
-      offQuestion()
-      offResp()
-      client.disconnect()
     }
-  }, [sessionId, participantToken, client, queryClient, dbSessionId, mappedQuestions])
+  })
+
+  const offQuestion = client.on('question_changed', (data) => {
+    queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+
+    if (data.is_live && data.question_id) {
+      // ✅ Set live question
+      setLiveQuestionId(data.question_id)
+
+      // ✅ Sync index (important for counter UI)
+      setQuestionIndex((prev) => {
+        const idx = mappedQuestions.findIndex(q => q.id === data.question_id)
+        return idx !== -1 ? idx : prev
+      })
+
+      // ✅ Only reset submission state
+      setSubmitted(false)
+
+      // ❌ DO NOT reset responses or input state
+    }
+  })
+
+  const offResp = client.on('response_received', () => {
+    queryClient.invalidateQueries({ queryKey: ['participant-qa', dbSessionId] })
+  })
+
+  client.connect()
+
+  return () => {
+    offOpen()
+    offClose()
+    offSession()
+    offQuestion()
+    offResp()
+    client.disconnect()
+  }
+}, [sessionId, participantToken, client, queryClient, dbSessionId, mappedQuestions])
+
+  useEffect(() => {
+  if (!liveQuestionId || !mappedQuestions.length) return
+
+  const exists = mappedQuestions.some(q => q.id === liveQuestionId)
+
+  if (!exists) {
+    setLiveQuestionId(null)
+    setQuestionIndex((prev) =>
+      clamp(prev, 0, mappedQuestions.length - 1)
+    )
+  }
+}, [mappedQuestions, liveQuestionId])
 
   useEffect(() => {
     if (!session) return
@@ -171,22 +193,54 @@ function ParticipantSessionPage() {
     [qaQuery.data],
   )
 
-  const responsePayload = useCallback(() => {
-    if (!question) return null
-    const payload = { question_id: question.id }
-    if (question.type === 'MCQ') {
-      const opt = question.options.find((o) => o.option_text === selectedOption)
+
+
+  const currentResponse = responses[question?.id] || {}
+
+  const buildFinalPayload = () => {
+  return Object.entries(responses).map(([questionId, res]) => {
+    const q = mappedQuestions.find(q => q.id == questionId)
+    if (!q) return null
+
+    const payload = {
+      question_id: q.id,
+    }
+
+    if (q.type === 'MCQ' || q.type === 'True/False') {
+      const opt = q.options.find(o => o.option_text === res.selectedOption)
       if (opt) payload.option_id = opt.option_id
     }
-    if (question.type === 'Rating') payload.rating_value = rating
-    if (question.type === 'Text' || question.type === 'Ranking') payload.text_response = textResponse.trim()
-    if (question.type === 'Word Cloud') payload.text_response = tags.join(', ')
-    if (question.type === 'True/False') {
-      const opt = question.options.find((o) => o.option_text === selectedOption)
-      if (opt) payload.option_id = opt.option_id
+
+    if (q.type === 'Rating') payload.rating_value = res.rating
+
+    if (q.type === 'Text' || q.type === 'Ranking') {
+      payload.text_response = res.textResponse?.trim()
     }
+
+    if (q.type === 'Word Cloud') {
+      payload.text_response = (res.tags || []).join(', ')
+    }
+
     return payload
-  }, [question, selectedOption, rating, textResponse, tags])
+  }).filter(Boolean)
+}
+const handleSubmitResponse = async () => {
+  const payloads = buildFinalPayload()
+
+  if (!payloads.length || !participantToken) return
+
+  setIsSubmitting(true)
+  try {
+    await Promise.all(
+      payloads.map(p => submitResponseApi(participantToken, p))
+    )
+    setSubmitted(true)
+  } catch (err) {
+    console.error(err)
+  } finally {
+    setIsSubmitting(false)
+  }
+}
 
   const handleJoin = async (event) => {
     event.preventDefault()
@@ -210,21 +264,6 @@ function ParticipantSessionPage() {
       setJoinError('')
     } catch (err) {
       setJoinError(err.message || 'Failed to join session')
-    }
-  }
-
-  const handleSubmitResponse = async () => {
-    const payload = responsePayload()
-    if (!payload || !participantToken) return
-
-    setIsSubmitting(true)
-    try {
-      await submitResponseApi(participantToken, payload)
-      setSubmitted(true)
-    } catch (err) {
-      console.error('Failed to submit response:', err)
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -413,9 +452,17 @@ function ParticipantSessionPage() {
                   <button
                     key={o.option_id}
                     type="button"
-                    onClick={() => setSelectedOption(o.option_text)}
+                    onClick={() => {
+                      setResponses((prev) => ({
+                        ...prev,
+                        [question.id]: {
+                          ...prev[question.id],
+                          selectedOption: o.option_text,
+                        },
+                      }))
+                    }}
                     className={`rounded-2xl border px-4 py-4 text-left text-sm font-semibold transition ${
-                      selectedOption === o.option_text ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                      currentResponse.selectedOption === o.option_text ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
                     }`}
                   >
                     <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs">
@@ -433,12 +480,20 @@ function ParticipantSessionPage() {
                   <button
                     key={i}
                     type="button"
-                    onClick={() => setRating(i + 1)}
+                    onClick={() => {
+                      setResponses((prev) => ({
+                        ...prev,
+                        [question.id]: {
+                          ...prev[question.id],
+                          rating: i + 1,
+                        },
+                      }))
+                    }}
                     className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                      rating === i + 1 ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                      currentResponse.rating === i + 1 ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
                     }`}
                   >
-                    <Star className={`size-4 ${rating >= i + 1 ? 'text-amber-500' : 'text-slate-400'}`} />
+                    <Star className={`size-4 ${currentResponse.rating >= i + 1 ? 'text-amber-500' : 'text-slate-400'}`} />
                     {i + 1}
                   </button>
                 ))}
@@ -448,12 +503,22 @@ function ParticipantSessionPage() {
             {(question.type === 'Text' || question.type === 'Ranking') && (
               <div>
                 <textarea
-                  value={textResponse}
-                  onChange={(e) => setTextResponse(e.target.value.slice(0, 300))}
+                  value={currentResponse.textResponse || ''}
+                  onChange={(e) => {
+                    const value = e.target.value.slice(0, 300)
+
+                    setResponses((prev) => ({
+                      ...prev,
+                      [question.id]: {
+                        ...prev[question.id],
+                        textResponse: value,
+                      },
+                    }))
+                  }}
                   className="h-28 w-full resize-none rounded-2xl border border-blue-200/70 bg-white p-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
                   placeholder="Type your response..."
                 />
-                <p className="mt-1 text-right text-xs text-slate-500">{textResponse.length}/300</p>
+                <p className="mt-1 text-right text-xs text-slate-500">{currentResponse.textResponse}/300</p>
               </div>
             )}
 
@@ -471,7 +536,15 @@ function ParticipantSessionPage() {
                     onClick={() => {
                       const t = tagsInput.trim()
                       if (!t) return
-                      setTags((prev) => [...prev, t].slice(0, 10))
+
+                      setResponses((prev) => ({
+                        ...prev,
+                        [question.id]: {
+                          ...prev[question.id],
+                          tags: [...(prev[question.id]?.tags || []), t].slice(0, 10),
+                        },
+                      }))
+
                       setTagsInput('')
                     }}
                     className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
@@ -480,7 +553,7 @@ function ParticipantSessionPage() {
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {tags.map((t, idx) => (
+                  {(currentResponse.tags || []).map((t, idx) => (
                     <span key={`${t}-${idx}`} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
                       {t}
                     </span>
@@ -495,9 +568,17 @@ function ParticipantSessionPage() {
                   <button
                     key={v}
                     type="button"
-                    onClick={() => setSelectedOption(v)}
+                    onClick={() => {
+                      setResponses((prev) => ({
+                        ...prev,
+                        [question.id]: {
+                          ...prev[question.id],
+                          selectedOption: v,
+                        },
+                      }))
+                    }}
                     className={`rounded-2xl border px-4 py-4 text-sm font-semibold transition ${
-                      selectedOption === v ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                      currentResponse.selectedOption === v ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
                     }`}
                   >
                     {v}
@@ -510,7 +591,7 @@ function ParticipantSessionPage() {
               <button
                 type="button"
                 onClick={handleSubmitResponse}
-                disabled={!responsePayload() || submitted || isSubmitting}
+                disabled={!Object.keys(responses).length || isSubmitting}
                 className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit response'}
@@ -518,12 +599,14 @@ function ParticipantSessionPage() {
               <button
                 type="button"
                 onClick={() => {
+                  setLiveQuestionId(null) // 🔥 IMPORTANT
                   setQuestionIndex((i) => clamp(i + 1, 0, mappedQuestions.length - 1))
+
                   setSubmitted(false)
-                  setTextResponse('')
-                  setSelectedOption('')
-                  setRating(0)
-                  setTags([])
+                  // setTextResponse('')
+                  // setSelectedOption('')
+                  // setRating(0)
+                  // setTags([])
                 }}
                 className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
               >
