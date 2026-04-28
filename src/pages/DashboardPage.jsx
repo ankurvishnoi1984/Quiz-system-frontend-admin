@@ -116,7 +116,7 @@ function DashboardPage() {
         setQrDataUrl('')
         return
       }
-      let link = `${window.location.origin}/join/${shareSession.id}`
+      let link = `${window.location.origin}/join/${shareSession.session_code || shareSession.id}`
       if (accessToken && shareSession?.id) {
         try {
           const qrPayload = await getSessionQrApi(accessToken, shareSession.id)
@@ -264,7 +264,7 @@ function DashboardPage() {
       return
     }
     if (action === 'analytics') {
-      navigate('/analytics')
+      navigate(`/analytics?session=${encodeURIComponent(session.id)}`)
       return
     }
     if (action === 'launch') {
@@ -481,12 +481,12 @@ function DashboardPage() {
                 <div className="flex gap-2">
                   <input
                     readOnly
-                    value={`${window.location.origin}/join/${shareSession.id}`}
+                    value={`${window.location.origin}/join/${shareSession.session_code || shareSession.id}`}
                     className="h-11 flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none"
                   />
                   <button
                     type="button"
-                    onClick={() => navigator.clipboard.writeText(`${window.location.origin}/join/${shareSession.id}`)}
+                    onClick={() => navigator.clipboard.writeText(`${window.location.origin}/join/${shareSession.session_code || shareSession.id}`)}
                     className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
                   >
                     Copy

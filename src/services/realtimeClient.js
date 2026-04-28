@@ -146,6 +146,16 @@ export function useRealtimeSession(sessionCode, accessToken) {
   return client
 }
 
+export function useRealtimeParticipant(sessionCode, participantToken) {
+  const client = createRealtimeClient('', {
+    session: sessionCode,
+    token: participantToken,
+    role: 'participant',
+  })
+  setGlobalClient(client)
+  return client
+}
+
 export const RealtimeEvent = {
   CONNECTED: 'connected',
   RESPONSE_RECEIVED: 'response_received',

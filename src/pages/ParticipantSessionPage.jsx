@@ -1,23 +1,44 @@
-import { CheckCircle2, Clock3, MessageSquare, Send, Star, Users, XCircle } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { CheckCircle2, Clock3, Send, Star, Users, XCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useSessions } from '../context/SessionsContext'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  askQaQuestionApi,
+  joinSessionApi,
+  listQaQuestionsApi,
+  listSessionQuestionsApi,
+  lookupSessionApi,
+  submitResponseApi,
+  upvoteQaApi,
+} from '../services/participantApi'
+import { useRealtimeParticipant } from '../services/realtimeClient'
+import { useParticipantStore } from '../store/participantStore'
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n))
 }
 
+function mapQuestionType(type) {
+  const map = {
+    mcq: 'MCQ',
+    word_cloud: 'Word Cloud',
+    rating: 'Rating',
+    open_text: 'Text',
+    true_false: 'True/False',
+    ranking: 'Ranking',
+  }
+  return map[type] || type
+}
+
 function ParticipantSessionPage() {
   const { sessionId } = useParams()
-  const { getSession, updateSession } = useSessions()
-  const session = getSession(sessionId)
+  const queryClient = useQueryClient()
+  const { participantToken, joinedUser, setParticipant } = useParticipantStore()
 
   const [step, setStep] = useState('join') // join | waiting | active | qa
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [joinError, setJoinError] = useState('')
-  const [joinedUser, setJoinedUser] = useState(null)
   const [transitioningLive, setTransitioningLive] = useState(false)
   const [questionIndex, setQuestionIndex] = useState(0)
   const [timer, setTimer] = useState(0)
@@ -33,15 +54,98 @@ function ParticipantSessionPage() {
   const [askAnonymous, setAskAnonymous] = useState(false)
   const [upvotes, setUpvotes] = useState({})
   const [ownQuestions, setOwnQuestions] = useState([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const question = session?.questions?.[questionIndex]
-  const joinRequirement = session?.joinRequirement ?? 'name'
-  const timeLimit = session?.timeLimitSeconds ?? 0
-  const allowAnonymousQa = session?.settings?.anonymous ?? false
+  const sessionQuery = useQuery({
+    queryKey: ['participant-session', sessionId],
+    queryFn: () => lookupSessionApi(sessionId),
+    enabled: !!sessionId,
+    retry: false,
+  })
+
+  const questionsQuery = useQuery({
+    queryKey: ['participant-questions', sessionQuery.data?.session_id, participantToken],
+    queryFn: () => listSessionQuestionsApi(participantToken, sessionQuery.data?.session_id),
+    enabled: Boolean(participantToken && sessionQuery.data?.session_id),
+  })
+
+  const qaQuery = useQuery({
+    queryKey: ['participant-qa', sessionQuery.data?.session_id, participantToken],
+    queryFn: () => listQaQuestionsApi(participantToken, sessionQuery.data?.session_id),
+    enabled: Boolean(participantToken && sessionQuery.data?.session_id),
+    refetchInterval: 10000,
+  })
+
+  const mappedQuestions = useMemo(
+    () =>
+      (questionsQuery.data || []).map((q) => ({
+        id: q.question_id,
+        text: q.question_text,
+        type: mapQuestionType(q.question_type),
+        rawType: q.question_type,
+        isLive: Boolean(q.is_live),
+        options: q.question_options || [],
+        timeLimit: q.time_limit || 0,
+      })),
+    [questionsQuery.data],
+  )
+
+  const currentLiveQuestion = useMemo(
+    () => mappedQuestions.find((q) => q.isLive) || null,
+    [mappedQuestions],
+  )
+
+  const session = sessionQuery.data
+  const question = currentLiveQuestion || mappedQuestions[questionIndex]
+  const joinRequirement = session?.is_anonymous_default ? 'anonymous' : 'name'
+  const timeLimit = question?.timeLimit || 0
+  const dbSessionId = session?.session_id
+
+  const client = useRealtimeParticipant(sessionId, participantToken)
+
+  useEffect(() => {
+    if (!sessionId || !participantToken) return
+
+    const offOpen = client.on('open', () => {})
+    const offClose = client.on('close', () => {})
+    const offSession = client.on('session_updated', (data) => {
+      if (data.status === 'live') {
+        queryClient.invalidateQueries({ queryKey: ['participant-session', sessionId] })
+        queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+      }
+    })
+    const offQuestion = client.on('question_changed', (data) => {
+      queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+      if (data.is_live && data.question_id) {
+        const q = mappedQuestions.find((q) => q.id === data.question_id)
+        if (q) {
+          setQuestionIndex(mappedQuestions.indexOf(q))
+          setSubmitted(false)
+          setSelectedOption('')
+          setTextResponse('')
+          setRating(0)
+          setTags([])
+        }
+      }
+    })
+    const offResp = client.on('response_received', () => {
+      queryClient.invalidateQueries({ queryKey: ['participant-qa', dbSessionId] })
+    })
+
+    client.connect()
+    return () => {
+      offOpen()
+      offClose()
+      offSession()
+      offQuestion()
+      offResp()
+      client.disconnect()
+    }
+  }, [sessionId, participantToken, client, queryClient, dbSessionId, mappedQuestions])
 
   useEffect(() => {
     if (!session) return
-    if (session.status === 'Live' && step === 'waiting') {
+    if (session.status === 'live' && step === 'waiting') {
       setTransitioningLive(true)
       const id = setTimeout(() => {
         setTransitioningLive(false)
@@ -49,7 +153,7 @@ function ParticipantSessionPage() {
       }, 900)
       return () => clearTimeout(id)
     }
-  }, [session?.status, step]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, step])
 
   useEffect(() => {
     if (step !== 'active' || !timeLimit) return
@@ -63,69 +167,101 @@ function ParticipantSessionPage() {
   }, [step, timeLimit, timer, submitted])
 
   const approvedQa = useMemo(
-    () => (session?.qaItems ?? []).filter((q) => q.moderationStatus === 'approved'),
-    [session?.qaItems],
+    () => (qaQuery.data || []).filter((q) => q.moderation_status === 'approved'),
+    [qaQuery.data],
   )
 
-  const responsePayload = () => {
-    if (!question) return ''
-    if (question.type === 'MCQ') return selectedOption
-    if (question.type === 'Rating') return rating ? `${rating}` : ''
-    if (question.type === 'Text') return textResponse.trim()
-    if (question.type === 'Word Cloud') return tags.join(', ')
-    if (question.type === 'True/False') return selectedOption
-    if (question.type === 'Ranking') return textResponse.trim()
-    return ''
-  }
+  const responsePayload = useCallback(() => {
+    if (!question) return null
+    const payload = { question_id: question.id }
+    if (question.type === 'MCQ') {
+      const opt = question.options.find((o) => o.option_text === selectedOption)
+      if (opt) payload.option_id = opt.option_id
+    }
+    if (question.type === 'Rating') payload.rating_value = rating
+    if (question.type === 'Text' || question.type === 'Ranking') payload.text_response = textResponse.trim()
+    if (question.type === 'Word Cloud') payload.text_response = tags.join(', ')
+    if (question.type === 'True/False') {
+      const opt = question.options.find((o) => o.option_text === selectedOption)
+      if (opt) payload.option_id = opt.option_id
+    }
+    return payload
+  }, [question, selectedOption, rating, textResponse, tags])
 
-  const handleJoin = (event) => {
+  const handleJoin = async (event) => {
     event.preventDefault()
     if (!session) return
 
-    if (session?.settings?.password && password !== session.settings.password) {
-      setJoinError('Invalid session password')
-      return
+    try {
+      const result = await joinSessionApi(sessionId, {
+        nickname: name.trim() || (joinRequirement === 'anonymous' ? 'Anonymous' : null),
+        email: email.trim() || null,
+        is_anonymous: joinRequirement === 'anonymous',
+      })
+      setParticipant({
+        token: result.token,
+        participant: {
+          name: result.participant.nickname || 'Anonymous',
+          email: result.participant.email,
+          anonymous: result.participant.is_anonymous,
+        },
+      })
+      setStep(session.status === 'live' ? 'active' : 'waiting')
+      setJoinError('')
+    } catch (err) {
+      setJoinError(err.message || 'Failed to join session')
     }
-    if (joinRequirement === 'name' && !name.trim()) {
-      setJoinError('Name is required')
-      return
-    }
-    if (joinRequirement === 'name_email' && (!name.trim() || !email.trim())) {
-      setJoinError('Name and email are required')
-      return
-    }
-
-    setJoinError('')
-    setJoinedUser({
-      name: name.trim() || 'Anonymous',
-      email: email.trim(),
-      anonymous: joinRequirement === 'anonymous',
-    })
-    updateSession(session.id, { participants: (session.participants ?? 0) + 1 })
-    setStep(session.status === 'Live' ? 'active' : 'waiting')
   }
 
-  const handleSubmitResponse = () => {
-    if (!responsePayload()) return
-    setSubmitted(true)
-  }
+  const handleSubmitResponse = async () => {
+    const payload = responsePayload()
+    if (!payload || !participantToken) return
 
-  const handleAskQuestion = () => {
-    if (!session || !askText.trim()) return
-    const own = {
-      id: `own-${Date.now()}`,
-      text: askText.trim(),
-      status: 'pending',
-      anonymous: allowAnonymousQa ? askAnonymous : false,
+    setIsSubmitting(true)
+    try {
+      await submitResponseApi(participantToken, payload)
+      setSubmitted(true)
+    } catch (err) {
+      console.error('Failed to submit response:', err)
+    } finally {
+      setIsSubmitting(false)
     }
-    setOwnQuestions((prev) => [own, ...prev])
-    setAskText('')
-    setAskAnonymous(false)
   }
 
-  const upvote = (id) => setUpvotes((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }))
+  const handleAskQuestion = async () => {
+    if (!dbSessionId || !askText.trim() || !participantToken) return
 
-  if (!session) {
+    try {
+      const newQ = await askQaQuestionApi(participantToken, dbSessionId, {
+        question_text: askText.trim(),
+        is_anonymous: allowAnonymousQa ? askAnonymous : false,
+      })
+      if (newQ) {
+        setOwnQuestions((prev) => [
+          { id: newQ.qa_question_id, text: newQ.question_text, status: newQ.moderation_status },
+          ...prev,
+        ])
+      }
+      setAskText('')
+      setAskAnonymous(false)
+    } catch (err) {
+      console.error('Failed to ask question:', err)
+    }
+  }
+
+  const handleUpvote = async (qaId) => {
+    if (!participantToken) return
+    try {
+      await upvoteQaApi(participantToken, qaId)
+      setUpvotes((prev) => ({ ...prev, [qaId]: (prev[qaId] || 0) + 1 }))
+    } catch (err) {
+      console.error('Failed to upvote:', err)
+    }
+  }
+
+  const allowAnonymousQa = session?.allow_anonymous_qa || false
+
+  if (!session && !sessionQuery.isLoading) {
     return (
       <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
         <div className="w-full max-w-lg rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
@@ -136,14 +272,24 @@ function ParticipantSessionPage() {
     )
   }
 
-  if (step === 'join') {
+  if (sessionQuery.isLoading) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
+        <div className="w-full max-w-lg rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
+          <p className="text-slate-600">Loading session...</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (!participantToken && step === 'join') {
     return (
       <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
         <form onSubmit={handleJoin} className="w-full max-w-lg space-y-4 rounded-2xl border border-blue-200/70 bg-white p-8 shadow-sm">
           <div className="text-center">
             <img src="/logo.svg" alt="Logo" className="mx-auto mb-4 h-12 w-42" />
             <h1 className="text-2xl font-bold text-navy-900">{session.title}</h1>
-            <p className="mt-1 text-sm text-slate-600">Join session {session.id}</p>
+            <p className="mt-1 text-sm text-slate-600">Join session {session.session_id}</p>
           </div>
 
           {joinRequirement !== 'anonymous' && (
@@ -166,19 +312,6 @@ function ParticipantSessionPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
                 placeholder="Enter your email"
-              />
-            </div>
-          )}
-
-          {session?.settings?.password && (
-            <div>
-              <label className="text-sm font-semibold text-slate-700">Session password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-                placeholder="Enter password"
               />
             </div>
           )}
@@ -210,7 +343,7 @@ function ParticipantSessionPage() {
           </h1>
           <p className="text-slate-600">{session.title}</p>
           <div className="mx-auto flex max-w-md items-center justify-center gap-6 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-blue-900">
-            <span className="inline-flex items-center gap-2"><Users className="size-4" /> {session.participants} participants</span>
+            <span className="inline-flex items-center gap-2"><Users className="size-4" /> {session.participant_count || 0} participants</span>
             <span>Fun fact: Participants respond 2x faster with visuals.</span>
           </div>
         </div>
@@ -249,7 +382,7 @@ function ParticipantSessionPage() {
         {step === 'active' && question && (
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
-              Question {questionIndex + 1} / {session.questions.length}
+              Question {questionIndex + 1} / {mappedQuestions.length}
             </p>
             {question.media?.url && question.media.kind === 'image' && (
               <img src={question.media.url} alt="Question media" className="max-h-80 w-full rounded-2xl border border-blue-100 object-contain" />
@@ -276,19 +409,19 @@ function ParticipantSessionPage() {
 
             {question.type === 'MCQ' && (
               <div className="grid gap-2 md:grid-cols-2">
-                {(question.options ?? []).map((o, idx) => (
+                {(question.options || []).map((o, idx) => (
                   <button
-                    key={o.id}
+                    key={o.option_id}
                     type="button"
-                    onClick={() => setSelectedOption(o.text)}
+                    onClick={() => setSelectedOption(o.option_text)}
                     className={`rounded-2xl border px-4 py-4 text-left text-sm font-semibold transition ${
-                      selectedOption === o.text ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                      selectedOption === o.option_text ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
                     }`}
                   >
                     <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs">
                       {String.fromCharCode(65 + idx)}
                     </span>
-                    {o.text}
+                    {o.option_text}
                   </button>
                 ))}
               </div>
@@ -377,15 +510,15 @@ function ParticipantSessionPage() {
               <button
                 type="button"
                 onClick={handleSubmitResponse}
-                disabled={!responsePayload() || submitted}
+                disabled={!responsePayload() || submitted || isSubmitting}
                 className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Submit response
+                {isSubmitting ? 'Submitting...' : 'Submit response'}
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  setQuestionIndex((i) => clamp(i + 1, 0, session.questions.length - 1))
+                  setQuestionIndex((i) => clamp(i + 1, 0, mappedQuestions.length - 1))
                   setSubmitted(false)
                   setTextResponse('')
                   setSelectedOption('')
@@ -470,12 +603,12 @@ function ParticipantSessionPage() {
             <div className="space-y-2">
               <p className="text-sm font-semibold text-navy-900">Approved questions</p>
               {approvedQa.map((q) => (
-                <div key={q.id} className="rounded-2xl border border-blue-200/70 bg-white p-3">
+                <div key={q.qa_question_id} className="rounded-2xl border border-blue-200/70 bg-white p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-navy-900">{q.text}</p>
+                      <p className="text-sm font-semibold text-navy-900">{q.question_text}</p>
                       <p className="mt-1 text-xs text-slate-600">
-                        {q.answerStatus === 'answered' ? (
+                        {q.answer_status === 'answered' ? (
                           <span className="inline-flex items-center gap-1 text-emerald-700">
                             <CheckCircle2 className="size-3" /> Answered
                           </span>
@@ -488,10 +621,10 @@ function ParticipantSessionPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => upvote(q.id)}
+                      onClick={() => handleUpvote(q.qa_question_id)}
                       className="rounded-xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
                     >
-                      Upvote {upvotes[q.id] ?? 0}
+                      Upvote {(upvotes[q.qa_question_id] || 0) + (q.upvote_count || 0)}
                     </button>
                   </div>
                 </div>
