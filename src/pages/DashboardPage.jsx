@@ -256,10 +256,10 @@ function DashboardPage() {
       return
     }
     if (action === 'edit') {
-      if (session.status !== 'Draft') {
+      /*if (session.status !== 'Draft') {
         setDashboardError('Only draft sessions can be edited in Question Builder')
         return
-      }
+      }*/
       navigate(`/builder?session=${encodeURIComponent(session.id)}`)
       return
     }

@@ -671,14 +671,14 @@ function BuilderPage() {
     )
   }
 
-  if (session.rawStatus !== 'draft') {
+ /* if (session.rawStatus !== 'draft') {
     return (
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-10 text-center text-amber-800 shadow-sm">
         This session is in <strong>{session.status}</strong> state. Question Builder editing is allowed only for
         <strong> Draft</strong> sessions.
       </div>
     )
-  }
+  }*/
 
   const mappedDeptSessions = (deptSessionsQuery.data || []).map((item) => ({
     id: String(item.session_id),
