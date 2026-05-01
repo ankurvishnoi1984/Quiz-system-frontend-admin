@@ -204,8 +204,14 @@ const isLastQuestion = questionIndex === mappedQuestions.length - 1
     }, 800) // small delay for UX
 
     return () => clearTimeout(timeout)
+  } else if (!submitted) {
+    const timeout = setTimeout(() => {
+      handleSubmitResponse()
+    }, 500)
+
+    return () => clearTimeout(timeout)
   }
-}, [timer, step, questionIndex, mappedQuestions.length])
+}, [timer, step, questionIndex, mappedQuestions.length, submitted, responses])
 
   const approvedQa = useMemo(
     () => (qaQuery.data || []).filter((q) => q.moderation_status === 'approved'),
