@@ -97,7 +97,7 @@ function ParticipantSessionPage() {
   const question = liveQuestionId
   ? mappedQuestions.find((q) => q.id === liveQuestionId)
   : mappedQuestions[questionIndex]
-  const joinRequirement = session?.is_anonymous_default ? 'anonymous' : 'name'
+   const joinRequirement = session?.join_type || 'name'
   const timeLimit = question?.timeLimit || 0
   const dbSessionId = session?.session_id
 
@@ -266,10 +266,38 @@ const handleSubmitResponse = async () => {
     if (!session) return
 
     try {
+      let nickname, checkEmail, isAnonymous
+
+      if (joinRequirement === 'anonymous') {
+        nickname = 'Anonymous'
+        checkEmail = null
+        isAnonymous = true
+      } else if (joinRequirement === 'name') {
+        if (!name?.trim()) {
+          setJoinError('Please enter your name')
+          return
+        }
+        nickname = name.trim()
+        checkEmail = null
+        isAnonymous = false
+      } else if (joinRequirement === 'name_email') {
+        if (!name?.trim()) {
+          setJoinError('Please enter your name')
+          return
+        }
+        if (!email?.trim()) {
+          setJoinError('Please enter your email')
+          return
+        }
+        nickname = name.trim()
+        checkEmail = email.trim()
+        isAnonymous = false
+      }
+
       const result = await joinSessionApi(sessionId, {
-        nickname: name.trim() || (joinRequirement === 'anonymous' ? 'Anonymous' : null),
-        email: email.trim() || null,
-        is_anonymous: joinRequirement === 'anonymous',
+        nickname,
+        email:checkEmail,
+        is_anonymous: isAnonymous,
       })
       setParticipant({
         token: result.token,
@@ -350,28 +378,40 @@ const handleSubmitResponse = async () => {
             <p className="mt-1 text-sm text-slate-600">Join session {session.session_id}</p>
           </div>
 
-          {joinRequirement !== 'anonymous' && (
+          {joinRequirement === 'anonymous' ? (
             <div>
               <label className="text-sm font-semibold text-slate-700">Name</label>
               <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-                placeholder="Enter your name"
+                value="Anonymous"
+                disabled
+                className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-slate-50 px-3 text-sm text-slate-500 cursor-not-allowed"
               />
             </div>
-          )}
+          ) : (
+            <>
+              <div>
+                <label className="text-sm font-semibold text-slate-700">Name</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                  placeholder="Enter your name"
+                />
+              </div>
 
-          {joinRequirement === 'name_email' && (
-            <div>
-              <label className="text-sm font-semibold text-slate-700">Email</label>
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-                placeholder="Enter your email"
-              />
-            </div>
+              {joinRequirement === 'name_email' && (
+                <div>
+                  <label className="text-sm font-semibold text-slate-700">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                    placeholder="Enter your email"
+                  />
+                </div>
+              )}
+            </>
           )}
 
           {joinError && (
