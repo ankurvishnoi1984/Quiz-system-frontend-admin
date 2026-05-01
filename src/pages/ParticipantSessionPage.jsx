@@ -165,6 +165,8 @@ function ParticipantSessionPage() {
   }
 }, [mappedQuestions, liveQuestionId])
 
+const isLastQuestion = questionIndex === mappedQuestions.length - 1
+
   useEffect(() => {
     if (!session) return
     if (session.status === 'live' && step === 'waiting') {
@@ -187,6 +189,23 @@ function ParticipantSessionPage() {
     const id = setInterval(() => setTimer((t) => Math.max(0, t - 1)), 1000)
     return () => clearInterval(id)
   }, [step, timeLimit, timer, submitted])
+
+  useEffect(() => {
+  if (step !== 'active') return
+  if (timer > 0) return
+
+  const isLastQuestion = questionIndex === mappedQuestions.length - 1
+
+  if (!isLastQuestion) {
+    const timeout = setTimeout(() => {
+      setLiveQuestionId(null)
+      setQuestionIndex((i) => i + 1)
+      setSubmitted(false)
+    }, 800) // small delay for UX
+
+    return () => clearTimeout(timeout)
+  }
+}, [timer, step, questionIndex, mappedQuestions.length])
 
   const approvedQa = useMemo(
     () => (qaQuery.data || []).filter((q) => q.moderation_status === 'approved'),
@@ -451,6 +470,7 @@ const handleSubmitResponse = async () => {
                 {(question.options || []).map((o, idx) => (
                   <button
                     key={o.option_id}
+                    disabled={timer === 0 || submitted}
                     type="button"
                     onClick={() => {
                       setResponses((prev) => ({
@@ -479,6 +499,7 @@ const handleSubmitResponse = async () => {
                 {Array.from({ length: 5 }).map((_, i) => (
                   <button
                     key={i}
+                    disabled={timer === 0 || submitted}
                     type="button"
                     onClick={() => {
                       setResponses((prev) => ({
@@ -527,12 +548,14 @@ const handleSubmitResponse = async () => {
                 <div className="flex gap-2">
                   <input
                     value={tagsInput}
+                    disabled={timer === 0 || submitted}
                     onChange={(e) => setTagsInput(e.target.value)}
                     className="h-11 flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
                     placeholder="Type a word and add"
                   />
                   <button
                     type="button"
+                    disabled={timer === 0 || submitted}
                     onClick={() => {
                       const t = tagsInput.trim()
                       if (!t) return
@@ -566,6 +589,7 @@ const handleSubmitResponse = async () => {
               <div className="grid gap-2 sm:grid-cols-2">
                 {['True', 'False'].map((v) => (
                   <button
+                    disabled={timer === 0 || submitted}
                     key={v}
                     type="button"
                     onClick={() => {
@@ -590,25 +614,24 @@ const handleSubmitResponse = async () => {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
+                disabled={timer === 0 || submitted}
                 onClick={handleSubmitResponse}
                 disabled={!Object.keys(responses).length || isSubmitting}
                 className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSubmitting ? 'Submitting...' : 'Submit response'}
+                {isSubmitting ? 'Submitting...' : 'Submit'}
               </button>
               <button
                 type="button"
+                disabled={isLastQuestion}
                 onClick={() => {
-                  setLiveQuestionId(null) // 🔥 IMPORTANT
-                  setQuestionIndex((i) => clamp(i + 1, 0, mappedQuestions.length - 1))
+                  if (isLastQuestion) return
 
+                  setLiveQuestionId(null)
+                  setQuestionIndex((i) => i + 1)
                   setSubmitted(false)
-                  // setTextResponse('')
-                  // setSelectedOption('')
-                  // setRating(0)
-                  // setTags([])
                 }}
-                className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+                className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next question
               </button>
