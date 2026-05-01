@@ -45,6 +45,7 @@ function DashboardPage() {
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [dashboardError, setDashboardError] = useState('')
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
+  const [join_type,setJoinType] = useState("name");
 
   const { departmentId, departments } = useShell()
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
@@ -301,6 +302,7 @@ function DashboardPage() {
         show_results_to_participants: true,
         allow_late_join: true,
         leaderboard_enabled: true,
+        join_type:join_type || 'name'
       },
     })
     setCreateOpen(false)
@@ -445,8 +447,9 @@ function DashboardPage() {
             <label className="text-sm font-semibold text-slate-700">Join requirements</label>
             <select
               name="joinRequirement"
-              defaultValue="name"
+              defaultValue={join_type}
               className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+              onChange={(e)=>setJoinType(e.target.value)}
             >
               <option value="anonymous">Anonymous (no name/email)</option>
               <option value="name">Name only</option>
