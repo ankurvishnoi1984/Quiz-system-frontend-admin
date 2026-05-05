@@ -589,6 +589,16 @@ function BuilderPage() {
       if (hasMixedQuestionTypes) {
         throw new Error('Only one question type is allowed per session. Please keep all questions the same type before saving.')
       }
+
+      for (const question of questions) {
+        if (question.type === 'MCQ') {
+          const hasCorrectOption = (question.options || []).some((opt) => opt.isCorrect)
+          if (!hasCorrectOption) {
+            throw new Error(`Question "${question.text || 'Untitled'}" has no correct answer selected. Please mark at least one correct option.`)
+          }
+        }
+      }
+
       const sessionNumericId = Number(session.id)
 
       const removedIds = initialQuestionIds.filter(
