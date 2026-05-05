@@ -111,7 +111,8 @@ function ParticipantSessionPage() {
     ? mappedQuestions.find((q) => q.id === liveQuestionId)
     : mappedQuestions[questionIndex]
   const joinRequirement = session?.join_type || 'name'
-  const timeLimit = question?.timeLimit || 0
+  const timeLimit = question?.timeLimit ?? 0
+  const hasCountdown = Number(timeLimit) > 0
   const dbSessionId = session?.session_id
 
 
@@ -223,20 +224,25 @@ function ParticipantSessionPage() {
 
 
   useEffect(() => {
-    if (step !== 'active' || !timeLimit) return
+    if (step !== 'active') return
+    if (!hasCountdown) {
+      setTimer(0)
+      return
+    }
     setTimer(timeLimit)
-  }, [questionIndex, step, timeLimit])
+  }, [questionIndex, step, timeLimit, hasCountdown])
 
 
   useEffect(() => {
-    if (step !== 'active' || !timeLimit || timer <= 0 || submitted) return
+    if (step !== 'active' || !hasCountdown || timer <= 0 || submitted) return
     const id = setInterval(() => setTimer((t) => Math.max(0, t - 1)), 1000)
     return () => clearInterval(id)
-  }, [step, timeLimit, timer, submitted])
+  }, [step, hasCountdown, timer, submitted])
 
 
   useEffect(() => {
     if (step !== 'active') return
+    if (!hasCountdown) return
     if (timer > 0) return
 
 
@@ -260,7 +266,7 @@ function ParticipantSessionPage() {
 
       return () => clearTimeout(timeout)
     }
-  }, [timer, step, questionIndex, mappedQuestions.length, submitted, responses])
+  }, [timer, step, questionIndex, mappedQuestions.length, submitted, responses, hasCountdown])
 
 
   const approvedQa = useMemo(
@@ -580,7 +586,7 @@ function ParticipantSessionPage() {
             <h2 className="text-2xl font-bold text-navy-900">{question.text || 'Untitled question'}</h2>
 
 
-            {!!timeLimit && (
+            {hasCountdown && (
               <div className="rounded-xl border border-blue-200/70 bg-white p-3">
                 <div className="flex items-center justify-between text-sm font-semibold">
                   <span className="text-slate-700">Time left</span>
@@ -601,7 +607,7 @@ function ParticipantSessionPage() {
                 {(question.options || []).map((o, idx) => (
                   <button
                     key={o.option_id}
-                    disabled={timer === 0 || submitted}
+                    disabled={(hasCountdown && timer === 0) || submitted}
                     type="button"
                     onClick={() => {
                       setResponses((prev) => ({
@@ -630,7 +636,7 @@ function ParticipantSessionPage() {
                 {Array.from({ length: 5 }).map((_, i) => (
                   <button
                     key={i}
-                    disabled={timer === 0 || submitted}
+                    disabled={(hasCountdown && timer === 0) || submitted}
                     type="button"
                     onClick={() => {
                       setResponses((prev) => ({
@@ -681,14 +687,14 @@ function ParticipantSessionPage() {
                 <div className="flex gap-2">
                   <input
                     value={tagsInput}
-                    disabled={timer === 0 || submitted}
+                    disabled={(hasCountdown && timer === 0) || submitted}
                     onChange={(e) => setTagsInput(e.target.value)}
                     className="h-11 flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
                     placeholder="Type a word and add"
                   />
                   <button
                     type="button"
-                    disabled={timer === 0 || submitted}
+                    disabled={(hasCountdown && timer === 0) || submitted}
                     onClick={() => {
                       const t = tagsInput.trim()
                       if (!t) return
@@ -725,7 +731,7 @@ function ParticipantSessionPage() {
               <div className="grid gap-2 sm:grid-cols-2">
                 {['True', 'False'].map((v) => (
                   <button
-                    disabled={timer === 0 || submitted}
+                    disabled={(hasCountdown && timer === 0) || submitted}
                     key={v}
                     type="button"
                     onClick={() => {
