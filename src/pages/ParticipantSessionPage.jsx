@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, Send, Star, Users, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock3, Crown, Send, Star, Trophy, Users, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -14,9 +14,11 @@ import {
 import { useRealtimeParticipant } from '../services/realtimeClient'
 import { useParticipantStore } from '../store/participantStore'
 
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n))
 }
+
 
 function mapQuestionType(type) {
   const map = {
@@ -30,10 +32,12 @@ function mapQuestionType(type) {
   return map[type] || type
 }
 
+
 function ParticipantSessionPage() {
   const { sessionId } = useParams()
   const queryClient = useQueryClient()
   const { participantToken, joinedUser, setParticipant } = useParticipantStore()
+
 
   const [step, setStep] = useState('join') // join | waiting | active | qa
   const [name, setName] = useState('')
@@ -47,12 +51,16 @@ function ParticipantSessionPage() {
   const [tagsInput, setTagsInput] = useState('')
   const [showLiveResult, setShowLiveResult] = useState(true)
 
+
   const [askText, setAskText] = useState('')
   const [askAnonymous, setAskAnonymous] = useState(false)
   const [upvotes, setUpvotes] = useState({})
   const [ownQuestions, setOwnQuestions] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [responses, setResponses] = useState({})
+  const [leaderboard, setLeaderboard] = useState([])
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
+
 
   const sessionQuery = useQuery({
     queryKey: ['participant-session', sessionId],
@@ -61,11 +69,13 @@ function ParticipantSessionPage() {
     retry: false,
   })
 
+
   const questionsQuery = useQuery({
     queryKey: ['participant-questions', sessionQuery.data?.session_id, participantToken],
     queryFn: () => listSessionQuestionsApi(participantToken, sessionQuery.data?.session_id),
     enabled: Boolean(participantToken && sessionQuery.data?.session_id),
   })
+
 
   const qaQuery = useQuery({
     queryKey: ['participant-qa', sessionQuery.data?.session_id, participantToken],
@@ -73,6 +83,7 @@ function ParticipantSessionPage() {
     enabled: Boolean(participantToken && sessionQuery.data?.session_id),
     refetchInterval: 10000,
   })
+
 
   const mappedQuestions = useMemo(
     () =>
@@ -88,84 +99,115 @@ function ParticipantSessionPage() {
     [questionsQuery.data],
   )
 
+
   // const currentLiveQuestion = useMemo(
   //   () => mappedQuestions.find((q) => q.isLive) || null,
   //   [mappedQuestions],
   // )
 
+
   const session = sessionQuery.data
   const question = liveQuestionId
-  ? mappedQuestions.find((q) => q.id === liveQuestionId)
-  : mappedQuestions[questionIndex]
-   const joinRequirement = session?.join_type || 'name'
+    ? mappedQuestions.find((q) => q.id === liveQuestionId)
+    : mappedQuestions[questionIndex]
+  const joinRequirement = session?.join_type || 'name'
   const timeLimit = question?.timeLimit || 0
   const dbSessionId = session?.session_id
 
+
   const client = useRealtimeParticipant(sessionId, participantToken)
 
+
   useEffect(() => {
-  if (!sessionId || !participantToken || !dbSessionId) return
+    if (!sessionId || !participantToken || !dbSessionId) return
 
-  const offOpen = client.on('open', () => {})
-  const offClose = client.on('close', () => {})
 
-  const offSession = client.on('session_updated', (data) => {
-    if (data.status === 'live') {
-      queryClient.invalidateQueries({ queryKey: ['participant-session', sessionId] })
+    const offOpen = client.on('open', () => { })
+    const offClose = client.on('close', () => { })
+
+
+    const offSession = client.on('session_updated', (data) => {
+      if (data.status === 'live') {
+        queryClient.invalidateQueries({ queryKey: ['participant-session', sessionId] })
+        queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+      }
+      if (data.status === 'completed' && data.leaderboard) {
+        setLeaderboard(data.leaderboard)
+        setStep('qa')
+      }
+    })
+
+
+    const offQuestion = client.on('question_changed', (data) => {
       queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+
+
+      if (data.is_live && data.question_id) {
+        // ✅ Set live question
+        setLiveQuestionId(data.question_id)
+
+
+        // ✅ Sync index (important for counter UI)
+        setQuestionIndex((prev) => {
+          const idx = mappedQuestions.findIndex(q => q.id === data.question_id)
+          return idx !== -1 ? idx : prev
+        })
+
+
+        // ✅ Only reset submission state
+        setSubmitted(false)
+
+
+        // ❌ DO NOT reset responses or input state
+      }
+    })
+
+
+    const offResp = client.on('response_received', () => {
+      queryClient.invalidateQueries({ queryKey: ['participant-qa', dbSessionId] })
+    })
+
+
+    const offLeaderboard = client.on('leaderboard_update', (data) => {
+      if (data.leaderboard) {
+        setLeaderboard(data.leaderboard)
+      }
+    })
+
+
+    client.connect()
+
+
+    return () => {
+      offOpen()
+      offClose()
+      offSession()
+      offQuestion()
+      offResp()
+      offLeaderboard()
+      client.disconnect()
     }
-  })
+  }, [sessionId, participantToken, client, queryClient, dbSessionId, mappedQuestions])
 
-  const offQuestion = client.on('question_changed', (data) => {
-    queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
-
-    if (data.is_live && data.question_id) {
-      // ✅ Set live question
-      setLiveQuestionId(data.question_id)
-
-      // ✅ Sync index (important for counter UI)
-      setQuestionIndex((prev) => {
-        const idx = mappedQuestions.findIndex(q => q.id === data.question_id)
-        return idx !== -1 ? idx : prev
-      })
-
-      // ✅ Only reset submission state
-      setSubmitted(false)
-
-      // ❌ DO NOT reset responses or input state
-    }
-  })
-
-  const offResp = client.on('response_received', () => {
-    queryClient.invalidateQueries({ queryKey: ['participant-qa', dbSessionId] })
-  })
-
-  client.connect()
-
-  return () => {
-    offOpen()
-    offClose()
-    offSession()
-    offQuestion()
-    offResp()
-    client.disconnect()
-  }
-}, [sessionId, participantToken, client, queryClient, dbSessionId, mappedQuestions])
 
   useEffect(() => {
-  if (!liveQuestionId || !mappedQuestions.length) return
+    if (!liveQuestionId || !mappedQuestions.length) return
 
-  const exists = mappedQuestions.some(q => q.id === liveQuestionId)
 
-  if (!exists) {
-    setLiveQuestionId(null)
-    setQuestionIndex((prev) =>
-      clamp(prev, 0, mappedQuestions.length - 1)
-    )
-  }
-}, [mappedQuestions, liveQuestionId])
+    const exists = mappedQuestions.some(q => q.id === liveQuestionId)
 
-const isLastQuestion = questionIndex === mappedQuestions.length - 1
+
+    if (!exists) {
+      setLiveQuestionId(null)
+      setQuestionIndex((prev) =>
+        clamp(prev, 0, mappedQuestions.length - 1)
+      )
+    }
+  }, [mappedQuestions, liveQuestionId])
+
+
+  const isLastQuestion = questionIndex === mappedQuestions.length - 1
+
 
   useEffect(() => {
     if (!session) return
@@ -179,10 +221,12 @@ const isLastQuestion = questionIndex === mappedQuestions.length - 1
     }
   }, [session, step])
 
+
   useEffect(() => {
     if (step !== 'active' || !timeLimit) return
     setTimer(timeLimit)
   }, [questionIndex, step, timeLimit])
+
 
   useEffect(() => {
     if (step !== 'active' || !timeLimit || timer <= 0 || submitted) return
@@ -190,28 +234,34 @@ const isLastQuestion = questionIndex === mappedQuestions.length - 1
     return () => clearInterval(id)
   }, [step, timeLimit, timer, submitted])
 
+
   useEffect(() => {
-  if (step !== 'active') return
-  if (timer > 0) return
+    if (step !== 'active') return
+    if (timer > 0) return
 
-  const isLastQuestion = questionIndex === mappedQuestions.length - 1
 
-  if (!isLastQuestion) {
-    const timeout = setTimeout(() => {
-      setLiveQuestionId(null)
-      setQuestionIndex((i) => i + 1)
-      setSubmitted(false)
-    }, 800) // small delay for UX
+    const isLastQuestion = questionIndex === mappedQuestions.length - 1
 
-    return () => clearTimeout(timeout)
-  } else if (!submitted) {
-    const timeout = setTimeout(() => {
-      handleSubmitResponse()
-    }, 500)
 
-    return () => clearTimeout(timeout)
-  }
-}, [timer, step, questionIndex, mappedQuestions.length, submitted, responses])
+    if (!isLastQuestion) {
+      const timeout = setTimeout(() => {
+        setLiveQuestionId(null)
+        setQuestionIndex((i) => i + 1)
+        setSubmitted(false)
+      }, 800) // small delay for UX
+
+
+      return () => clearTimeout(timeout)
+    } else if (!submitted) {
+      const timeout = setTimeout(() => {
+        handleSubmitResponse()
+      }, 500)
+
+
+      return () => clearTimeout(timeout)
+    }
+  }, [timer, step, questionIndex, mappedQuestions.length, submitted, responses])
+
 
   const approvedQa = useMemo(
     () => (qaQuery.data || []).filter((q) => q.moderation_status === 'approved'),
@@ -220,59 +270,77 @@ const isLastQuestion = questionIndex === mappedQuestions.length - 1
 
 
 
+
+
+
   const currentResponse = responses[question?.id] || {}
 
+
   const buildFinalPayload = () => {
-  return Object.entries(responses).map(([questionId, res]) => {
-    const q = mappedQuestions.find(q => q.id == questionId)
-    if (!q) return null
+    return Object.entries(responses).map(([questionId, res]) => {
+      const q = mappedQuestions.find(q => q.id == questionId)
+      if (!q) return null
 
-    const payload = {
-      question_id: q.id,
-    }
 
-    if (q.type === 'MCQ' || q.type === 'True/False') {
-      const opt = q.options.find(o => o.option_text === res.selectedOption)
-      if (opt) payload.option_id = opt.option_id
-    }
+      const payload = {
+        question_id: q.id,
+      }
 
-    if (q.type === 'Rating') payload.rating_value = res.rating
 
-    if (q.type === 'Text' || q.type === 'Ranking') {
-      payload.text_response = res.textResponse?.trim()
-    }
+      if (q.type === 'MCQ' || q.type === 'True/False') {
+        const opt = q.options.find(o => o.option_text === res.selectedOption)
+        if (opt) payload.option_id = opt.option_id
+      }
 
-    if (q.type === 'Word Cloud') {
-      payload.text_response = (res.tags || []).join(', ')
-    }
 
-    return payload
-  }).filter(Boolean)
-}
-const handleSubmitResponse = async () => {
-  const payloads = buildFinalPayload()
+      if (q.type === 'Rating') payload.rating_value = res.rating
 
-  if (!payloads.length || !participantToken) return
 
-  setIsSubmitting(true)
-  try {
-    await Promise.all(
-      payloads.map(p => submitResponseApi(participantToken, p))
-    )
-    setSubmitted(true)
-  } catch (err) {
-    console.error(err)
-  } finally {
-    setIsSubmitting(false)
+      if (q.type === 'Text' || q.type === 'Ranking') {
+        payload.text_response = res.textResponse?.trim()
+      }
+
+
+      if (q.type === 'Word Cloud') {
+        payload.text_response = (res.tags || []).join(', ')
+      }
+
+
+      return payload
+    }).filter(Boolean)
   }
-}
+  const handleSubmitResponse = async () => {
+    const payloads = buildFinalPayload()
+
+
+    if (!payloads.length || !participantToken) return
+
+
+    setIsSubmitting(true)
+    try {
+      await Promise.all(
+        payloads.map(p => submitResponseApi(participantToken, p))
+      )
+      setSubmitted(true)
+      if (isLastQuestion) {
+        setStep('qa')
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
 
   const handleJoin = async (event) => {
     event.preventDefault()
     if (!session) return
 
+
     try {
       let nickname, checkEmail, isAnonymous
+
 
       if (joinRequirement === 'anonymous') {
         nickname = 'Anonymous'
@@ -300,9 +368,10 @@ const handleSubmitResponse = async () => {
         isAnonymous = false
       }
 
+
       const result = await joinSessionApi(sessionId, {
         nickname,
-        email:checkEmail,
+        email: checkEmail,
         is_anonymous: isAnonymous,
       })
       setParticipant({
@@ -320,8 +389,10 @@ const handleSubmitResponse = async () => {
     }
   }
 
+
   const handleAskQuestion = async () => {
     if (!dbSessionId || !askText.trim() || !participantToken) return
+
 
     try {
       const newQ = await askQaQuestionApi(participantToken, dbSessionId, {
@@ -341,6 +412,7 @@ const handleSubmitResponse = async () => {
     }
   }
 
+
   const handleUpvote = async (qaId) => {
     if (!participantToken) return
     try {
@@ -351,7 +423,9 @@ const handleSubmitResponse = async () => {
     }
   }
 
+
   const allowAnonymousQa = session?.allow_anonymous_qa || false
+
 
   if (!session && !sessionQuery.isLoading) {
     return (
@@ -364,6 +438,7 @@ const handleSubmitResponse = async () => {
     )
   }
 
+
   if (sessionQuery.isLoading) {
     return (
       <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
@@ -374,6 +449,7 @@ const handleSubmitResponse = async () => {
     )
   }
 
+
   if (!participantToken && step === 'join') {
     return (
       <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
@@ -383,6 +459,7 @@ const handleSubmitResponse = async () => {
             <h1 className="text-2xl font-bold text-navy-900">{session.title}</h1>
             <p className="mt-1 text-sm text-slate-600">Join session {session.session_id}</p>
           </div>
+
 
           {joinRequirement === 'anonymous' ? (
             <div>
@@ -405,6 +482,7 @@ const handleSubmitResponse = async () => {
                 />
               </div>
 
+
               {joinRequirement === 'name_email' && (
                 <div>
                   <label className="text-sm font-semibold text-slate-700">Email</label>
@@ -420,9 +498,11 @@ const handleSubmitResponse = async () => {
             </>
           )}
 
+
           {joinError && (
             <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{joinError}</p>
           )}
+
 
           <button
             type="submit"
@@ -434,6 +514,7 @@ const handleSubmitResponse = async () => {
       </main>
     )
   }
+
 
   if (step === 'waiting') {
     return (
@@ -454,6 +535,7 @@ const handleSubmitResponse = async () => {
       </main>
     )
   }
+
 
   return (
     <main className="min-h-screen bg-linear-to-br from-sky-50 via-white to-indigo-50 p-4 md:p-6">
@@ -483,6 +565,7 @@ const handleSubmitResponse = async () => {
           </div>
         </div>
 
+
         {step === 'active' && question && (
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
@@ -495,6 +578,7 @@ const handleSubmitResponse = async () => {
               <video src={question.media.url} controls className="max-h-80 w-full rounded-2xl border border-blue-100" />
             )}
             <h2 className="text-2xl font-bold text-navy-900">{question.text || 'Untitled question'}</h2>
+
 
             {!!timeLimit && (
               <div className="rounded-xl border border-blue-200/70 bg-white p-3">
@@ -510,6 +594,7 @@ const handleSubmitResponse = async () => {
                 </div>
               </div>
             )}
+
 
             {question.type === 'MCQ' && (
               <div className="grid gap-2 md:grid-cols-2">
@@ -527,9 +612,8 @@ const handleSubmitResponse = async () => {
                         },
                       }))
                     }}
-                    className={`rounded-2xl border px-4 py-4 text-left text-sm font-semibold transition ${
-                      currentResponse.selectedOption === o.option_text ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                    }`}
+                    className={`rounded-2xl border px-4 py-4 text-left text-sm font-semibold transition ${currentResponse.selectedOption === o.option_text ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                      }`}
                   >
                     <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs">
                       {String.fromCharCode(65 + idx)}
@@ -539,6 +623,7 @@ const handleSubmitResponse = async () => {
                 ))}
               </div>
             )}
+
 
             {question.type === 'Rating' && (
               <div className="flex flex-wrap gap-2">
@@ -556,9 +641,8 @@ const handleSubmitResponse = async () => {
                         },
                       }))
                     }}
-                    className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                      currentResponse.rating === i + 1 ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                    }`}
+                    className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${currentResponse.rating === i + 1 ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                      }`}
                   >
                     <Star className={`size-4 ${currentResponse.rating >= i + 1 ? 'text-amber-500' : 'text-slate-400'}`} />
                     {i + 1}
@@ -567,12 +651,14 @@ const handleSubmitResponse = async () => {
               </div>
             )}
 
+
             {(question.type === 'Text' || question.type === 'Ranking') && (
               <div>
                 <textarea
                   value={currentResponse.textResponse || ''}
                   onChange={(e) => {
                     const value = e.target.value.slice(0, 300)
+
 
                     setResponses((prev) => ({
                       ...prev,
@@ -588,6 +674,7 @@ const handleSubmitResponse = async () => {
                 <p className="mt-1 text-right text-xs text-slate-500">{currentResponse.textResponse}/300</p>
               </div>
             )}
+
 
             {question.type === 'Word Cloud' && (
               <div className="space-y-2">
@@ -606,6 +693,7 @@ const handleSubmitResponse = async () => {
                       const t = tagsInput.trim()
                       if (!t) return
 
+
                       setResponses((prev) => ({
                         ...prev,
                         [question.id]: {
@@ -613,6 +701,7 @@ const handleSubmitResponse = async () => {
                           tags: [...(prev[question.id]?.tags || []), t].slice(0, 10),
                         },
                       }))
+
 
                       setTagsInput('')
                     }}
@@ -631,6 +720,7 @@ const handleSubmitResponse = async () => {
               </div>
             )}
 
+
             {question.type === 'True/False' && (
               <div className="grid gap-2 sm:grid-cols-2">
                 {['True', 'False'].map((v) => (
@@ -647,9 +737,8 @@ const handleSubmitResponse = async () => {
                         },
                       }))
                     }}
-                    className={`rounded-2xl border px-4 py-4 text-sm font-semibold transition ${
-                      currentResponse.selectedOption === v ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                    }`}
+                    className={`rounded-2xl border px-4 py-4 text-sm font-semibold transition ${currentResponse.selectedOption === v ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                      }`}
                   >
                     {v}
                   </button>
@@ -657,10 +746,10 @@ const handleSubmitResponse = async () => {
               </div>
             )}
 
+
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                disabled={timer === 0 || submitted}
                 onClick={handleSubmitResponse}
                 disabled={!Object.keys(responses).length || isSubmitting}
                 className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
@@ -672,6 +761,7 @@ const handleSubmitResponse = async () => {
                 disabled={isLastQuestion}
                 onClick={() => {
                   if (isLastQuestion) return
+
 
                   setLiveQuestionId(null)
                   setQuestionIndex((i) => i + 1)
@@ -692,20 +782,53 @@ const handleSubmitResponse = async () => {
               </label>
             </div>
 
-            {submitted && (
+
+            {submitted && !showLiveResult && (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                 <p className="text-sm font-semibold text-emerald-800">Response received!</p>
-                {showLiveResult && (
-                  <p className="mt-1 text-sm text-emerald-700">Live result preview is enabled for this question.</p>
-                )}
               </div>
             )}
           </section>
         )}
 
+
         {step === 'qa' && (
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-bold text-navy-900">Q&A</h2>
+            {(submitted || session?.status === 'completed') && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold text-amber-900">
+                    <Trophy className="mr-2 inline size-4" />
+                    Leaderboard
+                  </p>
+                  {leaderboard.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowLeaderboard(true)}
+                      className="text-xs font-semibold text-amber-700 hover:underline"
+                    >
+                      View all
+                    </button>
+                  )}
+                </div>
+                {leaderboard.length > 0 ? (
+                  <div className="mt-2 space-y-1">
+                    {leaderboard.slice(0, 3).map((entry, idx) => (
+                      <div key={entry.participant_id} className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-2 text-slate-700">
+                          {idx === 0 ? <Crown className="size-4 text-amber-500" /> : `${idx + 1}.`}
+                          {entry.nickname || `Participant ${entry.participant_id}`}
+                        </span>
+                        <span className="font-semibold text-amber-700">{entry.score}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-amber-700">Leaderboard will appear after participants submit responses.</p>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <textarea
                 value={askText}
@@ -736,6 +859,7 @@ const handleSubmitResponse = async () => {
               </div>
             </div>
 
+
             {!!ownQuestions.length && (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-navy-900">Your questions</p>
@@ -751,6 +875,7 @@ const handleSubmitResponse = async () => {
                 ))}
               </div>
             )}
+
 
             <div className="space-y-2">
               <p className="text-sm font-semibold text-navy-900">Approved questions</p>
@@ -785,9 +910,55 @@ const handleSubmitResponse = async () => {
           </section>
         )}
       </div>
+
+
+      {showLeaderboard && (
+        <div className="fixed inset-0 z-40">
+          <button
+            type="button"
+            className="absolute inset-0 bg-navy-950/20 backdrop-blur-sm"
+            onClick={() => setShowLeaderboard(false)}
+            aria-label="Close leaderboard"
+          />
+          <div className="relative mx-auto mt-20 w-[min(92vw,520px)] rounded-2xl border border-amber-200/70 bg-white p-5 shadow-2xl shadow-blue-900/20">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Leaderboard</p>
+                <h3 className="mt-1 text-xl font-bold text-navy-900">Top Participants</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLeaderboard(false)}
+                className="rounded-xl border border-amber-200/70 p-2 text-slate-600 transition hover:bg-amber-50"
+                aria-label="Close"
+              >
+                <XCircle className="size-4" />
+              </button>
+            </div>
+
+
+            <div className="mt-4 space-y-2">
+              {leaderboard.map((row, idx) => (
+                <div key={row.participant_id} className="flex items-center justify-between rounded-2xl border border-amber-200/60 bg-amber-50/40 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-9 place-items-center rounded-2xl bg-linear-to-br from-amber-400 to-amber-600 text-white">
+                      {idx === 0 ? <Crown className="size-4" /> : idx + 1}
+                    </div>
+                    <p className="font-semibold text-navy-900">{row.nickname || `Participant ${row.participant_id}`}</p>
+                  </div>
+                  <p className="text-sm font-bold text-navy-900">{row.score}</p>
+                </div>
+              ))}
+              {!leaderboard.length ? (
+                <p className="text-sm text-slate-500 text-center py-4">No scores yet.</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
 
-export default ParticipantSessionPage
 
+export default ParticipantSessionPage
