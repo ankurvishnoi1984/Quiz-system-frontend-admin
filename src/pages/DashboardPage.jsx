@@ -46,6 +46,7 @@ function DashboardPage() {
   const [dashboardError, setDashboardError] = useState('')
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
   const [join_type,setJoinType] = useState("name");
+  const [copied, setCopied] = useState(false)
 
   const { departmentId, departments } = useShell()
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
@@ -489,10 +490,21 @@ function DashboardPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => navigator.clipboard.writeText(`${window.location.origin}/join/${shareSession.session_code || shareSession.id}`)}
-                    className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/join/${shareSession.session_code || shareSession.id}`)
+                      setCopied(true)
+
+                      setTimeout(() => {
+                        setCopied(false)
+                      }, 1500)
+                    }}
+                    className={`h-11 rounded-xl border px-4 text-sm font-semibold transition
+    ${copied
+                        ? 'bg-green-100 border-green-300 text-green-700 scale-95'
+                        : 'bg-white border-blue-200 text-slate-700 hover:bg-blue-50'
+                      }`}
                   >
-                    Copy
+                    {copied ? 'Copied ✓' : 'Copy'}
                   </button>
                 </div>
               </div>
