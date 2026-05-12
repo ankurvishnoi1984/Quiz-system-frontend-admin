@@ -2,6 +2,7 @@ import { CheckCircle2, Clock3, Crown, Send, Star, Trophy, Users, XCircle } from 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useShallow } from 'zustand/shallow'
 import {
   askQaQuestionApi,
   joinSessionApi,
@@ -39,15 +40,52 @@ function ParticipantSessionPage() {
   const { participantToken, joinedUser, setParticipant } = useParticipantStore()
 
 
+  const {
+    responses,
+    questionIndex,
+    liveQuestionId,
+    submitted,
+    countdownEndsAt,
+    countdownFrozen,
+    setResponses,
+    setQuestionIndex,
+    setLiveQuestionId,
+    setSubmitted,
+    setQuizCountdown,
+    resetQuizProgress,
+    freezeCountdownAfterSubmit,
+  } = useParticipantStore(
+    useShallow((s) => ({
+      responses: s.quizResponses,
+      questionIndex: s.quizQuestionIndex,
+      liveQuestionId: s.quizLiveQuestionId,
+      submitted: s.quizSubmitted,
+      countdownEndsAt: s.quizCountdownEndsAt,
+      countdownFrozen: s.quizCountdownFrozen,
+      setResponses: s.setQuizResponses,
+      setQuestionIndex: s.setQuizQuestionIndex,
+      setLiveQuestionId: s.setQuizLiveQuestionId,
+      setSubmitted: s.setQuizSubmitted,
+      setQuizCountdown: s.setQuizCountdown,
+      resetQuizProgress: s.resetQuizProgress,
+      freezeCountdownAfterSubmit: s.freezeCountdownAfterSubmit,
+    })),
+  )
+
+
+  const [participantHydrated, setParticipantHydrated] = useState(() =>
+    useParticipantStore.persist.hasHydrated(),
+  )
+
+
+  const [countdownTick, setCountdownTick] = useState(0)
+
+
   const [step, setStep] = useState('join') // join | waiting | active | qa
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [joinError, setJoinError] = useState('')
   const [transitioningLive, setTransitioningLive] = useState(false)
-  const [questionIndex, setQuestionIndex] = useState(0)
-  const [liveQuestionId, setLiveQuestionId] = useState(null)
-  const [timer, setTimer] = useState(0)
-  const [submitted, setSubmitted] = useState(false)
   const [tagsInput, setTagsInput] = useState('')
   const [showLiveResult, setShowLiveResult] = useState(true)
 
@@ -57,7 +95,6 @@ function ParticipantSessionPage() {
   const [upvotes, setUpvotes] = useState({})
   const [ownQuestions, setOwnQuestions] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [responses, setResponses] = useState({})
   const [leaderboard, setLeaderboard] = useState([])
   const [showLeaderboard, setShowLeaderboard] = useState(false)
 
@@ -116,7 +153,49 @@ function ParticipantSessionPage() {
   const dbSessionId = session?.session_id
 
 
+  const timer = useMemo(() => {
+    if (submitted && countdownFrozen != null) return countdownFrozen
+    if (!hasCountdown || !countdownEndsAt) return 0
+    return Math.max(0, Math.ceil((countdownEndsAt - Date.now()) / 1000))
+  }, [submitted, countdownFrozen, hasCountdown, countdownEndsAt, countdownTick])
+
+
   const client = useRealtimeParticipant(sessionId, participantToken)
+
+
+  useEffect(() => {
+    const unsub = useParticipantStore.persist.onFinishHydration(() => {
+      setParticipantHydrated(true)
+    })
+    if (useParticipantStore.persist.hasHydrated()) {
+      setParticipantHydrated(true)
+    }
+    return unsub
+  }, [])
+
+
+  useEffect(() => {
+    if (!participantHydrated || !sessionId) return
+    const { participantToken: token, joinedSessionCode, clearParticipant } = useParticipantStore.getState()
+    if (token && joinedSessionCode && joinedSessionCode !== sessionId) {
+      clearParticipant()
+      setStep('join')
+    }
+  }, [participantHydrated, sessionId])
+
+
+  useEffect(() => {
+    if (!participantHydrated || !session || !sessionId) return
+    const { participantToken: token, joinedSessionCode } = useParticipantStore.getState()
+    if (!token || joinedSessionCode !== sessionId) return
+    setStep((current) => {
+      if (current !== 'join') return current
+      const s = session.status
+      if (s === 'completed' || s === 'archived') return 'qa'
+      if (s === 'live' || s === 'paused') return 'active'
+      return 'waiting'
+    })
+  }, [participantHydrated, session, sessionId])
 
 
   useEffect(() => {
@@ -211,6 +290,26 @@ function ParticipantSessionPage() {
 
 
   useEffect(() => {
+    if (step !== 'active' || !hasCountdown || submitted) return
+    const id = setInterval(() => setCountdownTick((t) => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [step, hasCountdown, question?.id, submitted])
+
+
+  useEffect(() => {
+    if (step !== 'active' || !question?.id) return
+    if (!hasCountdown) {
+      setQuizCountdown({ questionId: null, endsAt: null })
+      return
+    }
+    const qid = question.id
+    const s = useParticipantStore.getState()
+    if (s.quizCountdownQuestionId === qid && s.quizCountdownEndsAt != null) return
+    setQuizCountdown({ questionId: qid, endsAt: Date.now() + timeLimit * 1000 })
+  }, [step, question?.id, hasCountdown, timeLimit, setQuizCountdown])
+
+
+  useEffect(() => {
     if (!session) return
     if (session.status === 'live' && step === 'waiting') {
       setTransitioningLive(true)
@@ -221,23 +320,6 @@ function ParticipantSessionPage() {
       return () => clearTimeout(id)
     }
   }, [session, step])
-
-
-  useEffect(() => {
-    if (step !== 'active') return
-    if (!hasCountdown) {
-      setTimer(0)
-      return
-    }
-    setTimer(timeLimit)
-  }, [questionIndex, step, timeLimit, hasCountdown])
-
-
-  useEffect(() => {
-    if (step !== 'active' || !hasCountdown || timer <= 0 || submitted) return
-    const id = setInterval(() => setTimer((t) => Math.max(0, t - 1)), 1000)
-    return () => clearInterval(id)
-  }, [step, hasCountdown, timer, submitted])
 
 
   useEffect(() => {
@@ -323,10 +405,12 @@ function ParticipantSessionPage() {
 
 
     setIsSubmitting(true)
+    const hadCountdown = hasCountdown
     try {
       await Promise.all(
         payloads.map(p => submitResponseApi(participantToken, p))
       )
+      if (hadCountdown) freezeCountdownAfterSubmit()
       setSubmitted(true)
       if (isLastQuestion) {
         setStep('qa')
@@ -380,6 +464,7 @@ function ParticipantSessionPage() {
         email: checkEmail,
         is_anonymous: isAnonymous,
       })
+      resetQuizProgress()
       setParticipant({
         token: result.token,
         participant: {
@@ -387,8 +472,15 @@ function ParticipantSessionPage() {
           email: result.participant.email,
           anonymous: result.participant.is_anonymous,
         },
+        sessionCode: sessionId,
       })
-      setStep(session.status === 'live' ? 'active' : 'waiting')
+      if (session.status === 'completed' || session.status === 'archived') {
+        setStep('qa')
+      } else if (session.status === 'live' || session.status === 'paused') {
+        setStep('active')
+      } else {
+        setStep('waiting')
+      }
       setJoinError('')
     } catch (err) {
       setJoinError(err.message || 'Failed to join session')
@@ -433,23 +525,23 @@ function ParticipantSessionPage() {
   const allowAnonymousQa = session?.allow_anonymous_qa || false
 
 
-  if (!session && !sessionQuery.isLoading) {
+  if (!participantHydrated || sessionQuery.isLoading) {
     return (
       <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
         <div className="w-full max-w-lg rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-bold text-navy-900">Session not found</h1>
-          <p className="mt-2 text-slate-600">The join link is invalid or this session was removed.</p>
+          <p className="text-slate-600">{!participantHydrated ? 'Restoring session...' : 'Loading session...'}</p>
         </div>
       </main>
     )
   }
 
 
-  if (sessionQuery.isLoading) {
+  if (!session && !sessionQuery.isLoading) {
     return (
       <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
         <div className="w-full max-w-lg rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
-          <p className="text-slate-600">Loading session...</p>
+          <h1 className="text-2xl font-bold text-navy-900">Session not found</h1>
+          <p className="mt-2 text-slate-600">The join link is invalid or this session was removed.</p>
         </div>
       </main>
     )
