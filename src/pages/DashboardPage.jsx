@@ -14,6 +14,7 @@ import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 import {
   archiveSessionApi,
   createSessionApi,
+  duplicateSessionApi,
   getSessionQrApi,
   listDepartmentSessionsApi,
   transitionSessionApi,
@@ -91,16 +92,10 @@ function DashboardPage() {
   })
 
   const duplicateMutation = useMutation({
-    mutationFn: ({ deptId, session }) =>
-      createSessionApi(accessToken, deptId, {
+    mutationFn: ({ session }) =>
+      duplicateSessionApi(accessToken, session.id, {
         host_id: user?.user_id,
         title: `${session.title} (Copy)`,
-        description: session.description || '',
-        is_anonymous_default: Boolean(session.is_anonymous_default),
-        max_participants: session.max_participants || 500,
-        show_results_to_participants: Boolean(session.show_results_to_participants),
-        allow_late_join: Boolean(session.allow_late_join),
-        leaderboard_enabled: Boolean(session.leaderboard_enabled),
       }),
     onSuccess: (createdSession) => {
       queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
@@ -254,7 +249,7 @@ function DashboardPage() {
       return
     }
     if (action === 'duplicate') {
-      duplicateMutation.mutate({ deptId: session.dept_id || departmentId, session })
+      duplicateMutation.mutate({ session })
       return
     }
     if (action === 'edit') {
