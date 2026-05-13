@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import HostLayout from './layouts/HostLayout'
 import LoginPage from './pages/LoginPage'
@@ -15,12 +15,24 @@ function App() {
   const user = useAuthStore((state) => state.user)
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping)
   const bootstrapAuth = useAuthStore((state) => state.bootstrapAuth)
+  const [authHydrated, setAuthHydrated] = useState(() => useAuthStore.persist.hasHydrated())
 
   useEffect(() => {
-    bootstrapAuth()
-  }, [bootstrapAuth])
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      setAuthHydrated(true)
+    })
+    if (useAuthStore.persist.hasHydrated()) {
+      setAuthHydrated(true)
+    }
+    return unsub
+  }, [])
 
-  if (isBootstrapping) {
+  useEffect(() => {
+    if (!authHydrated) return
+    bootstrapAuth()
+  }, [authHydrated, bootstrapAuth])
+
+  if (!authHydrated || isBootstrapping) {
     return (
       <div className="grid min-h-screen place-items-center bg-linear-to-br from-slate-100 via-blue-50 to-indigo-100/70">
         <p className="text-sm font-medium text-slate-600">Checking session...</p>

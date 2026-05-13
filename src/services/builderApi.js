@@ -1,32 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1'
-
-async function parseJson(response) {
-  try {
-    return await response.json()
-  } catch {
-    return null
-  }
-}
+import { hostAuthRequest } from './hostAuthRequest'
 
 async function authRequest(path, accessToken, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-      ...(options.headers || {}),
-    },
-    ...options,
-  })
-
-  const payload = await parseJson(response)
-  if (!response.ok) {
-    const error = new Error(payload?.message || 'Request failed')
-    error.status = response.status
-    error.details = payload?.errors || null
-    throw error
-  }
-
-  return payload?.data
+  return hostAuthRequest(path, accessToken, options)
 }
 
 export async function getSessionDetailApi(accessToken, sessionId) {

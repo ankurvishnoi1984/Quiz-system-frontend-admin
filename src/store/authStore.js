@@ -60,19 +60,45 @@ export const useAuthStore = create(
         set({ isBootstrapping: true, error: null })
 
         try {
-          let activeAccessToken = accessToken
-
-          if (!activeAccessToken && refreshToken) {
-            const refreshResponse = await refreshApi(refreshToken)
-            activeAccessToken = refreshResponse?.data?.access_token || null
-            if (!activeAccessToken) {
-              throw new Error('Unable to refresh access token')
-            }
-            set({ accessToken: activeAccessToken })
+          const fetchUser = async (token) => {
+            const meResponse = await meApi(token)
+            return meResponse?.data?.user || null
           }
 
-          const meResponse = await meApi(activeAccessToken)
-          const user = meResponse?.data?.user || null
+          const applyRefresh = async () => {
+            if (!refreshToken) {
+              const err = new Error('No refresh token')
+              err.status = 401
+              throw err
+            }
+            const refreshResponse = await refreshApi(refreshToken)
+            const next = refreshResponse?.data?.access_token || null
+            if (!next) {
+              const err = new Error('Unable to refresh access token')
+              err.status = 401
+              throw err
+            }
+            set({ accessToken: next })
+            return next
+          }
+
+          let token = accessToken
+
+          if (!token) {
+            token = await applyRefresh()
+          }
+
+          let user
+          try {
+            user = await fetchUser(token)
+          } catch (err) {
+            if (err.status === 401 && refreshToken) {
+              token = await applyRefresh()
+              user = await fetchUser(token)
+            } else {
+              throw err
+            }
+          }
 
           set({
             user,
