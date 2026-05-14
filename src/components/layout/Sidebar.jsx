@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   ChartColumnBig,
@@ -8,16 +9,33 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react'
+import { useHostNavSessions, getBuilderNavTo, getLiveNavTo } from '../../hooks/useHostNavSessions'
 
-const navigationItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/builder', label: 'Question Builder', icon: FileQuestion, isNew: true },
-  { to: '/live', label: 'Live Present Mode', icon: CirclePlay, live: true },
-  { to: '/analytics', label: 'Session Analytics', icon: ChartColumnBig },
-  { to: '/reports', label: 'Reports', icon: FileBarChart2 },
+const staticNavigationItems = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, kind: 'static' },
+  { kind: 'builder', label: 'Question Builder', icon: FileQuestion, isNew: true },
+  { kind: 'live', label: 'Live Present Mode', icon: CirclePlay, live: true },
+  { to: '/analytics', label: 'Session Analytics', icon: ChartColumnBig, kind: 'static' },
+  { to: '/reports', label: 'Reports', icon: FileBarChart2, kind: 'static' },
 ]
 
 function Sidebar({ collapsed, onToggle }) {
+  const sessionsQuery = useHostNavSessions()
+  const sessions = sessionsQuery.data
+
+  const builderTo = useMemo(() => getBuilderNavTo(sessions), [sessions])
+  const liveTo = useMemo(() => getLiveNavTo(sessions), [sessions])
+
+  const navigationItems = useMemo(
+    () =>
+      staticNavigationItems.map((item) => {
+        if (item.kind === 'builder') return { ...item, to: builderTo }
+        if (item.kind === 'live') return { ...item, to: liveTo }
+        return item
+      }),
+    [builderTo, liveTo],
+  )
+
   return (
     <aside
       className={`relative z-20 border-r border-navy-700/70 bg-linear-to-b from-navy-900 via-navy-800 to-blue-900 text-slate-100 shadow-2xl shadow-navy-950/30 transition-all duration-300 ${
@@ -52,9 +70,10 @@ function Sidebar({ collapsed, onToggle }) {
       <nav className="space-y-1 p-3">
         {navigationItems.map((item) => {
           const Icon = item.icon
+          const navKey = item.kind === 'builder' ? 'nav-builder' : item.kind === 'live' ? 'nav-live' : item.to
           return (
             <NavLink
-              key={item.to}
+              key={navKey}
               to={item.to}
               className={({ isActive }) =>
                 `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
