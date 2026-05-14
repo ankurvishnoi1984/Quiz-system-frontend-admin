@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, Crown, Send, Star, Trophy, Users, XCircle } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock3, Crown, Pencil, Send, Star, Trophy, Users, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -47,6 +47,7 @@ function ParticipantSessionPage() {
     submitted,
     countdownEndsAt,
     countdownFrozen,
+    quizSubmittedQuestionIds,
     setResponses,
     setQuestionIndex,
     setLiveQuestionId,
@@ -54,6 +55,7 @@ function ParticipantSessionPage() {
     setQuizCountdown,
     resetQuizProgress,
     freezeCountdownAfterSubmit,
+    markQuestionsSubmitted,
   } = useParticipantStore(
     useShallow((s) => ({
       responses: s.quizResponses,
@@ -62,6 +64,7 @@ function ParticipantSessionPage() {
       submitted: s.quizSubmitted,
       countdownEndsAt: s.quizCountdownEndsAt,
       countdownFrozen: s.quizCountdownFrozen,
+      quizSubmittedQuestionIds: s.quizSubmittedQuestionIds,
       setResponses: s.setQuizResponses,
       setQuestionIndex: s.setQuizQuestionIndex,
       setLiveQuestionId: s.setQuizLiveQuestionId,
@@ -69,6 +72,7 @@ function ParticipantSessionPage() {
       setQuizCountdown: s.setQuizCountdown,
       resetQuizProgress: s.resetQuizProgress,
       freezeCountdownAfterSubmit: s.freezeCountdownAfterSubmit,
+      markQuestionsSubmitted: s.markQuestionsSubmitted,
     })),
   )
 
@@ -150,14 +154,24 @@ function ParticipantSessionPage() {
   const joinRequirement = session?.join_type || 'name'
   const timeLimit = question?.timeLimit ?? 0
   const hasCountdown = Number(timeLimit) > 0
+  const questionLockedBySubmission = Boolean((quizSubmittedQuestionIds || {})[String(question?.id)])
   const dbSessionId = session?.session_id
 
 
   const timer = useMemo(() => {
-    if (submitted && countdownFrozen != null) return countdownFrozen
+    if (hasCountdown && questionLockedBySubmission && countdownFrozen != null) return countdownFrozen
     if (!hasCountdown || !countdownEndsAt) return 0
     return Math.max(0, Math.ceil((countdownEndsAt - Date.now()) / 1000))
-  }, [submitted, countdownFrozen, hasCountdown, countdownEndsAt, countdownTick])
+  }, [hasCountdown, questionLockedBySubmission, countdownFrozen, countdownEndsAt, countdownTick])
+
+
+  /** Timed: lock after server submit / local advance, or when time hits zero */
+  const inputsLocked = hasCountdown && (questionLockedBySubmission || timer === 0)
+
+
+  useEffect(() => {
+    setSubmitted(questionLockedBySubmission)
+  }, [questionLockedBySubmission, setSubmitted])
 
 
   const client = useRealtimeParticipant(sessionId, participantToken)
@@ -235,6 +249,7 @@ function ParticipantSessionPage() {
 
 
         // ✅ Only reset submission state
+        useParticipantStore.getState().clearQuizSubmissionLocks()
         setSubmitted(false)
 
 
@@ -286,14 +301,33 @@ function ParticipantSessionPage() {
   }, [mappedQuestions, liveQuestionId])
 
 
-  const isLastQuestion = questionIndex === mappedQuestions.length - 1
+  const displayQuestionIndex = useMemo(() => {
+    if (!question?.id || !mappedQuestions.length) return questionIndex
+    const idx = mappedQuestions.findIndex((q) => q.id === question.id)
+    return idx !== -1 ? idx : questionIndex
+  }, [question?.id, mappedQuestions, questionIndex])
+
+
+  const isLastDisplayedQuestion =
+    mappedQuestions.length > 0 && displayQuestionIndex === mappedQuestions.length - 1
+
+
+  const goToQuestionIndex = useCallback(
+    (nextIndex) => {
+      if (!mappedQuestions.length) return
+      const n = clamp(nextIndex, 0, mappedQuestions.length - 1)
+      setLiveQuestionId(null)
+      setQuestionIndex(n)
+    },
+    [mappedQuestions.length, setLiveQuestionId, setQuestionIndex],
+  )
 
 
   useEffect(() => {
-    if (step !== 'active' || !hasCountdown || submitted) return
+    if (step !== 'active' || !hasCountdown || questionLockedBySubmission) return
     const id = setInterval(() => setCountdownTick((t) => t + 1), 1000)
     return () => clearInterval(id)
-  }, [step, hasCountdown, question?.id, submitted])
+  }, [step, hasCountdown, question?.id, questionLockedBySubmission])
 
 
   useEffect(() => {
@@ -304,9 +338,15 @@ function ParticipantSessionPage() {
     }
     const qid = question.id
     const s = useParticipantStore.getState()
+    const submittedIds = s.quizSubmittedQuestionIds || {}
+    if (submittedIds[String(qid)]) {
+      setQuizCountdown({ questionId: qid, endsAt: Date.now() })
+      useParticipantStore.getState().freezeCountdownAfterSubmit()
+      return
+    }
     if (s.quizCountdownQuestionId === qid && s.quizCountdownEndsAt != null) return
     setQuizCountdown({ questionId: qid, endsAt: Date.now() + timeLimit * 1000 })
-  }, [step, question?.id, hasCountdown, timeLimit, setQuizCountdown])
+  }, [step, question?.id, hasCountdown, timeLimit, setQuizCountdown, quizSubmittedQuestionIds])
 
 
   useEffect(() => {
@@ -326,21 +366,27 @@ function ParticipantSessionPage() {
     if (step !== 'active') return
     if (!hasCountdown) return
     if (timer > 0) return
+    // Revisiting a finalized timed question shows timer 0; do not auto-advance or re-submit
+    if (questionLockedBySubmission) return
 
 
-    const isLastQuestion = questionIndex === mappedQuestions.length - 1
+    const isLast = isLastDisplayedQuestion
 
 
-    if (!isLastQuestion) {
+    if (!isLast) {
+      const qid = question?.id
+      const nextIdx = displayQuestionIndex + 1
       const timeout = setTimeout(() => {
+        if (qid != null) {
+          useParticipantStore.getState().markQuestionsSubmitted([qid])
+        }
         setLiveQuestionId(null)
-        setQuestionIndex((i) => i + 1)
-        setSubmitted(false)
+        setQuestionIndex(nextIdx)
       }, 800) // small delay for UX
 
 
       return () => clearTimeout(timeout)
-    } else if (!submitted) {
+    } else if (!questionLockedBySubmission) {
       const timeout = setTimeout(() => {
         handleSubmitResponse()
       }, 500)
@@ -348,12 +394,18 @@ function ParticipantSessionPage() {
 
       return () => clearTimeout(timeout)
     }
-  }, [timer, step, questionIndex, mappedQuestions.length, submitted, responses, hasCountdown])
+  }, [timer, step, displayQuestionIndex, mappedQuestions.length, questionLockedBySubmission, responses, hasCountdown, question?.id, isLastDisplayedQuestion])
 
 
   const approvedQa = useMemo(
     () => (qaQuery.data || []).filter((q) => q.moderation_status === 'approved'),
     [qaQuery.data],
+  )
+
+
+  const hasAnyQuestionSaved = useMemo(
+    () => Object.keys(quizSubmittedQuestionIds || {}).length > 0,
+    [quizSubmittedQuestionIds],
   )
 
 
@@ -410,9 +462,9 @@ function ParticipantSessionPage() {
       await Promise.all(
         payloads.map(p => submitResponseApi(participantToken, p))
       )
+      markQuestionsSubmitted(payloads.map((p) => p.question_id))
       if (hadCountdown) freezeCountdownAfterSubmit()
-      setSubmitted(true)
-      if (isLastQuestion) {
+      if (hadCountdown && isLastDisplayedQuestion) {
         setStep('qa')
       }
     } catch (err) {
@@ -666,9 +718,41 @@ function ParticipantSessionPage() {
 
         {step === 'active' && question && (
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">
-              Question {questionIndex + 1} / {mappedQuestions.length}
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Previous question"
+                  disabled={displayQuestionIndex <= 0}
+                  onClick={() => goToQuestionIndex(displayQuestionIndex - 1)}
+                  className="grid size-9 shrink-0 place-items-center rounded-xl border border-blue-200/70 bg-white text-slate-600 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft className="size-5" />
+                </button>
+                <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-navy-700">
+                  Question {displayQuestionIndex + 1} / {mappedQuestions.length}
+                </p>
+                <button
+                  type="button"
+                  aria-label="Next question"
+                  disabled={displayQuestionIndex >= mappedQuestions.length - 1}
+                  onClick={() => goToQuestionIndex(displayQuestionIndex + 1)}
+                  className="grid size-9 shrink-0 place-items-center rounded-xl border border-blue-200/70 bg-white text-slate-600 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight className="size-5" />
+                </button>
+              </div>
+              {hasCountdown && inputsLocked && (
+                <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
+                  Timed: browse with arrows; answers cannot be changed after submit or when time runs out.
+                </p>
+              )}
+              {!hasCountdown && hasAnyQuestionSaved && (
+                <p className="max-w-[min(100%,18rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
+                  No timer: revisit any question and use Save changes to update.
+                </p>
+              )}
+            </div>
             {question.media?.url && question.media.kind === 'image' && (
               <img src={question.media.url} alt="Question media" className="max-h-80 w-full rounded-2xl border border-blue-100 object-contain" />
             )}
@@ -699,7 +783,7 @@ function ParticipantSessionPage() {
                 {(question.options || []).map((o, idx) => (
                   <button
                     key={o.option_id}
-                    disabled={(hasCountdown && timer === 0) || submitted}
+                    disabled={inputsLocked}
                     type="button"
                     onClick={() => {
                       setResponses((prev) => ({
@@ -728,7 +812,7 @@ function ParticipantSessionPage() {
                 {Array.from({ length: 5 }).map((_, i) => (
                   <button
                     key={i}
-                    disabled={(hasCountdown && timer === 0) || submitted}
+                    disabled={inputsLocked}
                     type="button"
                     onClick={() => {
                       setResponses((prev) => ({
@@ -754,6 +838,7 @@ function ParticipantSessionPage() {
               <div>
                 <textarea
                   value={currentResponse.textResponse || ''}
+                  disabled={inputsLocked}
                   onChange={(e) => {
                     const value = e.target.value.slice(0, 300)
 
@@ -779,14 +864,14 @@ function ParticipantSessionPage() {
                 <div className="flex gap-2">
                   <input
                     value={tagsInput}
-                    disabled={(hasCountdown && timer === 0) || submitted}
+                    disabled={inputsLocked}
                     onChange={(e) => setTagsInput(e.target.value)}
                     className="h-11 flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
                     placeholder="Type a word and add"
                   />
                   <button
                     type="button"
-                    disabled={(hasCountdown && timer === 0) || submitted}
+                    disabled={inputsLocked}
                     onClick={() => {
                       const t = tagsInput.trim()
                       if (!t) return
@@ -823,7 +908,7 @@ function ParticipantSessionPage() {
               <div className="grid gap-2 sm:grid-cols-2">
                 {['True', 'False'].map((v) => (
                   <button
-                    disabled={(hasCountdown && timer === 0) || submitted}
+                    disabled={inputsLocked}
                     key={v}
                     type="button"
                     onClick={() => {
@@ -852,23 +937,25 @@ function ParticipantSessionPage() {
                 disabled={!Object.keys(responses).length || isSubmitting}
                 className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSubmitting ? 'Submitting...' : 'Submit'}
+                {isSubmitting
+                  ? hasCountdown
+                    ? 'Submitting...'
+                    : 'Saving...'
+                  : hasCountdown
+                    ? 'Submit'
+                    : submitted
+                      ? 'Save changes'
+                      : 'Submit'}
               </button>
-              <button
-                type="button"
-                disabled={isLastQuestion}
-                onClick={() => {
-                  if (isLastQuestion) return
-
-
-                  setLiveQuestionId(null)
-                  setQuestionIndex((i) => i + 1)
-                  setSubmitted(false)
-                }}
-                className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next question
-              </button>
+              {isLastDisplayedQuestion && submitted && !hasCountdown && (
+                <button
+                  type="button"
+                  onClick={() => setStep('qa')}
+                  className="h-11 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100"
+                >
+                  Go to Q&A
+                </button>
+              )}
               <label className="ml-auto inline-flex items-center gap-2 text-sm text-slate-600">
                 <input
                   type="checkbox"
@@ -881,7 +968,20 @@ function ParticipantSessionPage() {
             </div>
 
 
-            {submitted && !showLiveResult && (
+            {submitted && !hasCountdown && (
+              <div className="flex gap-3 rounded-2xl border border-sky-200 bg-sky-50/90 p-4">
+                <Pencil className="mt-0.5 size-5 shrink-0 text-sky-700" aria-hidden />
+                <div>
+                  <p className="text-sm font-semibold text-navy-900">Modify your responses anytime</p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    There is no timer on this question. Change your answer above and press Save changes to update your submission.
+                  </p>
+                </div>
+              </div>
+            )}
+
+
+            {submitted && hasCountdown && !showLiveResult && (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                 <p className="text-sm font-semibold text-emerald-800">Response received!</p>
               </div>
@@ -893,7 +993,7 @@ function ParticipantSessionPage() {
         {step === 'qa' && (
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-bold text-navy-900">Q&A</h2>
-            {(submitted || session?.status === 'completed') && (
+            {(hasAnyQuestionSaved || session?.status === 'completed') && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-bold text-amber-900">

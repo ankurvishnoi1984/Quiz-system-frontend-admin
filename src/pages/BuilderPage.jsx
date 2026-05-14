@@ -82,13 +82,17 @@ function SortableRow({ id, children, className = '' }) {
   )
 }
 
-function MediaUpload({ media, onChange }) {
+function MediaUpload({ media, onChange, disabled = false }) {
   const inputRef = useRef(null)
   const [dragOver, setDragOver] = useState(false)
 
-  const pickFile = () => inputRef.current?.click()
+  const pickFile = () => {
+    if (disabled) return
+    inputRef.current?.click()
+  }
 
   const onFiles = (files) => {
+    if (disabled) return
     const file = files?.[0]
     if (!file) return
     const url = URL.createObjectURL(file)
@@ -120,18 +124,21 @@ function MediaUpload({ media, onChange }) {
 
       <div
         className={`rounded-2xl border border-dashed p-4 transition ${
-          dragOver ? 'border-blue-400 bg-blue-50/70' : 'border-blue-300 bg-white/60'
-        }`}
+          disabled ? 'pointer-events-none opacity-60' : ''
+        } ${dragOver && !disabled ? 'border-blue-400 bg-blue-50/70' : 'border-blue-300 bg-white/60'}`}
         onDragEnter={(e) => {
+          if (disabled) return
           e.preventDefault()
           setDragOver(true)
         }}
         onDragOver={(e) => {
+          if (disabled) return
           e.preventDefault()
           setDragOver(true)
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => {
+          if (disabled) return
           e.preventDefault()
           setDragOver(false)
           onFiles(e.dataTransfer.files)
@@ -150,7 +157,8 @@ function MediaUpload({ media, onChange }) {
           <button
             type="button"
             onClick={pickFile}
-            className="rounded-xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+            disabled={disabled}
+            className="rounded-xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Browse
           </button>
@@ -165,8 +173,9 @@ function MediaUpload({ media, onChange }) {
               </div>
               <button
                 type="button"
-                onClick={() => onChange(null)}
-                className="rounded-xl border border-blue-200/70 p-2 text-slate-600 transition hover:bg-blue-50"
+                onClick={() => !disabled && onChange(null)}
+                disabled={disabled}
+                className="rounded-xl border border-blue-200/70 p-2 text-slate-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Remove media"
               >
                 <X className="size-4" />
@@ -189,7 +198,7 @@ function MediaUpload({ media, onChange }) {
   )
 }
 
-function OptionsEditor({ question, quizMode, onChange }) {
+function OptionsEditor({ question, quizMode, onChange, structureLocked }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -203,6 +212,7 @@ function OptionsEditor({ question, quizMode, onChange }) {
   }
 
   const addOption = () => {
+    if (structureLocked) return
     onChange({
       ...question,
       options: [...question.options, { id: uid('opt'), text: `Option ${question.options.length + 1}`, isCorrect: false }],
@@ -210,11 +220,12 @@ function OptionsEditor({ question, quizMode, onChange }) {
   }
 
   const removeOption = (id) => {
+    if (structureLocked) return
     onChange({ ...question, options: question.options.filter((o) => o.id !== id) })
   }
 
   const toggleCorrect = (id) => {
-    if (!quizMode) return
+    if (!quizMode || structureLocked) return
     onChange({
       ...question,
       // MCQ supports a single correct answer at a time.
@@ -223,12 +234,61 @@ function OptionsEditor({ question, quizMode, onChange }) {
   }
 
   const onDragEnd = (event) => {
+    if (structureLocked) return
     const { active, over } = event
     if (!over || active.id === over.id) return
     const oldIndex = question.options.findIndex((o) => o.id === active.id)
     const newIndex = question.options.findIndex((o) => o.id === over.id)
     onChange({ ...question, options: arrayMove(question.options, oldIndex, newIndex) })
   }
+
+  const optionRows = question.options.map((opt) => (
+    <div key={opt.id} className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => toggleCorrect(opt.id)}
+        disabled={structureLocked}
+        className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+          structureLocked
+            ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500'
+            : quizMode
+              ? opt.isCorrect
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+              : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500'
+        }`}
+        title={
+          structureLocked
+            ? 'Correct answers cannot be changed after the session is live'
+            : quizMode
+              ? 'Toggle correct answer'
+              : 'Enable Quiz Mode to select correct answers'
+        }
+        aria-label="Toggle correct"
+      >
+        <CheckCircle2 className="size-4" />
+        {structureLocked ? (opt.isCorrect ? 'Correct' : '—') : quizMode ? (opt.isCorrect ? 'Correct' : 'Mark correct') : 'Quiz mode off'}
+      </button>
+      <input
+        className="h-10 min-w-[220px] flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+        value={opt.text}
+        onChange={(e) => setOptionText(opt.id, e.target.value)}
+      />
+      <button
+        type="button"
+        onClick={() => removeOption(opt.id)}
+        disabled={structureLocked}
+        className={`rounded-xl border p-2 transition ${
+          structureLocked
+            ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300'
+            : 'border-red-200 bg-white text-red-700 hover:bg-red-50'
+        }`}
+        aria-label="Delete option"
+      >
+        <Trash2 className="size-4" />
+      </button>
+    </div>
+  ))
 
   return (
     <div className="space-y-3">
@@ -237,54 +297,63 @@ function OptionsEditor({ question, quizMode, onChange }) {
         <button
           type="button"
           onClick={addOption}
-          className="inline-flex items-center gap-2 rounded-xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+          disabled={structureLocked}
+          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+            structureLocked
+              ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+              : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+          }`}
         >
           <Plus className="size-4" />
           Add option
         </button>
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={question.options.map((o) => o.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2">
-            {question.options.map((opt) => (
-              <SortableRow key={opt.id} id={opt.id}>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleCorrect(opt.id)}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                      quizMode
-                        ? opt.isCorrect
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                          : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                        : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500'
-                    }`}
-                    title={quizMode ? 'Toggle correct answer' : 'Enable Quiz Mode to select correct answers'}
-                    aria-label="Toggle correct"
-                  >
-                    <CheckCircle2 className="size-4" />
-                    {quizMode ? (opt.isCorrect ? 'Correct' : 'Mark correct') : 'Quiz mode off'}
-                  </button>
-                  <input
-                    className="h-10 min-w-[220px] flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-                    value={opt.text}
-                    onChange={(e) => setOptionText(opt.id, e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeOption(opt.id)}
-                    className="rounded-xl border border-red-200 bg-white p-2 text-red-700 transition hover:bg-red-50"
-                    aria-label="Delete option"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                </div>
-              </SortableRow>
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+      {structureLocked ? (
+        <div className="space-y-2">{optionRows}</div>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={question.options.map((o) => o.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {question.options.map((opt) => (
+                <SortableRow key={opt.id} id={opt.id}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleCorrect(opt.id)}
+                      className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                        quizMode
+                          ? opt.isCorrect
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                          : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500'
+                      }`}
+                      title={quizMode ? 'Toggle correct answer' : 'Enable Quiz Mode to select correct answers'}
+                      aria-label="Toggle correct"
+                    >
+                      <CheckCircle2 className="size-4" />
+                      {quizMode ? (opt.isCorrect ? 'Correct' : 'Mark correct') : 'Quiz mode off'}
+                    </button>
+                    <input
+                      className="h-10 min-w-[220px] flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                      value={opt.text}
+                      onChange={(e) => setOptionText(opt.id, e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeOption(opt.id)}
+                      className="rounded-xl border border-red-200 bg-white p-2 text-red-700 transition hover:bg-red-50"
+                      aria-label="Delete option"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </SortableRow>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
     </div>
   )
 }
@@ -475,6 +544,8 @@ function BuilderPage() {
     }
   }, [sessionQuery.data])
 
+  const isDraftSession = session?.rawStatus === 'draft'
+
   const quizMode = true
   const timeLimitSeconds = 30
   const [timeLimitMode, setTimeLimitMode] = useState('30s')
@@ -586,6 +657,7 @@ function BuilderPage() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!session) return
+      const isDraft = session.rawStatus === 'draft'
       if (hasMixedQuestionTypes) {
         throw new Error('Only one question type is allowed per session. Please keep all questions the same type before saving.')
       }
@@ -604,13 +676,21 @@ function BuilderPage() {
       const removedIds = initialQuestionIds.filter(
         (questionId) => !questions.some((item) => item.questionId === questionId),
       )
-      for (const questionId of removedIds) {
-        await deleteQuestionApi(accessToken, questionId)
+      if (isDraft) {
+        for (const questionId of removedIds) {
+          await deleteQuestionApi(accessToken, questionId)
+        }
+      } else if (removedIds.length > 0) {
+        throw new Error('Cannot remove questions while the session is live.')
       }
 
       const orderedIds = []
       for (let index = 0; index < questions.length; index += 1) {
         const question = questions[index]
+        if (!isDraft && !question.questionId) {
+          throw new Error('Cannot add new questions while the session is live.')
+        }
+
         const payload = {
           question_type: uiToApiType(question.type),
           question_text: question.text || 'Untitled question',
@@ -621,6 +701,7 @@ function BuilderPage() {
           options:
             question.type === 'MCQ'
               ? (question.options || []).map((option, optionIndex) => ({
+                  ...(option.optionId != null ? { option_id: option.optionId } : {}),
                   option_text: option.text || `Option ${optionIndex + 1}`,
                   is_correct: Boolean(option.isCorrect),
                   display_order: optionIndex + 1,
@@ -638,15 +719,17 @@ function BuilderPage() {
         }
       }
 
-      if (orderedIds.length > 0) {
+      if (isDraft && orderedIds.length > 0) {
         await reorderQuestionsApi(accessToken, sessionNumericId, orderedIds)
       }
 
-      await updateSessionApi(accessToken, sessionNumericId, {
-        is_anonymous_default: settings.anonymous,
-        leaderboard_enabled: settings.leaderboard,
-        max_participants: settings.maxParticipants,
-      })
+      if (isDraft) {
+        await updateSessionApi(accessToken, sessionNumericId, {
+          is_anonymous_default: settings.anonymous,
+          leaderboard_enabled: settings.leaderboard,
+          max_participants: settings.maxParticipants,
+        })
+      }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
@@ -789,6 +872,12 @@ function BuilderPage() {
           {saveSuccess}
         </div>
       ) : null}
+      {!isDraftSession ? (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          This session is <strong>live</strong>. You can update <strong>question text</strong> and <strong>answer labels</strong> only. Correct
+          answers, ordering, new questions, and session settings stay locked until the session is back in draft.
+        </div>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[440px_minmax(560px,1fr)_360px]">
         {/* Left: Question list */}
@@ -801,7 +890,7 @@ function BuilderPage() {
             <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
               {QUESTION_TYPES.map((t) => {
                 const Icon = t.icon
-                const isDisabled = Boolean(sessionQuestionType && sessionQuestionType !== t.type)
+                const isDisabled = Boolean(sessionQuestionType && sessionQuestionType !== t.type) || !isDraftSession
                 return (
                   <button
                     key={t.type}
@@ -814,9 +903,11 @@ function BuilderPage() {
                         : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
                     }`}
                     title={
-                      isDisabled
-                        ? `Session locked to ${sessionQuestionType}. Remove existing questions to switch type.`
-                        : t.description
+                      !isDraftSession
+                        ? 'Add questions is available only while the session is in draft.'
+                        : isDisabled
+                          ? `Session locked to ${sessionQuestionType}. Remove existing questions to switch type.`
+                          : t.description
                     }
                   >
                     <span
@@ -837,7 +928,9 @@ function BuilderPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-navy-900">Questions</p>
-                <p className="mt-1 text-xs text-slate-600">Drag to reorder • Click to edit</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  {isDraftSession ? 'Drag to reorder • Click to edit' : 'Click to edit wording (reorder & delete are locked while live)'}
+                </p>
               </div>
               <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-navy-700">
                 {questions.length}
@@ -845,6 +938,7 @@ function BuilderPage() {
             </div>
 
             <div className="mt-4 max-h-[calc(100vh-270px)] space-y-2 overflow-auto pr-1">
+              {isDraftSession ? (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onQuestionsDragEnd}>
                 <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-2">
@@ -903,6 +997,62 @@ function BuilderPage() {
                   </div>
                 </SortableContext>
               </DndContext>
+              ) : (
+              <div className="space-y-2">
+                {questions.map((q, idx) => {
+                  const isTypeMismatch = Boolean(sessionQuestionType && q.type !== sessionQuestionType)
+                  return (
+                    <div
+                      key={q.id}
+                      className={`rounded-2xl border border-blue-200/70 bg-white/90 shadow-sm shadow-blue-900/5 backdrop-blur ${
+                        q.id === selectedId ? 'ring-2 ring-blue-500/25' : ''
+                      }`}
+                    >
+                      <div className="px-3 py-2">
+                        <div className="flex w-full items-start justify-between gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isTypeMismatch) return
+                              setSelectedId(q.id)
+                            }}
+                            className={`min-w-0 flex-1 rounded-xl px-2 py-2 text-left ${
+                              isTypeMismatch ? 'cursor-not-allowed opacity-60' : ''
+                            }`}
+                            disabled={isTypeMismatch}
+                            title={isTypeMismatch ? `Session locked to ${sessionQuestionType}.` : undefined}
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                {idx + 1}
+                              </span>
+                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-navy-700">
+                                {q.type}
+                              </span>
+                            </div>
+                            <p className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug text-navy-900">
+                              {q.text?.trim() ? q.text : `Untitled ${q.type}`}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-600">
+                              {q.media?.url ? 'Has media • ' : ''}
+                              {q.type === 'MCQ' ? `${q.options?.length ?? 0} options` : 'No options'}
+                            </p>
+                          </button>
+                          <button
+                            type="button"
+                            disabled
+                            className="cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-300"
+                            aria-label="Delete question (locked while live)"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              )}
             </div>
           </div>
         </div>
@@ -926,10 +1076,12 @@ function BuilderPage() {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
+                  disabled={!isDraftSession}
                   onClick={() => {
                     setDirty(true)
                   }}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  title={!isDraftSession ? 'Quiz mode is locked while the session is live' : undefined}
                 >
                   {quizMode ? <ToggleRight className="size-4 text-emerald-600" /> : <ToggleLeft className="size-4 text-slate-500" />}
                   Quiz mode
@@ -939,11 +1091,13 @@ function BuilderPage() {
                   <input
                     type="number"
                     min={0}
-                    disabled={!quizMode}
+                    disabled={!quizMode || !isDraftSession}
                     value={selected.points ?? 0}
                     onChange={(e) => updateQuestion({ ...selected, points: Number(e.target.value || 0) })}
                     className={`h-9 w-20 rounded-xl border px-2 text-sm outline-none ${
-                      quizMode ? 'border-blue-200/70 bg-white text-slate-700 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15' : 'border-slate-200 bg-slate-50 text-slate-500'
+                      quizMode && isDraftSession
+                        ? 'border-blue-200/70 bg-white text-slate-700 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15'
+                        : 'border-slate-200 bg-slate-50 text-slate-500'
                     }`}
                   />
                 </div>
@@ -964,11 +1118,17 @@ function BuilderPage() {
               <MediaUpload
                 media={selected.media}
                 onChange={(media) => updateQuestion({ ...selected, media })}
+                disabled={!isDraftSession}
               />
 
               {selected.type === 'MCQ' && (
                 <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
-                  <OptionsEditor question={selected} quizMode={quizMode} onChange={updateQuestion} />
+                  <OptionsEditor
+                    question={selected}
+                    quizMode={quizMode}
+                    onChange={updateQuestion}
+                    structureLocked={!isDraftSession}
+                  />
                 </div>
               )}
 
@@ -981,8 +1141,9 @@ function BuilderPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <select
                       value={timeLimitMode}
+                      disabled={!isDraftSession}
                       onChange={(e) => setTimeLimitMode(e.target.value)}
-                      className="h-10 rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                      className="h-10 rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
                     >
                       {['Off', '15s', '30s', '60s', '120s', 'Custom'].map((x) => (
                         <option key={x} value={x}>
@@ -994,9 +1155,10 @@ function BuilderPage() {
                       <input
                         type="number"
                         min={1}
+                        disabled={!isDraftSession}
                         value={customTime}
                         onChange={(e) => setCustomTime(Number(e.target.value || 1))}
-                        className="h-10 w-24 rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                        className="h-10 w-24 rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50"
                       />
                     )}
                   </div>
@@ -1024,13 +1186,14 @@ function BuilderPage() {
                 <p className="text-xs text-slate-500">What participants must enter to join</p>
                 <select
                   value={joinRequirement}
+                  disabled={!isDraftSession}
                   onChange={(e) => {
                     const next = e.target.value
                     setDirty(true)
                     setJoinRequirement(next)
                     setSettings((prev) => ({ ...prev, anonymous: next === 'anonymous' }))
                   }}
-                  className="mt-2 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                  className="mt-2 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50"
                 >
                   <option value="anonymous">Anonymous (no name/email)</option>
                   <option value="name">Name only</option>
@@ -1045,12 +1208,13 @@ function BuilderPage() {
                 </div>
                 <input
                   type="checkbox"
+                  disabled={!isDraftSession}
                   checked={settings.anonymous}
                   onChange={(e) => {
                     setDirty(true)
                     setSettings((prev) => ({ ...prev, anonymous: e.target.checked }))
                   }}
-                  className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
+                  className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40 disabled:cursor-not-allowed"
                 />
               </label>
 
@@ -1061,12 +1225,13 @@ function BuilderPage() {
                 </div>
                 <input
                   type="checkbox"
+                  disabled={!isDraftSession}
                   checked={settings.leaderboard}
                   onChange={(e) => {
                     setDirty(true)
                     setSettings((prev) => ({ ...prev, leaderboard: e.target.checked }))
                   }}
-                  className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
+                  className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40 disabled:cursor-not-allowed"
                 />
               </label>
 
@@ -1075,12 +1240,13 @@ function BuilderPage() {
                 <input
                   type="number"
                   min={1}
+                  disabled={!isDraftSession}
                   value={settings.maxParticipants}
                   onChange={(e) => {
                     setDirty(true)
                     setSettings((prev) => ({ ...prev, maxParticipants: Number(e.target.value || 1) }))
                   }}
-                  className="mt-2 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                  className="mt-2 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50"
                 />
               </div>
 
@@ -1088,13 +1254,14 @@ function BuilderPage() {
                 <label className="text-sm font-semibold text-slate-700">Session password</label>
                 <input
                   type="text"
+                  disabled={!isDraftSession}
                   value={settings.password}
                   onChange={(e) => {
                     setDirty(true)
                     setSettings((prev) => ({ ...prev, password: e.target.value }))
                   }}
                   placeholder="Optional"
-                  className="mt-2 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                  className="mt-2 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50"
                 />
               </div>
 
