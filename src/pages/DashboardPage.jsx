@@ -308,14 +308,14 @@ function DashboardPage() {
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-800">Admin Dashboard</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Admin Dashboard</p>
           <h2 className="mt-1 text-2xl font-bold text-navy-900">Sessions overview</h2>
         </div>
 
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
+          className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
         >
           <Plus className="size-4" />
           New Session
@@ -366,7 +366,7 @@ function DashboardPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -456,7 +456,7 @@ function DashboardPage() {
             <button type="button" onClick={() => setCreateOpen(false)} className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50">
               Cancel
             </button>
-            <button type="submit" className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110">
+            <button type="submit" className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110">
               Create session
             </button>
           </div>
@@ -467,7 +467,7 @@ function DashboardPage() {
         {shareSession && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Session</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session</p>
               <p className="mt-1 text-lg font-bold text-navy-900">{shareSession.title}</p>
               <p className="mt-1 text-sm text-slate-600">
                 Link for participants to join session {shareSession.id}

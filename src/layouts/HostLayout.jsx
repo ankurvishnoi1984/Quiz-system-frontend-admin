@@ -12,7 +12,7 @@ function HostLayout() {
     <ShellProvider>
       <SessionsProvider>
         <div className="relative flex min-h-screen overflow-hidden bg-linear-to-br from-slate-100 via-blue-50 to-indigo-100/70">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(30,64,175,0.10),transparent_35%),radial-gradient(circle_at_12%_72%,rgba(14,116,144,0.10),transparent_35%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(27,75,107,0.09),transparent_35%),radial-gradient(circle_at_12%_72%,rgba(200,35,44,0.04),transparent_35%)]" />
           <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((prev) => !prev)} />
           <div className="relative z-10 flex min-w-0 flex-1 flex-col">
             <Navbar />

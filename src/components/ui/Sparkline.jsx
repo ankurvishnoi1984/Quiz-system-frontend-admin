@@ -1,4 +1,4 @@
-function Sparkline({ points, stroke = '#2563eb' }) {
+function Sparkline({ points, stroke = '#1b4b6b' }) {
   const width = 92
   const height = 26
   const pad = 2

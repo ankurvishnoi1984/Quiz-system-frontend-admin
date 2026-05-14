@@ -604,7 +604,7 @@ function ParticipantSessionPage() {
 
           <button
             type="submit"
-            className="h-11 w-full rounded-xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110"
+            className="h-11 w-full rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110"
           >
             Join
           </button>
@@ -666,7 +666,7 @@ function ParticipantSessionPage() {
 
         {step === 'active' && question && (
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
+            <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">
               Question {questionIndex + 1} / {mappedQuestions.length}
             </p>
             {question.media?.url && question.media.kind === 'image' && (
@@ -682,11 +682,11 @@ function ParticipantSessionPage() {
               <div className="rounded-xl border border-blue-200/70 bg-white p-3">
                 <div className="flex items-center justify-between text-sm font-semibold">
                   <span className="text-slate-700">Time left</span>
-                  <span className={timer <= 5 ? 'text-red-700' : 'text-blue-700'}>{timer}s</span>
+                  <span className={timer <= 5 ? 'text-red-700' : 'text-navy-700'}>{timer}s</span>
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
                   <div
-                    className={`h-full ${timer <= 5 ? 'bg-red-500' : 'bg-linear-to-r from-blue-600 to-indigo-600'}`}
+                    className={`h-full ${timer <= 5 ? 'bg-red-500' : 'bg-linear-to-r from-navy-600 to-navy-500'}`}
                     style={{ width: `${Math.round((timer / Math.max(1, timeLimit)) * 100)}%` }}
                   />
                 </div>
@@ -810,7 +810,7 @@ function ParticipantSessionPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {(currentResponse.tags || []).map((t, idx) => (
-                    <span key={`${t}-${idx}`} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                    <span key={`${t}-${idx}`} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-navy-700">
                       {t}
                     </span>
                   ))}
@@ -850,7 +850,7 @@ function ParticipantSessionPage() {
                 type="button"
                 onClick={handleSubmitResponse}
                 disabled={!Object.keys(responses).length || isSubmitting}
-                className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit'}
               </button>
@@ -874,7 +874,7 @@ function ParticipantSessionPage() {
                   type="checkbox"
                   checked={showLiveResult}
                   onChange={(e) => setShowLiveResult(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500/40"
+                  className="h-4 w-4 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
                 />
                 Show live result after submit
               </label>
@@ -941,7 +941,7 @@ function ParticipantSessionPage() {
                       type="checkbox"
                       checked={askAnonymous}
                       onChange={(e) => setAskAnonymous(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500/40"
+                      className="h-4 w-4 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
                     />
                     Ask anonymously
                   </label>
@@ -949,7 +949,7 @@ function ParticipantSessionPage() {
                 <button
                   type="button"
                   onClick={handleAskQuestion}
-                  className="ml-auto inline-flex h-10 items-center gap-2 rounded-xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white shadow-sm shadow-blue-900/20 transition hover:brightness-110"
+                  className="ml-auto inline-flex h-10 items-center gap-2 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-sm shadow-blue-900/20 transition hover:brightness-110"
                 >
                   <Send className="size-4" />
                   Submit
@@ -962,10 +962,10 @@ function ParticipantSessionPage() {
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-navy-900">Your questions</p>
                 {ownQuestions.map((q) => (
-                  <div key={q.id} className="rounded-2xl border border-indigo-200 bg-indigo-50 p-3">
+                  <div key={q.id} className="rounded-2xl border border-blue-200 bg-navy-900/40 p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-indigo-900">{q.text}</p>
-                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                      <p className="text-sm font-semibold text-slate-800">{q.text}</p>
+                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-navy-700">
                         {q.status}
                       </span>
                     </div>

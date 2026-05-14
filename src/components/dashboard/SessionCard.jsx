@@ -16,7 +16,7 @@ function StatusBadge({ status }) {
 }
 
 function Tag({ children }) {
-  return <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">{children}</span>
+  return <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-navy-700">{children}</span>
 }
 
 function ProgressPill({ value, isLive }) {
@@ -24,7 +24,7 @@ function ProgressPill({ value, isLive }) {
     <div className="flex items-center gap-2">
       <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100">
         <div 
-          className={`h-full bg-linear-to-r from-blue-600 to-indigo-600 transition-all duration-500 ${isLive ? 'animate-pulse' : ''}`} 
+          className={`h-full bg-linear-to-r from-navy-600 to-navy-500 transition-all duration-500 ${isLive ? 'animate-pulse' : ''}`} 
           style={{ width: `${Math.max(2, Math.min(100, value))}%` }} 
         />
       </div>
@@ -43,7 +43,7 @@ function SessionCard({ session, onAction }) {
 
   return (
     <div
-      className="group relative z-0 overflow-visible rounded-2xl border border-blue-200/70 bg-white/85 p-4 shadow-sm shadow-blue-900/5 backdrop-blur transition hover:z-20 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-900/10"
+      className="group relative z-0 overflow-visible rounded-2xl border border-blue-200/70 bg-white/90 p-4 shadow-sm shadow-blue-900/5 backdrop-blur transition hover:z-20 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-900/10"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">

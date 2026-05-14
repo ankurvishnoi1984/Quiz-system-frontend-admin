@@ -1,10 +1,17 @@
 @import "tailwindcss";
 
+/* Brand: primary teal-blue #1b4b6b, accent red #c8232c — surfaces stay light */
 @theme {
-  --color-navy-950: #050b1f;
-  --color-navy-900: #0a1330;
-  --color-navy-800: #12224d;
-  --color-navy-700: #1c2f66;
+  --color-navy-950: #050b14;
+  --color-navy-900: #0a1f2e;
+  --color-navy-800: #12354a;
+  --color-navy-700: #1b4b6b;
+  --color-navy-600: #2a6585;
+  --color-navy-500: #3d7fa0;
+  --color-navy-400: #5a9ab8;
+
+  --color-accent: #c8232c;
+  --color-accent-hover: #e02e38;
 }
 
 @layer base {
@@ -16,14 +23,14 @@
 
 @layer components {
   .glass-card {
-    @apply rounded-2xl border border-slate-200 bg-white/90 shadow-2xl shadow-blue-900/10 backdrop-blur;
+    @apply rounded-2xl border border-slate-200 bg-white/90 shadow-2xl shadow-navy-900/10 backdrop-blur;
   }
 
   .input-modern {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20;
+    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-navy-700 focus:ring-2 focus:ring-navy-700/20;
   }
 
   .btn-gradient {
-    @apply inline-flex w-full items-center justify-center rounded-xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex w-full items-center justify-center rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-navy-900/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60;
   }
 }

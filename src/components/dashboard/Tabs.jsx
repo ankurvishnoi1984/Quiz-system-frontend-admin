@@ -7,7 +7,7 @@ function Tabs({ items, active, onChange }) {
           type="button"
           onClick={() => onChange(item)}
           className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-            active === item ? 'bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 text-white shadow' : 'text-slate-600 hover:bg-blue-50'
+            active === item ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow' : 'text-slate-600 hover:bg-blue-50'
           }`}
         >
           {item}

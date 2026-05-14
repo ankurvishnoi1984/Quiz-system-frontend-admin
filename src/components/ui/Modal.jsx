@@ -24,7 +24,7 @@ function Modal({ open, title, children, onClose }) {
       <div className="relative mx-auto mt-20 w-[min(92vw,680px)] rounded-2xl border border-blue-200/70 bg-white p-5 shadow-2xl shadow-blue-900/20">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Create</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Create</p>
             <h3 className="text-xl font-bold text-navy-900">{title}</h3>
           </div>
           <button

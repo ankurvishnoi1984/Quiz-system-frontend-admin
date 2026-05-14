@@ -62,7 +62,7 @@ function SortableRow({ id, children, className = '' }) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-2xl border border-blue-200/70 bg-white/85 shadow-sm shadow-blue-900/5 backdrop-blur transition ${
+      className={`rounded-2xl border border-blue-200/70 bg-white/90 shadow-sm shadow-blue-900/5 backdrop-blur transition ${
         isDragging ? 'opacity-70' : ''
       } ${className}`}
     >
@@ -139,7 +139,7 @@ function MediaUpload({ media, onChange }) {
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-2xl bg-linear-to-br from-blue-600 to-indigo-600 text-white">
+            <div className="grid size-10 place-items-center rounded-2xl bg-linear-to-br from-navy-600 to-navy-500 text-white">
               <FileUp className="size-4" />
             </div>
             <div>
@@ -258,7 +258,7 @@ function OptionsEditor({ question, quizMode, onChange }) {
                         ? opt.isCorrect
                           ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                           : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                        : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                        : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500'
                     }`}
                     title={quizMode ? 'Toggle correct answer' : 'Enable Quiz Mode to select correct answers'}
                     aria-label="Toggle correct"
@@ -293,7 +293,7 @@ function ParticipantPreview({ question, quizMode }) {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Participant View</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Participant View</p>
         <h3 className="mt-2 text-lg font-bold text-navy-900">{question.text || 'Untitled question'}</h3>
         <p className="mt-1 text-sm text-slate-600">Type: {question.type}</p>
         {question.media?.url && question.media.kind === 'image' && (
@@ -711,11 +711,11 @@ function BuilderPage() {
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-800">Question Builder</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Question Builder</p>
           <h2 className="mt-1 text-2xl font-bold text-navy-900">{session.title}</h2>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">Session {session.id}</span>
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{session.status}</span>
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-navy-700">{session.status}</span>
             <span className="text-xs">Last saved: {lastSavedLabel}</span>
             {dirty ? (
               <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">Unsaved changes</span>
@@ -759,7 +759,7 @@ function BuilderPage() {
             onClick={() => {
               saveMutation.mutate()
             }}
-            className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
+            className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
           >
             {saveMutation.isPending ? 'Saving...' : 'Save'}
           </button>
@@ -810,7 +810,7 @@ function BuilderPage() {
                     disabled={isDisabled}
                     className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                       isDisabled
-                        ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+                        ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500'
                         : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
                     }`}
                     title={
@@ -821,7 +821,7 @@ function BuilderPage() {
                   >
                     <span
                       className={`grid size-9 place-items-center rounded-2xl ${
-                        isDisabled ? 'bg-slate-300 text-white' : 'bg-linear-to-br from-navy-900 to-blue-700 text-white'
+                        isDisabled ? 'bg-slate-300 text-white' : 'bg-linear-to-br from-navy-900 to-navy-600 text-white'
                       }`}
                     >
                       <Icon className="size-4" />
@@ -839,7 +839,7 @@ function BuilderPage() {
                 <p className="text-sm font-semibold text-navy-900">Questions</p>
                 <p className="mt-1 text-xs text-slate-600">Drag to reorder • Click to edit</p>
               </div>
-              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-navy-700">
                 {questions.length}
               </span>
             </div>
@@ -871,7 +871,7 @@ function BuilderPage() {
                                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                                   {idx + 1}
                                 </span>
-                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-navy-700">
                                   {q.type}
                                 </span>
                               </div>
@@ -909,7 +909,7 @@ function BuilderPage() {
 
         {/* Center: Editor */}
         <div className="space-y-4">
-          <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-6 shadow-sm shadow-blue-900/5 backdrop-blur">
+          <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-6 shadow-sm shadow-blue-900/5 backdrop-blur">
             {!selected ? (
               <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-8 text-center text-slate-600">
                 No questions in this session yet. Use <strong>Add question</strong> from the left panel, then click
@@ -919,7 +919,7 @@ function BuilderPage() {
               <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Editing</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Editing</p>
                 <h3 className="mt-1 text-lg font-bold text-navy-900">{selected.type}</h3>
               </div>
 
@@ -943,7 +943,7 @@ function BuilderPage() {
                     value={selected.points ?? 0}
                     onChange={(e) => updateQuestion({ ...selected, points: Number(e.target.value || 0) })}
                     className={`h-9 w-20 rounded-xl border px-2 text-sm outline-none ${
-                      quizMode ? 'border-blue-200/70 bg-white text-slate-700 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15' : 'border-slate-200 bg-slate-50 text-slate-400'
+                      quizMode ? 'border-blue-200/70 bg-white text-slate-700 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15' : 'border-slate-200 bg-slate-50 text-slate-500'
                     }`}
                   />
                 </div>
@@ -1014,8 +1014,8 @@ function BuilderPage() {
 
         {/* Right: Session settings */}
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Session settings</p>
+          <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
+            <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session settings</p>
             <h3 className="mt-1 text-lg font-bold text-navy-900">Controls</h3>
 
             <div className="mt-4 space-y-3">
@@ -1050,7 +1050,7 @@ function BuilderPage() {
                     setDirty(true)
                     setSettings((prev) => ({ ...prev, anonymous: e.target.checked }))
                   }}
-                  className="h-5 w-5 rounded border-slate-300 text-blue-700 focus:ring-blue-500/40"
+                  className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
                 />
               </label>
 
@@ -1066,7 +1066,7 @@ function BuilderPage() {
                     setDirty(true)
                     setSettings((prev) => ({ ...prev, leaderboard: e.target.checked }))
                   }}
-                  className="h-5 w-5 rounded border-slate-300 text-blue-700 focus:ring-blue-500/40"
+                  className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
                 />
               </label>
 

@@ -38,13 +38,13 @@ function Sidebar({ collapsed, onToggle }) {
 
   return (
     <aside
-      className={`relative z-20 border-r border-navy-700/70 bg-linear-to-b from-navy-900 via-navy-800 to-blue-900 text-slate-100 shadow-2xl shadow-navy-950/30 transition-all duration-300 ${
+      className={`relative z-20 border-r border-navy-700/70 bg-linear-to-b from-navy-950 via-navy-900 to-navy-800 text-slate-100 shadow-2xl shadow-navy-950/30 transition-all duration-300 ${
         collapsed ? 'w-20' : 'w-72'
       }`}
     >
       <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
         <div className={`flex items-center gap-2 overflow-hidden ${collapsed ? 'w-0' : 'w-auto'}`}>
-  <div className="grid size-12 place-items-center rounded-xl bg-white/10 p-1">
+  <div className="grid size-12 place-items-center rounded-xl bg-white p-1">
   <img
     src="/icon.png"
     alt="Logo"
@@ -88,8 +88,8 @@ function Sidebar({ collapsed, onToggle }) {
                 <>
                   <span className="truncate">{item.label}</span>
                   <div className="ml-auto flex items-center gap-2">
-                    {item.live && <span className="rounded-full bg-red-500/25 px-2 py-0.5 text-[10px] font-semibold text-red-100">LIVE</span>}
-                    {item.isNew && <span className="rounded-full bg-cyan-300/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-100">NEW</span>}
+                    {item.live && <span className="rounded-full bg-accent/25 px-2 py-0.5 text-[10px] font-semibold text-red-100">LIVE</span>}
+                    {item.isNew && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-red-100">NEW</span>}
                   </div>
                 </>
               )}

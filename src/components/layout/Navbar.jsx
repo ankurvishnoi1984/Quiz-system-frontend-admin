@@ -43,7 +43,7 @@ function Navbar() {
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-blue-200/70 bg-white/70 px-6 backdrop-blur-xl">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-800">Host Workspace</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-navy-700">Host Workspace</p>
         <h1 className="text-lg font-semibold text-navy-900">{pageTitles[pathname] ?? 'Quiz Management System'}</h1>
       </div>
 
@@ -97,7 +97,7 @@ function Navbar() {
           onClick={() => setMenuOpen((prev) => !prev)}
           className="inline-flex items-center gap-2 rounded-xl border border-blue-200/70 bg-white/90 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5 transition hover:bg-blue-50"
         >
-          <span className="grid size-7 place-items-center rounded-full bg-linear-to-br from-navy-900 to-blue-700 text-xs font-semibold text-white">
+          <span className="grid size-7 place-items-center rounded-full bg-linear-to-br from-navy-900 to-navy-600 text-xs font-semibold text-white">
             {initials}
           </span>
           {user?.full_name || 'User'}

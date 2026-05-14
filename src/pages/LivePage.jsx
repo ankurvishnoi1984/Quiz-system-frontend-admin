@@ -260,7 +260,7 @@ function LivePage() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-800">Live Present Mode</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Live Present Mode</p>
           <p className="mt-1 text-lg font-bold text-navy-900">{session.title}</p>
           <p className="mt-1 text-xs text-slate-600">
             Session {session.session_id} • {statusLabel} • Socket: {socketStatus}
@@ -293,7 +293,7 @@ function LivePage() {
           >
             End Session
           </button>
-          <span className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white">
+          <span className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white">
             <Users className="size-4" />
             {participants} participants
           </span>
@@ -317,10 +317,10 @@ function LivePage() {
 
 
       <div className="grid gap-6 2xl:grid-cols-[1.1fr_1fr]">
-        <div className="space-y-4 rounded-2xl border border-blue-200/70 bg-white/85 p-5">
+        <div className="space-y-4 rounded-2xl border border-blue-200/70 bg-white/90 p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Current question</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Current question</p>
               <h3 className="mt-1 text-xl font-bold text-navy-900">{activeQuestion?.text || 'No question selected'}</h3>
               <p className="text-sm text-slate-600">
                 {activeQuestion ? `${questionIndex + 1} / ${mappedQuestions.length} • ${activeQuestion.type}` : 'Add questions in Builder first'}
@@ -361,7 +361,7 @@ function LivePage() {
               </span>
             </div>
             <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full bg-linear-to-r from-blue-600 to-indigo-600" style={{ width: `${responseRate}%` }} />
+              <div className="h-full bg-linear-to-r from-navy-600 to-navy-500" style={{ width: `${responseRate}%` }} />
             </div>
           </div>
 
@@ -369,7 +369,7 @@ function LivePage() {
           <div className="rounded-2xl border border-blue-200 bg-white p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-navy-900">Attempts & responses</p>
-              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{attemptsRows.length}</span>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-navy-700">{attemptsRows.length}</span>
             </div>
             <div className="mt-3 max-h-[280px] overflow-auto rounded-xl border border-blue-100">
               <table className="w-full text-left text-sm">
@@ -403,8 +403,8 @@ function LivePage() {
 
 
         <div className="space-y-4">
-          <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Live chart</p>
+          <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Live chart</p>
             <div className="mt-3 h-[300px] rounded-2xl border border-blue-200 bg-white p-3">
               <ResponsiveContainer width="100%" height="100%">
                 {activeQuestion?.rawType === 'mcq' ? (
@@ -431,7 +431,7 @@ function LivePage() {
           </div>
 
 
-          <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-5">
+          <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-navy-900">Q&A panel</p>
               <button type="button" onClick={() => setQaOpen((p) => !p)} className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm">

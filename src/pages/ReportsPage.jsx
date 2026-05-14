@@ -109,7 +109,7 @@ function ReportsPage() {
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-800">Reports</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Reports</p>
           <h2 className="mt-1 text-2xl font-bold text-navy-900">Download & view session reports</h2>
           <p className="mt-1 text-sm text-slate-600">Exports are based on your sessions, questions, and settings.</p>
         </div>
@@ -118,7 +118,7 @@ function ReportsPage() {
           <button
             type="button"
             onClick={() => exportAllCsv(filtered)}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
+            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
           >
             <Download className="size-4" />
             Export all (CSV)
@@ -143,7 +143,7 @@ function ReportsPage() {
                 type="button"
                 onClick={() => setStatus(t)}
                 className={`rounded-2xl px-3 py-2 text-sm font-semibold transition ${
-                  status === t ? 'bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 text-white shadow' : 'border border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                  status === t ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow' : 'border border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
                 }`}
               >
                 {t}
@@ -152,7 +152,7 @@ function ReportsPage() {
           </div>
 
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -180,7 +180,7 @@ function ReportsPage() {
         </div>
       </div>
 
-      <div className="relative z-0 overflow-visible  rounded-2xl border border-blue-200/70 bg-white/85 shadow-sm shadow-blue-900/5 backdrop-blur">
+      <div className="relative z-0 overflow-visible  rounded-2xl border border-blue-200/70 bg-white/90 shadow-sm shadow-blue-900/5 backdrop-blur">
         <div className="grid min-w-[900px] grid-cols-[minmax(240px,1.6fr)_minmax(90px,0.8fr)_minmax(90px,0.8fr)_minmax(140px,0.8fr)_96px] gap-3 border-b border-blue-100 bg-white pl-5 pr-8 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
           <div>Session</div>
           <div>Status</div>
@@ -216,7 +216,7 @@ function ReportsPage() {
             <div className="text-sm font-semibold text-slate-700">{(s.participants ?? 0).toLocaleString()}</div>
             <div className="text-sm text-slate-700">
               <span className="inline-flex items-center gap-2">
-                <ShieldCheck className="size-4 text-blue-700" />
+                <ShieldCheck className="size-4 text-navy-700" />
                 {s.joinRequirement ?? 'name'}
               </span>
             </div>

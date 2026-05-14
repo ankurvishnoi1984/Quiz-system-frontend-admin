@@ -144,7 +144,7 @@ function AnalyticsPage() {
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-800">Session Analytics</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Session Analytics</p>
           <h2 className="mt-1 text-2xl font-bold text-navy-900">{session.title}</h2>
           <p className="mt-1 text-sm text-slate-600">Session {session.id} • {session.status}</p>
         </div>
@@ -188,7 +188,7 @@ function AnalyticsPage() {
           <button
             type="button"
             onClick={printPdf}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
+            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
           >
             <Printer className="size-4" />
             PDF report
@@ -204,7 +204,7 @@ function AnalyticsPage() {
           ['Avg response rate', `${summary.avg}%`, 'Across all questions'],
           ['Session duration', `${summary.durationMin}m`, 'Estimated based on questions'],
         ].map(([label, value, hint]) => (
-          <div key={label} className="rounded-2xl border border-blue-200/70 bg-white/85 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
+          <div key={label} className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
             <p className="mt-2 text-2xl font-bold text-navy-900">{value}</p>
             <p className="mt-2 text-sm text-slate-600">{hint}</p>
@@ -224,12 +224,12 @@ function AnalyticsPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {perQuestion.map((q) => (
-          <div key={q.id} className="rounded-2xl border border-blue-200/70 bg-white/85 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
+          <div key={q.id} className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">Q{q.index}</span>
-                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{q.type}</span>
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-navy-700">{q.type}</span>
                 </div>
                 <p className="mt-2 line-clamp-2 text-base font-semibold text-navy-900">{q.text || 'Untitled question'}</p>
               </div>
@@ -239,7 +239,7 @@ function AnalyticsPage() {
               </div>
             </div>
 
-            <div className="mt-4 h-56 rounded-2xl border border-blue-200/70 bg-white/85 p-3">
+            <div className="mt-4 h-56 rounded-2xl border border-blue-200/70 bg-white/90 p-3">
               <ResponsiveContainer width="100%" height="100%">
                 {q.type === 'MCQ' ? (
                   <BarChart data={q.chart}>
@@ -289,7 +289,7 @@ function AnalyticsPage() {
 
       {/* Leaderboard + Q&A */}
       <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-2xl border border-amber-200/70 bg-white/85 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
+        <div className="rounded-2xl border border-amber-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Leaderboard</p>
@@ -312,13 +312,13 @@ function AnalyticsPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-blue-200/70 bg-white/85 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
+        <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Session settings</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session settings</p>
               <h3 className="mt-1 text-lg font-bold text-navy-900">Snapshot</h3>
             </div>
-            <FileText className="size-5 text-blue-700" />
+            <FileText className="size-5 text-navy-700" />
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
@@ -358,7 +358,7 @@ function AnalyticsPage() {
       <Modal open={pdfOpen} title="PDF Report (Print)" onClose={() => setPdfOpen(false)}>
         <div className="space-y-4">
           <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Report</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Report</p>
             <h3 className="mt-2 text-lg font-bold text-navy-900">{session.title}</h3>
             <p className="mt-1 text-sm text-slate-600">Session {session.id}</p>
           </div>
@@ -395,7 +395,7 @@ function AnalyticsPage() {
             <button
               type="button"
               onClick={() => window.print()}
-              className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-blue-700 to-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
+              className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
             >
               <Printer className="size-4" />
               Print / Save as PDF

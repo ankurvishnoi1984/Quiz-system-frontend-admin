@@ -34,16 +34,19 @@ function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
-      <div className="pointer-events-none absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50/80" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.14),transparent_42%),radial-gradient(circle_at_82%_78%,rgba(14,165,233,0.16),transparent_38%),radial-gradient(circle_at_50%_120%,rgba(79,70,229,0.12),transparent_40%)]" />
-      <div className="pointer-events-none absolute -top-24 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-blue-300/35 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-44 right-8 h-80 w-80 rounded-full bg-indigo-300/30 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-8 left-6 h-64 w-64 rounded-full bg-cyan-200/40 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 bg-linear-to-br from-slate-100 via-blue-50 to-indigo-100/80" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(27,75,107,0.12),transparent_42%),radial-gradient(circle_at_82%_78%,rgba(200,35,44,0.06),transparent_38%),radial-gradient(circle_at_50%_120%,rgba(27,75,107,0.08),transparent_40%)]" />
+      <div className="pointer-events-none absolute -top-24 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-navy-400/25 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-44 right-8 h-80 w-80 rounded-full bg-accent/10 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-8 left-6 h-64 w-64 rounded-full bg-navy-500/15 blur-3xl" />
 
       <section className="glass-card relative w-full max-w-md p-6 sm:p-8">
         <div className="mb-8 space-y-2 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-blue-700">Host Portal</p>
-          <h1 className="text-2xl font-bold text-navy-900 sm:text-3xl">Welcome back</h1>
+          <div className="mx-auto mb-4 flex justify-center">
+            <img src="/log5.png" alt="Company logo" className="h-16 w-auto max-w-[220px] object-contain sm:h-20" />
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-navy-700">Host Portal</p>
+          {/* <h1 className="text-2xl font-bold text-navy-900 sm:text-3xl">Welcome back</h1> */}
           <p className="text-sm text-slate-600">Sign in to manage your quiz, poll, and survey sessions.</p>
         </div>
 
@@ -100,11 +103,11 @@ function LoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(event) => setRememberMe(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 bg-white text-blue-700 focus:ring-blue-500/40"
+                className="h-4 w-4 rounded border-slate-300 bg-white text-navy-700 focus:ring-blue-500/40"
               />
               Remember Me
             </label>
-            <a href="#" className="text-sm font-medium text-blue-700 transition hover:text-blue-900">
+            <a href="#" className="text-sm font-medium text-navy-700 transition hover:text-navy-900">
               Forgot password?
             </a>
           </div>
