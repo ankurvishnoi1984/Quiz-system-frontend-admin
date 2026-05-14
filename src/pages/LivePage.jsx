@@ -1,10 +1,12 @@
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { ChevronLeft, ChevronRight, Crown, Eye, Play, Square, ThumbsDown, ThumbsUp, Trophy, Users, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Crown, Eye, Play, Share2, Square, ThumbsDown, ThumbsUp, Trophy, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import QRCode from 'qrcode'
 import Modal from '../components/ui/Modal'
 import { useAuthStore } from '../store/authStore'
+import { getSessionQrApi } from '../services/dashboardApi'
 import {
   getQuestionResultsApi,
   getSessionDetailApi,
@@ -49,6 +51,9 @@ function LivePage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [socketStatus, setSocketStatus] = useState('disconnected')
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareQrDataUrl, setShareQrDataUrl] = useState('')
+  const [shareCopied, setShareCopied] = useState(false)
 
 
   const sessionQuery = useQuery({
@@ -115,6 +120,28 @@ function LivePage() {
   useEffect(() => {
     setQuestionIndex(0)
   }, [sessionId])
+
+  useEffect(() => {
+    const makeQr = async () => {
+      const s = sessionQuery.data
+      if (!shareOpen || !s) {
+        setShareQrDataUrl('')
+        return
+      }
+      let link = `${window.location.origin}/join/${s.session_code || s.session_id}`
+      if (accessToken && s.session_id) {
+        try {
+          const qrPayload = await getSessionQrApi(accessToken, s.session_id)
+          if (qrPayload?.join_url) link = qrPayload.join_url
+        } catch {
+          // Fall back to local join link shape if QR endpoint fails.
+        }
+      }
+      const data = await QRCode.toDataURL(link, { margin: 1, width: 280 })
+      setShareQrDataUrl(data)
+    }
+    makeQr()
+  }, [shareOpen, sessionQuery.data, accessToken])
 
 
   useEffect(() => {
@@ -236,6 +263,10 @@ function LivePage() {
   const statusLabel = session?.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : '—'
   const canEditLive = session?.status === 'live'
 
+  const shareJoinUrl = session
+    ? `${window.location.origin}/join/${session.session_code || session.session_id}`
+    : ''
+
 
   if (!sessionId) {
     return (
@@ -306,6 +337,17 @@ function LivePage() {
           >
             <Trophy className="size-4" />
             Leaderboard
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShareOpen(true)
+              setShareCopied(false)
+            }}
+            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+          >
+            <Share2 className="size-4" />
+            Share
           </button>
         </div>
       </div>
@@ -466,6 +508,62 @@ function LivePage() {
           <h3 className="text-lg font-bold text-navy-900">{activeQuestion?.text || 'No question selected'}</h3>
           <p className="mt-1 text-sm text-slate-600">Type: {activeQuestion?.type || '—'}</p>
         </div>
+      </Modal>
+
+      <Modal
+        open={shareOpen}
+        title="Share Session"
+        onClose={() => {
+          setShareOpen(false)
+          setShareQrDataUrl('')
+          setShareCopied(false)
+        }}
+      >
+        {session ? (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session</p>
+              <p className="mt-1 text-lg font-bold text-navy-900">{session.title}</p>
+              <p className="mt-1 text-sm text-slate-600">Link for participants to join session {session.session_id}</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-[1fr_280px]">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Share link</label>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={shareJoinUrl}
+                    className="h-11 flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!shareJoinUrl) return
+                      navigator.clipboard.writeText(shareJoinUrl)
+                      setShareCopied(true)
+                      setTimeout(() => setShareCopied(false), 1500)
+                    }}
+                    className={`h-11 rounded-xl border px-4 text-sm font-semibold transition ${
+                      shareCopied
+                        ? 'scale-95 border-green-300 bg-green-100 text-green-700'
+                        : 'border-blue-200 bg-white text-slate-700 hover:bg-blue-50'
+                    }`}
+                  >
+                    {shareCopied ? 'Copied ✓' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-blue-200/70 bg-white p-3">
+                {shareQrDataUrl ? (
+                  <img src={shareQrDataUrl} alt="Session QR" className="mx-auto h-[240px] w-[240px]" />
+                ) : (
+                  <div className="grid h-[240px] place-items-center text-sm text-slate-500">Generating QR...</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </Modal>
 
       {leaderboardOpen && (
