@@ -33,6 +33,23 @@ function mapQuestionType(type) {
   return map[type] || type
 }
 
+function findOptionForSelection(options, selected) {
+  if (selected == null || selected === '' || !options?.length) return null
+  const norm = String(selected).trim().toLowerCase()
+  return options.find((o) => String(o.option_text || '').trim().toLowerCase() === norm) || null
+}
+
+function getTrueFalseChoices(question) {
+  const opts = question?.options || []
+  if (opts.length >= 2) {
+    return [...opts].sort((a, b) => {
+      const rank = (t) => (String(t).trim().toLowerCase() === 'true' ? 0 : 1)
+      return rank(a.option_text) - rank(b.option_text)
+    })
+  }
+  return [{ option_text: 'True' }, { option_text: 'False' }]
+}
+
 
 function ParticipantSessionPage() {
   const { sessionId } = useParams()
@@ -428,8 +445,9 @@ function ParticipantSessionPage() {
 
 
       if (q.type === 'MCQ' || q.type === 'True/False') {
-        const opt = q.options.find(o => o.option_text === res.selectedOption)
-        if (opt) payload.option_id = opt.option_id
+        const opt = findOptionForSelection(q.options, res.selectedOption)
+        if (!opt?.option_id) return null
+        payload.option_id = opt.option_id
       }
 
 
@@ -906,26 +924,33 @@ function ParticipantSessionPage() {
 
             {question.type === 'True/False' && (
               <div className="grid gap-2 sm:grid-cols-2">
-                {['True', 'False'].map((v) => (
-                  <button
-                    disabled={inputsLocked}
-                    key={v}
-                    type="button"
-                    onClick={() => {
-                      setResponses((prev) => ({
-                        ...prev,
-                        [question.id]: {
-                          ...prev[question.id],
-                          selectedOption: v,
-                        },
-                      }))
-                    }}
-                    className={`rounded-2xl border px-4 py-4 text-sm font-semibold transition ${currentResponse.selectedOption === v ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                {getTrueFalseChoices(question).map((o) => {
+                  const label = o.option_text
+                  return (
+                    <button
+                      disabled={inputsLocked}
+                      key={label}
+                      type="button"
+                      onClick={() => {
+                        setResponses((prev) => ({
+                          ...prev,
+                          [question.id]: {
+                            ...prev[question.id],
+                            selectedOption: label,
+                          },
+                        }))
+                      }}
+                      className={`rounded-2xl border px-4 py-4 text-sm font-semibold transition ${
+                        String(currentResponse.selectedOption || '').trim().toLowerCase() ===
+                        String(label).trim().toLowerCase()
+                          ? 'border-blue-400 bg-blue-50 text-blue-900'
+                          : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
                       }`}
-                  >
-                    {v}
-                  </button>
-                ))}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
               </div>
             )}
 

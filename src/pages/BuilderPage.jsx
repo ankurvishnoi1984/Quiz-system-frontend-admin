@@ -47,6 +47,67 @@ function uid(prefix = 'id') {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`
 }
 
+function createTrueFalseOptions(correctIsTrue = true) {
+  return [
+    { id: uid('opt'), optionId: null, text: 'True', isCorrect: correctIsTrue },
+    { id: uid('opt'), optionId: null, text: 'False', isCorrect: !correctIsTrue },
+  ]
+}
+
+function normalizeTrueFalseOptions(apiOptions = []) {
+  const byKey = {}
+  for (const o of apiOptions || []) {
+    const key = String(o.option_text || '').trim().toLowerCase()
+    if (key === 'true' || key === 'false') byKey[key] = o
+  }
+  const trueRow = byKey.true
+  const falseRow = byKey.false
+  return [
+    {
+      id: trueRow ? String(trueRow.option_id) : uid('opt'),
+      optionId: trueRow?.option_id ?? null,
+      text: 'True',
+      isCorrect: Boolean(trueRow?.is_correct),
+    },
+    {
+      id: falseRow ? String(falseRow.option_id) : uid('opt'),
+      optionId: falseRow?.option_id ?? null,
+      text: 'False',
+      isCorrect: Boolean(falseRow?.is_correct),
+    },
+  ]
+}
+
+function questionTypeUsesOptions(type) {
+  return type === 'MCQ' || type === 'True/False'
+}
+
+function buildOptionsPayload(question) {
+  if (question.type === 'MCQ') {
+    return (question.options || []).map((option, optionIndex) => ({
+      ...(option.optionId != null ? { option_id: option.optionId } : {}),
+      option_text: option.text || `Option ${optionIndex + 1}`,
+      is_correct: Boolean(option.isCorrect),
+      display_order: optionIndex + 1,
+    }))
+  }
+  if (question.type === 'True/False') {
+    return normalizeTrueFalseOptions(
+      (question.options || []).map((o) => ({
+        option_id: o.optionId,
+        option_text: o.text,
+        is_correct: o.isCorrect,
+      })),
+    ).map((option, optionIndex) => ({
+      ...(option.optionId != null ? { option_id: option.optionId } : {}),
+      option_text: option.text,
+      is_correct: Boolean(option.isCorrect),
+      display_order: optionIndex + 1,
+    }))
+  }
+  return []
+}
+
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`
   const kb = bytes / 1024
@@ -194,6 +255,57 @@ function MediaUpload({ media, onChange, disabled = false }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function TrueFalseOptionsEditor({ question, quizMode, onChange, structureLocked }) {
+  const options = normalizeTrueFalseOptions(
+    (question.options || []).map((o) => ({
+      option_id: o.optionId,
+      option_text: o.text,
+      is_correct: o.isCorrect,
+    })),
+  )
+
+  const setCorrect = (label) => {
+    if (!quizMode || structureLocked) return
+    onChange({
+      ...question,
+      options: options.map((o) => ({
+        ...o,
+        isCorrect: o.text === label,
+      })),
+    })
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-semibold text-navy-900">Answer key</p>
+      <p className="text-xs text-slate-600">True/False always has two fixed choices. Mark exactly one as correct.</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((opt) => (
+          <button
+            key={opt.text}
+            type="button"
+            disabled={structureLocked || !quizMode}
+            onClick={() => setCorrect(opt.text)}
+            className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+              structureLocked || !quizMode
+                ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500'
+                : opt.isCorrect
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+            }`}
+          >
+            <span>{opt.text}</span>
+            {opt.isCorrect && <CheckCircle2 className="size-4 text-emerald-600" />}
+          </button>
+        ))}
+      </div>
+      {!quizMode && (
+        <p className="text-xs text-amber-700">Enable Quiz mode to select the correct answer.</p>
+      )}
     </div>
   )
 }
@@ -407,7 +519,30 @@ function ParticipantPreview({ question, quizMode }) {
         </div>
       )}
 
-      {(question.type === 'Word Cloud' || question.type === 'True/False' || question.type === 'Ranking') && (
+      {question.type === 'True/False' && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {normalizeTrueFalseOptions(
+            (question.options || []).map((o) => ({
+              option_id: o.optionId,
+              option_text: o.text,
+              is_correct: o.isCorrect,
+            })),
+          ).map((o) => (
+            <button
+              key={o.text}
+              type="button"
+              className="rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+            >
+              {o.text}
+              {quizMode && o.isCorrect && (
+                <span className="ml-2 text-xs font-bold text-emerald-700">Correct</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {(question.type === 'Word Cloud' || question.type === 'Ranking') && (
         <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-8 text-center text-sm text-slate-600">
           Preview for <strong>{question.type}</strong> will be implemented next.
         </div>
@@ -483,26 +618,35 @@ function BuilderPage() {
     return mapping[uiType] || 'open_text'
   }
 
-  const mapQuestionFromApi = (question) => ({
-    id: String(question.question_id),
-    questionId: question.question_id,
-    type: apiToUiType(question.question_type),
-    text: question.question_text || '',
-    media: question.media_url
-      ? {
-          url: question.media_url,
-          kind: question.media_type?.includes('video') ? 'video' : 'image',
-          file: null,
-        }
-      : null,
-    points: question.points_value ?? 10,
-    options: (question.question_options || []).map((option) => ({
-      id: String(option.option_id),
-      optionId: option.option_id,
-      text: option.option_text,
-      isCorrect: Boolean(option.is_correct),
-    })),
-  })
+  const mapQuestionFromApi = (question) => {
+    const uiType = apiToUiType(question.question_type)
+    const apiOptions = question.question_options || []
+    const options =
+      uiType === 'True/False'
+        ? normalizeTrueFalseOptions(apiOptions)
+        : apiOptions.map((option) => ({
+            id: String(option.option_id),
+            optionId: option.option_id,
+            text: option.option_text,
+            isCorrect: Boolean(option.is_correct),
+          }))
+
+    return {
+      id: String(question.question_id),
+      questionId: question.question_id,
+      type: uiType,
+      text: question.question_text || '',
+      media: question.media_url
+        ? {
+            url: question.media_url,
+            kind: question.media_type?.includes('video') ? 'video' : 'image',
+            file: null,
+          }
+        : null,
+      points: question.points_value ?? 10,
+      options,
+    }
+  }
 
   useEffect(() => {
     if (!questionsQuery.data) return
@@ -609,7 +753,9 @@ function BuilderPage() {
               { id: uid('opt'), optionId: null, text: 'Option 1', isCorrect: false },
               { id: uid('opt'), optionId: null, text: 'Option 2', isCorrect: false },
             ]
-          : [],
+          : type === 'True/False'
+            ? createTrueFalseOptions(true)
+            : [],
     }
     setQuestions((prev) => [q, ...prev])
     setSelectedId(q.id)
@@ -663,10 +809,22 @@ function BuilderPage() {
       }
 
       for (const question of questions) {
-        if (question.type === 'MCQ') {
-          const hasCorrectOption = (question.options || []).some((opt) => opt.isCorrect)
-          if (!hasCorrectOption) {
-            throw new Error(`Question "${question.text || 'Untitled'}" has no correct answer selected. Please mark at least one correct option.`)
+        if (question.type === 'MCQ' || question.type === 'True/False') {
+          const opts =
+            question.type === 'True/False'
+              ? normalizeTrueFalseOptions(
+                  (question.options || []).map((o) => ({
+                    option_id: o.optionId,
+                    option_text: o.text,
+                    is_correct: o.isCorrect,
+                  })),
+                )
+              : question.options || []
+          const correctCount = opts.filter((opt) => opt.isCorrect).length
+          if (quizMode && correctCount !== 1) {
+            throw new Error(
+              `Question "${question.text || 'Untitled'}" must have exactly one correct answer (True or False).`,
+            )
           }
         }
       }
@@ -698,15 +856,7 @@ function BuilderPage() {
           points_value: Number(question.points || 0),
           time_limit_seconds: effectiveTimeLimitSeconds || null,
           allow_multiple_select: false,
-          options:
-            question.type === 'MCQ'
-              ? (question.options || []).map((option, optionIndex) => ({
-                  ...(option.optionId != null ? { option_id: option.optionId } : {}),
-                  option_text: option.text || `Option ${optionIndex + 1}`,
-                  is_correct: Boolean(option.isCorrect),
-                  display_order: optionIndex + 1,
-                }))
-              : [],
+          options: questionTypeUsesOptions(question.type) ? buildOptionsPayload(question) : [],
           display_order: index + 1,
         }
 
@@ -974,7 +1124,7 @@ function BuilderPage() {
                               </p>
                               <p className="mt-1 text-xs text-slate-600">
                                 {q.media?.url ? 'Has media • ' : ''}
-                                {q.type === 'MCQ' ? `${q.options?.length ?? 0} options` : 'No options'}
+                                {questionTypeUsesOptions(q.type) ? `${q.options?.length ?? 0} options` : 'No options'}
                               </p>
                             </div>
                             <button
@@ -1035,7 +1185,7 @@ function BuilderPage() {
                             </p>
                             <p className="mt-1 text-xs text-slate-600">
                               {q.media?.url ? 'Has media • ' : ''}
-                              {q.type === 'MCQ' ? `${q.options?.length ?? 0} options` : 'No options'}
+                              {questionTypeUsesOptions(q.type) ? `${q.options?.length ?? 0} options` : 'No options'}
                             </p>
                           </button>
                           <button
@@ -1124,6 +1274,17 @@ function BuilderPage() {
               {selected.type === 'MCQ' && (
                 <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
                   <OptionsEditor
+                    question={selected}
+                    quizMode={quizMode}
+                    onChange={updateQuestion}
+                    structureLocked={!isDraftSession}
+                  />
+                </div>
+              )}
+
+              {selected.type === 'True/False' && (
+                <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
+                  <TrueFalseOptionsEditor
                     question={selected}
                     quizMode={quizMode}
                     onChange={updateQuestion}
