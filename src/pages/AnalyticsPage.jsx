@@ -9,24 +9,23 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { Download, FileText, Printer, Trophy } from 'lucide-react'
+import { Download, FileText, Loader2, Printer, Trophy } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import Modal from '../components/ui/Modal'
+import { useShell } from '../context/ShellContext'
 import { useSessions } from '../context/SessionsContext'
+import { getSessionReportApi } from '../services/analyticsApi'
+import { getSessionDetailApi, listSessionQuestionsApi } from '../services/builderApi'
+import { listDepartmentSessionsApi } from '../services/dashboardApi'
+import { getQuestionResultsApi, getSessionResponsesApi } from '../services/liveApi'
+import { useAuthStore } from '../store/authStore'
 
 const COLORS = ['#1d4ed8', '#2563eb', '#4f46e5', '#0891b2', '#0ea5e9', '#6366f1']
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n))
-}
-
-function makeOptionData(question) {
-  if (question?.type !== 'MCQ') return []
-  const opts = question.options ?? []
-  const values = opts.map((o) => ({ name: o.text, value: clamp(10 + Math.round(Math.random() * 70), 1, 100) }))
-  const sum = values.reduce((a, b) => a + b.value, 0) || 1
-  return values.map((v) => ({ ...v, value: Math.round((v.value / sum) * 100) }))
 }
 
 function downloadText(filename, text, mime = 'text/plain') {
@@ -39,11 +38,119 @@ function downloadText(filename, text, mime = 'text/plain') {
   URL.revokeObjectURL(url)
 }
 
+function isBackendSessionId(id) {
+  const n = Number(id)
+  return Number.isFinite(n) && n > 0 && String(n) === String(id).trim()
+}
+
+function formatStatus(status) {
+  const map = {
+    draft: 'Draft',
+    live: 'Live',
+    paused: 'Paused',
+    completed: 'Completed',
+    archived: 'Archived',
+  }
+  return map[status] || status || '—'
+}
+
+function apiQuestionTypeToUi(type) {
+  const mapping = {
+    mcq: 'MCQ',
+    word_cloud: 'Word Cloud',
+    rating: 'Rating',
+    open_text: 'Text',
+    true_false: 'True/False',
+    ranking: 'Ranking',
+    fill_blank: 'Text',
+  }
+  return mapping[type] || type || 'Text'
+}
+
+function formatSessionDuration(startedAt, endedAt) {
+  if (!startedAt) return '—'
+  const start = new Date(startedAt).getTime()
+  const end = endedAt ? new Date(endedAt).getTime() : Date.now()
+  const mins = Math.max(0, Math.round((end - start) / 60000))
+  if (mins < 60) return `${mins}m`
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`
+}
+
+function buildLeaderboard(responses) {
+  const byParticipant = new Map()
+  for (const row of responses || []) {
+    const id = row.participant_id
+    if (id == null) continue
+    const name = row.participant?.nickname || `Participant ${id}`
+    const entry = byParticipant.get(id) || { name, score: 0 }
+    entry.score += Number(row.points_earned || 0)
+    byParticipant.set(id, entry)
+  }
+  return [...byParticipant.values()].sort((a, b) => b.score - a.score).slice(0, 10)
+}
+
+function chartFromQuestionResults(results, question) {
+  const type = question.question_type
+  const total = results?.total_responses || 0
+  const options = question.question_options || []
+
+  if ((type === 'mcq' || type === 'true_false') && options.length) {
+    const byOption = results?.by_option || {}
+    return options.map((opt) => {
+      const count = Number(byOption[String(opt.option_id)] || 0)
+      return {
+        name: opt.option_text,
+        value: total > 0 ? Math.round((count / total) * 100) : 0,
+        count,
+      }
+    })
+  }
+
+  if (type === 'rating' && results?.average_rating != null) {
+    return [{ name: `Avg ${results.average_rating}`, value: 100, count: total }]
+  }
+
+  return []
+}
+
+function correctRateForQuestion(question, responses) {
+  if (!question?.is_quiz_mode) return null
+  const qid = Number(question.question_id)
+  const qResponses = (responses || []).filter((r) => Number(r.question_id) === qid)
+  if (!qResponses.length) return null
+  const correct = qResponses.filter((r) => r.is_correct).length
+  return Math.round((correct / qResponses.length) * 100)
+}
+
 function AnalyticsPage() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session')
   const navigate = useNavigate()
-  const { sessions, getSession } = useSessions()
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const { departmentId } = useShell()
+  const { sessions: contextSessions, getSession } = useSessions()
+
+  const [pdfOpen, setPdfOpen] = useState(false)
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+
+  const deptSessionsQuery = useQuery({
+    queryKey: ['analytics-dept-sessions', departmentId],
+    queryFn: () => listDepartmentSessionsApi(accessToken, departmentId),
+    enabled: Boolean(accessToken && departmentId),
+  })
+
+  const apiSessions = useMemo(() => {
+    return (deptSessionsQuery.data || []).map((s) => ({
+      id: String(s.session_id),
+      title: s.title,
+      status: formatStatus(s.status),
+      date: s.created_at ? String(s.created_at).split('T')[0] : '',
+      joinRequirement: s.join_type ?? 'name',
+    }))
+  }, [deptSessionsQuery.data])
+
+  const sessions = apiSessions.length > 0 ? apiSessions : contextSessions
 
   const defaultSessionId =
     sessionId ||
@@ -56,78 +163,212 @@ function AnalyticsPage() {
     if (!sessionId && defaultSessionId) {
       navigate(`/analytics?session=${encodeURIComponent(defaultSessionId)}`, { replace: true })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, defaultSessionId])
+  }, [sessionId, defaultSessionId, navigate])
 
-  const session = defaultSessionId ? getSession(defaultSessionId) : null
-  const [pdfOpen, setPdfOpen] = useState(false)
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
+  const activeSessionId = sessionId || defaultSessionId
+  const numericSessionId = isBackendSessionId(activeSessionId) ? activeSessionId : null
+
+  const reportQuery = useQuery({
+    queryKey: ['analytics-session-report', numericSessionId],
+    queryFn: () => getSessionReportApi(accessToken, numericSessionId),
+    enabled: Boolean(accessToken && numericSessionId),
+  })
+
+  const sessionDetailQuery = useQuery({
+    queryKey: ['analytics-session-detail', numericSessionId],
+    queryFn: () => getSessionDetailApi(accessToken, numericSessionId),
+    enabled: Boolean(accessToken && numericSessionId),
+  })
+
+  const questionsQuery = useQuery({
+    queryKey: ['analytics-session-questions', numericSessionId],
+    queryFn: () => listSessionQuestionsApi(accessToken, numericSessionId),
+    enabled: Boolean(accessToken && numericSessionId),
+  })
+
+  const responsesQuery = useQuery({
+    queryKey: ['analytics-session-responses', numericSessionId],
+    queryFn: () => getSessionResponsesApi(accessToken, numericSessionId),
+    enabled: Boolean(accessToken && numericSessionId),
+  })
+
+  const sortedQuestions = useMemo(() => {
+    return [...(questionsQuery.data || [])].sort(
+      (a, b) => (Number(a.display_order) || 0) - (Number(b.display_order) || 0),
+    )
+  }, [questionsQuery.data])
+
+  const questionResultsQueries = useQueries({
+    queries: sortedQuestions.map((q) => ({
+      queryKey: ['analytics-question-results', q.question_id],
+      queryFn: () => getQuestionResultsApi(accessToken, q.question_id),
+      enabled: Boolean(accessToken && numericSessionId),
+      staleTime: 30_000,
+    })),
+  })
+
+  const resultsByQuestionId = useMemo(() => {
+    const map = {}
+    sortedQuestions.forEach((q, idx) => {
+      map[q.question_id] = questionResultsQueries[idx]?.data ?? null
+    })
+    return map
+  }, [sortedQuestions, questionResultsQueries])
+
+  const breakdownByQuestionId = useMemo(() => {
+    const map = {}
+    for (const row of reportQuery.data?.question_breakdown || []) {
+      map[row.question_id] = row
+    }
+    return map
+  }, [reportQuery.data?.question_breakdown])
+
+  const report = reportQuery.data
+  const sessionDetail = sessionDetailQuery.data
+  const allResponses = responsesQuery.data || []
+
+  const contextSession = activeSessionId ? getSession(activeSessionId) : null
+
+  const sessionMeta = useMemo(() => {
+    if (report?.session) {
+      return {
+        id: String(report.session.session_id),
+        title: report.session.title,
+        status: formatStatus(report.session.status),
+        startedAt: report.session.started_at,
+        endedAt: report.session.ended_at,
+      }
+    }
+    if (contextSession) {
+      return {
+        id: contextSession.id,
+        title: contextSession.title,
+        status: contextSession.status,
+        startedAt: null,
+        endedAt: null,
+      }
+    }
+    return null
+  }, [report?.session, contextSession])
 
   const summary = useMemo(() => {
-    const joined = session?.participants ?? 0
-    const responded = Math.round(joined * clamp((session?.progress ?? 60) / 100, 0, 1))
-    const avg = joined ? Math.round((responded / joined) * 100) : 0
-    const durationMin = session?.questions?.length ? Math.max(8, session.questions.length * 2) : 0
-    return { joined, responded, avg, durationMin }
-  }, [session?.participants, session?.progress, session?.questions?.length]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (report?.stats) {
+      const { participant_count, active_responders, response_rate_percent } = report.stats
+      return {
+        joined: participant_count ?? 0,
+        responded: active_responders ?? 0,
+        avg: response_rate_percent ?? 0,
+        duration: formatSessionDuration(sessionMeta?.startedAt, sessionMeta?.endedAt),
+      }
+    }
+    return {
+      joined: contextSession?.participants ?? 0,
+      responded: 0,
+      avg: 0,
+      duration: '—',
+    }
+  }, [report?.stats, sessionMeta?.startedAt, sessionMeta?.endedAt, contextSession?.participants])
 
   const perQuestion = useMemo(() => {
-    const qs = session?.questions ?? []
-    return qs.map((q, idx) => {
-      const responseCount = Math.max(0, Math.round(summary.joined * clamp(0.55 + idx * 0.06, 0.2, 0.95)))
-      const correctRate =
-        q.type === 'MCQ' && (session?.quizMode ?? false)
-          ? Math.round(40 + (idx * 11) % 45)
-          : null
-      const chart = makeOptionData(q)
-      return { ...q, index: idx + 1, responseCount, correctRate, chart }
-    })
-  }, [session?.questions, session?.quizMode, summary.joined]) // eslint-disable-line react-hooks/exhaustive-deps
+    return sortedQuestions.map((q, idx) => {
+      const breakdown = breakdownByQuestionId[q.question_id]
+      const results = resultsByQuestionId[q.question_id]
+      const uiType = apiQuestionTypeToUi(q.question_type)
+      const responseCount = breakdown?.response_count ?? results?.total_responses ?? 0
+      const chart = chartFromQuestionResults(results, q)
+      const correctRate = correctRateForQuestion(q, allResponses)
 
-  const leaderboard = useMemo(
-    () => [
-      { name: 'Aarav', score: 1240 },
-      { name: 'Priya', score: 1188 },
-      { name: 'Isha', score: 1101 },
-      { name: 'Kabir', score: 1034 },
-      { name: 'Neha', score: 998 },
-      { name: 'Rohan', score: 941 },
-      { name: 'Anaya', score: 910 },
-      { name: 'Vihaan', score: 872 },
-      { name: 'Meera', score: 841 },
-      { name: 'Arjun', score: 799 },
-    ],
-    [],
-  )
+      return {
+        id: String(q.question_id),
+        index: idx + 1,
+        type: uiType,
+        text: q.question_text || breakdown?.question_text || '',
+        responseCount,
+        correctRate,
+        chart,
+        rawType: q.question_type,
+      }
+    })
+  }, [sortedQuestions, breakdownByQuestionId, resultsByQuestionId, allResponses])
+
+  const leaderboard = useMemo(() => buildLeaderboard(allResponses), [allResponses])
+
+  const settingsSnapshot = useMemo(() => {
+    const d = sessionDetail
+    if (!d) {
+      return {
+        joinRequirement: contextSession?.joinRequirement ?? 'name',
+        timeLimitLabel: contextSession?.timeLimitSeconds ? `${contextSession.timeLimitSeconds}s` : 'Off',
+        quizMode: Boolean(contextSession?.quizMode),
+        maxParticipants: contextSession?.settings?.maxParticipants ?? 0,
+        anonymous: Boolean(contextSession?.settings?.anonymous),
+        password: Boolean(contextSession?.settings?.password),
+        leaderboard: contextSession?.settings?.leaderboard ?? true,
+      }
+    }
+    const timed = sortedQuestions.some((q) => Number(q.time_limit_seconds) > 0)
+    const maxTime = sortedQuestions.reduce(
+      (max, q) => Math.max(max, Number(q.time_limit_seconds) || 0),
+      0,
+    )
+    return {
+      joinRequirement: d.join_type ?? 'name',
+      timeLimitLabel: timed ? (maxTime ? `${maxTime}s (max per question)` : 'Varies') : 'Off',
+      quizMode: sortedQuestions.some((q) => q.is_quiz_mode),
+      maxParticipants: d.max_participants ?? 0,
+      anonymous: d.join_type === 'anonymous',
+      password: Boolean(d.password_hash),
+      leaderboard: Boolean(d.leaderboard_enabled),
+    }
+  }, [sessionDetail, contextSession, sortedQuestions])
 
   const exportCsv = () => {
-    if (!session) return
-    const headers = ['sessionId', 'sessionTitle', 'questionIndex', 'questionType', 'questionText', 'response']
-    const rows = []
-    perQuestion.forEach((q) => {
-      // mock responses; real app will use stored raw responses
-      const sample = q.type === 'MCQ' ? (q.options?.[0]?.text ?? '') : 'Sample response'
-      rows.push([session.id, session.title, String(q.index), q.type, q.text?.replaceAll('"', '""') ?? '', sample])
+    if (!sessionMeta) return
+    const headers = [
+      'sessionId',
+      'sessionTitle',
+      'questionIndex',
+      'questionType',
+      'questionText',
+      'participant',
+      'response',
+      'points',
+      'isCorrect',
+    ]
+    const questionOrder = new Map(sortedQuestions.map((q, i) => [Number(q.question_id), i + 1]))
+
+    const rows = allResponses.map((r) => {
+      const qIdx = questionOrder.get(Number(r.question_id)) ?? ''
+      const responseText =
+        r.question_option?.option_text ||
+        r.text_response ||
+        (r.rating_value != null ? String(r.rating_value) : '')
+      return [
+        sessionMeta.id,
+        sessionMeta.title,
+        String(qIdx),
+        apiQuestionTypeToUi(r.question?.question_type),
+        (r.question?.question_text ?? '').replaceAll('"', '""'),
+        r.participant?.nickname ?? '',
+        responseText,
+        String(r.points_earned ?? 0),
+        r.is_correct == null ? '' : r.is_correct ? 'yes' : 'no',
+      ]
     })
 
+    if (!rows.length) {
+      perQuestion.forEach((q) => {
+        rows.push([sessionMeta.id, sessionMeta.title, String(q.index), q.type, q.text?.replaceAll('"', '""') ?? '', '', '', '', ''])
+      })
+    }
+
     const csv = [headers.join(','), ...rows.map((r) => r.map((x) => `"${String(x ?? '').replaceAll('"', '""')}"`).join(','))].join('\n')
-    downloadText(`session-${session.id}-responses.csv`, csv, 'text/csv')
+    downloadText(`session-${sessionMeta.id}-responses.csv`, csv, 'text/csv')
   }
 
   const printPdf = () => {
-    // lightweight “PDF report” approach without adding deps:
-    // open a printable modal, then call window.print().
     setPdfOpen(true)
     setTimeout(() => window.print(), 50)
-  }
-
-  if (!session) {
-    return (
-      <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-10 text-center text-slate-600 shadow-sm">
-        No session selected. Go to <strong>Dashboard</strong> and choose a session.
-      </div>
-    )
   }
 
   const filteredSessions = sessions
@@ -140,18 +381,52 @@ function AnalyticsPage() {
     })
     .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
 
+  const isLoading =
+    Boolean(numericSessionId) &&
+    (reportQuery.isLoading ||
+      sessionDetailQuery.isLoading ||
+      questionsQuery.isLoading ||
+      responsesQuery.isLoading)
+
+  const loadError = reportQuery.error || questionsQuery.error
+
+  if (!activeSessionId || !sessionMeta) {
+    return (
+      <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-10 text-center text-slate-600 shadow-sm">
+        No session selected. Go to <strong>Dashboard</strong> and choose a session.
+      </div>
+    )
+  }
+
+  if (!numericSessionId) {
+    return (
+      <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/80 p-10 text-center text-slate-700 shadow-sm">
+        <p className="font-semibold text-navy-900">Session analytics requires a saved session</p>
+        <p className="mt-2 text-sm">Select a session from your department list on the dashboard.</p>
+      </div>
+    )
+  }
+
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Session Analytics</p>
-          <h2 className="mt-1 text-2xl font-bold text-navy-900">{session.title}</h2>
-          <p className="mt-1 text-sm text-slate-600">Session {session.id} • {session.status}</p>
+          <h2 className="mt-1 text-2xl font-bold text-navy-900">{sessionMeta.title}</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Session {sessionMeta.id} • {sessionMeta.status}
+            {isLoading && (
+              <span className="ml-2 inline-flex items-center gap-1 text-navy-600">
+                <Loader2 className="size-3.5 animate-spin" />
+                Loading…
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <select
-            value={session.id}
+            value={activeSessionId}
             onChange={(e) => navigate(`/analytics?session=${encodeURIComponent(e.target.value)}`)}
             className="h-11 rounded-2xl border border-blue-200/70 bg-white/90 px-3 text-sm font-semibold text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
             aria-label="Select session"
@@ -180,7 +455,8 @@ function AnalyticsPage() {
           <button
             type="button"
             onClick={exportCsv}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 shadow-sm shadow-blue-900/5 transition hover:bg-blue-50"
+            disabled={isLoading}
+            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 shadow-sm shadow-blue-900/5 transition hover:bg-blue-50 disabled:opacity-50"
           >
             <Download className="size-4" />
             Export CSV
@@ -196,15 +472,23 @@ function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Summary */}
+      {loadError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+          {loadError.message || 'Failed to load analytics'}
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
           ['Total joined', summary.joined.toLocaleString(), 'Participants entered the session'],
           ['Total responded', summary.responded.toLocaleString(), 'Submitted at least one response'],
-          ['Avg response rate', `${summary.avg}%`, 'Across all questions'],
-          ['Session duration', `${summary.durationMin}m`, 'Estimated based on questions'],
+          ['Avg response rate', `${summary.avg}%`, 'Unique responders / participants'],
+          ['Session duration', summary.duration, 'From session start to end'],
         ].map(([label, value, hint]) => (
-          <div key={label} className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
+          <div
+            key={label}
+            className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur"
+          >
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
             <p className="mt-2 text-2xl font-bold text-navy-900">{value}</p>
             <p className="mt-2 text-sm text-slate-600">{hint}</p>
@@ -212,19 +496,29 @@ function AnalyticsPage() {
         ))}
       </div>
 
-      {/* Per-question breakdown */}
       <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4 shadow-sm shadow-blue-900/5 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-navy-900">Per-question breakdown</p>
-            <p className="text-xs text-slate-600">Charts, response counts, and correctness</p>
+            <p className="text-xs text-slate-600">
+              {perQuestion.length} question{perQuestion.length === 1 ? '' : 's'} • live response data
+            </p>
           </div>
         </div>
       </div>
 
+      {!perQuestion.length && !isLoading && (
+        <div className="rounded-2xl border border-dashed border-blue-200 bg-white/80 p-8 text-center text-sm text-slate-600">
+          No questions in this session yet.
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-2">
         {perQuestion.map((q) => (
-          <div key={q.id} className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
+          <div
+            key={q.id}
+            className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur"
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -241,11 +535,11 @@ function AnalyticsPage() {
 
             <div className="mt-4 h-56 rounded-2xl border border-blue-200/70 bg-white/90 p-3">
               <ResponsiveContainer width="100%" height="100%">
-                {q.type === 'MCQ' ? (
+                {q.chart.length > 0 && (q.rawType === 'mcq' || q.rawType === 'true_false') ? (
                   <BarChart data={q.chart}>
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis />
-                    <Tooltip />
+                    <YAxis unit="%" />
+                    <Tooltip formatter={(value, _name, props) => [`${value}% (${props.payload.count} responses)`, 'Share']} />
                     <Bar dataKey="value" radius={[10, 10, 0, 0]}>
                       {q.chart.map((entry, idx) => (
                         <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
@@ -257,8 +551,22 @@ function AnalyticsPage() {
                     <Tooltip />
                     <Pie
                       data={[
-                        { name: 'Responded', value: clamp(Math.round((q.responseCount / Math.max(1, summary.joined)) * 100), 0, 100) },
-                        { name: 'No response', value: clamp(100 - Math.round((q.responseCount / Math.max(1, summary.joined)) * 100), 0, 100) },
+                        {
+                          name: 'Responded',
+                          value: clamp(
+                            Math.round((q.responseCount / Math.max(1, summary.joined)) * 100),
+                            0,
+                            100,
+                          ),
+                        },
+                        {
+                          name: 'No response',
+                          value: clamp(
+                            100 - Math.round((q.responseCount / Math.max(1, summary.joined)) * 100),
+                            0,
+                            100,
+                          ),
+                        },
                       ]}
                       dataKey="value"
                       nameKey="name"
@@ -280,35 +588,43 @@ function AnalyticsPage() {
               </div>
               <div className="text-right">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</p>
-                <p className="mt-1 text-sm text-slate-600">{q.correctRate == null ? 'Not a scored question' : 'Based on marked correct options'}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {q.correctRate == null ? 'Not a scored question' : 'Based on marked correct options'}
+                </p>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Leaderboard + Q&A */}
       <div className="grid gap-4 xl:grid-cols-2">
         <div className="rounded-2xl border border-amber-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Leaderboard</p>
-              <h3 className="mt-1 text-lg font-bold text-navy-900">Final top 10</h3>
+              <h3 className="mt-1 text-lg font-bold text-navy-900">Top participants</h3>
             </div>
             <Trophy className="size-5 text-amber-600" />
           </div>
           <div className="mt-4 space-y-2">
-            {leaderboard.map((row, idx) => (
-              <div key={row.name} className="flex items-center justify-between rounded-2xl border border-amber-200/60 bg-amber-50/40 px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="grid size-9 place-items-center rounded-2xl bg-linear-to-br from-amber-400 to-amber-600 text-white">
-                    {idx + 1}
+            {leaderboard.length ? (
+              leaderboard.map((row, idx) => (
+                <div
+                  key={`${row.name}-${idx}`}
+                  className="flex items-center justify-between rounded-2xl border border-amber-200/60 bg-amber-50/40 px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-9 place-items-center rounded-2xl bg-linear-to-br from-amber-400 to-amber-600 text-white">
+                      {idx + 1}
+                    </div>
+                    <p className="font-semibold text-navy-900">{row.name}</p>
                   </div>
-                  <p className="font-semibold text-navy-900">{row.name}</p>
+                  <p className="text-sm font-bold text-navy-900">{row.score}</p>
                 </div>
-                <p className="text-sm font-bold text-navy-900">{row.score}</p>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-slate-600">No scored responses yet.</p>
+            )}
           </div>
         </div>
 
@@ -323,33 +639,33 @@ function AnalyticsPage() {
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Join requirement</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{session.joinRequirement ?? 'name'}</p>
+              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.joinRequirement}</p>
               <p className="mt-1 text-xs text-slate-600">Controls what participants must enter</p>
             </div>
             <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Time limit</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{session.timeLimitSeconds ? `${session.timeLimitSeconds}s` : 'Off'}</p>
+              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.timeLimitLabel}</p>
               <p className="mt-1 text-xs text-slate-600">Per question</p>
             </div>
             <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Quiz mode</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{session.quizMode ? 'Enabled' : 'Disabled'}</p>
+              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.quizMode ? 'Enabled' : 'Disabled'}</p>
               <p className="mt-1 text-xs text-slate-600">Correct answers + points</p>
             </div>
             <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Max participants</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{session.settings?.maxParticipants ?? 0}</p>
+              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.maxParticipants}</p>
               <p className="mt-1 text-xs text-slate-600">Capacity control</p>
             </div>
             <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Anonymous</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{session.settings?.anonymous ? 'Yes' : 'No'}</p>
+              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.anonymous ? 'Yes' : 'No'}</p>
               <p className="mt-1 text-xs text-slate-600">Identity hidden in reports</p>
             </div>
             <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Password</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{session.settings?.password ? 'Enabled' : 'None'}</p>
-              <p className="mt-1 text-xs text-slate-600">Session access gate</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Leaderboard</p>
+              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.leaderboard ? 'Enabled' : 'Disabled'}</p>
+              <p className="mt-1 text-xs text-slate-600">Shown to participants</p>
             </div>
           </div>
         </div>
@@ -359,8 +675,8 @@ function AnalyticsPage() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Report</p>
-            <h3 className="mt-2 text-lg font-bold text-navy-900">{session.title}</h3>
-            <p className="mt-1 text-sm text-slate-600">Session {session.id}</p>
+            <h3 className="mt-2 text-lg font-bold text-navy-900">{sessionMeta.title}</h3>
+            <p className="mt-1 text-sm text-slate-600">Session {sessionMeta.id}</p>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -378,7 +694,10 @@ function AnalyticsPage() {
             <p className="text-sm font-semibold text-navy-900">Per-question summary</p>
             <div className="mt-3 space-y-2">
               {perQuestion.map((q) => (
-                <div key={q.id} className="flex items-start justify-between gap-3 border-b border-blue-50 py-2 last:border-b-0">
+                <div
+                  key={q.id}
+                  className="flex items-start justify-between gap-3 border-b border-blue-50 py-2 last:border-b-0"
+                >
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-navy-900">
                       Q{q.index}: {q.text || 'Untitled'}
@@ -416,4 +735,3 @@ function AnalyticsPage() {
 }
 
 export default AnalyticsPage
-
