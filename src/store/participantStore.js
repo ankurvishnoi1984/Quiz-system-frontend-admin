@@ -8,12 +8,8 @@ const initialQuiz = {
   quizSubmitted: false,
   /** Timed sessions: question ids the participant may no longer edit (submitted or timer moved on) */
   quizSubmittedQuestionIds: {},
-  /** Wall-clock ms when the active question's countdown reaches zero */
-  quizCountdownEndsAt: null,
-  /** Question id that `quizCountdownEndsAt` applies to */
-  quizCountdownQuestionId: null,
-  /** Seconds remaining shown after submit (countdown UI stops ticking) */
-  quizCountdownFrozen: null,
+  /** Per-question countdown: { [questionId]: { endsAt, frozen } } */
+  quizCountdownByQuestion: {},
 }
 
 export const useParticipantStore = create(
@@ -66,24 +62,51 @@ export const useParticipantStore = create(
       clearQuizSubmissionLocks: () => set({ quizSubmittedQuestionIds: {} }),
 
       setQuizSubmitted: (value) =>
-        set({
+        set((s) => ({
           quizSubmitted: value,
-          ...(value ? {} : { quizCountdownFrozen: null }),
-        }),
+          ...(value
+            ? {}
+            : {
+                quizCountdownByQuestion: Object.fromEntries(
+                  Object.entries(s.quizCountdownByQuestion || {}).map(([id, entry]) => [
+                    id,
+                    { ...entry, frozen: null },
+                  ]),
+                ),
+              }),
+        })),
 
-      setQuizCountdown: ({ questionId, endsAt }) =>
-        set({
-          quizCountdownQuestionId: questionId,
-          quizCountdownEndsAt: endsAt,
-          quizCountdownFrozen: null,
-        }),
+      setQuizCountdown: ({ questionId, endsAt }) => {
+        if (questionId == null) {
+          set({ quizCountdownByQuestion: {} })
+          return
+        }
+        const qid = String(questionId)
+        set((s) => ({
+          quizCountdownByQuestion: {
+            ...(s.quizCountdownByQuestion || {}),
+            [qid]: {
+              ...(s.quizCountdownByQuestion?.[qid] || {}),
+              endsAt,
+              frozen: null,
+            },
+          },
+        }))
+      },
 
       /** Call after a successful submit while a per-question timer is active */
-      freezeCountdownAfterSubmit: () => {
+      freezeCountdownAfterSubmit: (questionId) => {
         const s = get()
-        if (!s.quizCountdownEndsAt) return
-        const remaining = Math.max(0, Math.ceil((s.quizCountdownEndsAt - Date.now()) / 1000))
-        set({ quizCountdownFrozen: remaining })
+        const qid = String(questionId)
+        const entry = s.quizCountdownByQuestion?.[qid]
+        if (!entry?.endsAt) return
+        const remaining = Math.max(0, Math.ceil((entry.endsAt - Date.now()) / 1000))
+        set((state) => ({
+          quizCountdownByQuestion: {
+            ...(state.quizCountdownByQuestion || {}),
+            [qid]: { ...entry, frozen: remaining },
+          },
+        }))
       },
     }),
     {
@@ -98,10 +121,22 @@ export const useParticipantStore = create(
         quizLiveQuestionId: state.quizLiveQuestionId,
         quizSubmitted: state.quizSubmitted,
         quizSubmittedQuestionIds: state.quizSubmittedQuestionIds,
-        quizCountdownEndsAt: state.quizCountdownEndsAt,
-        quizCountdownQuestionId: state.quizCountdownQuestionId,
-        quizCountdownFrozen: state.quizCountdownFrozen,
+        quizCountdownByQuestion: state.quizCountdownByQuestion,
       }),
+      migrate: (persistedState, version) => {
+        const s = persistedState || {}
+        const byQ = { ...(s.quizCountdownByQuestion || {}) }
+        const legacyId = s.quizCountdownQuestionId
+        const legacyEnds = s.quizCountdownEndsAt
+        if (legacyId != null && legacyEnds != null && !byQ[String(legacyId)]) {
+          byQ[String(legacyId)] = {
+            endsAt: legacyEnds,
+            frozen: s.quizCountdownFrozen ?? null,
+          }
+        }
+        return { ...s, quizCountdownByQuestion: byQ, version }
+      },
+      version: 1,
     },
   ),
 )

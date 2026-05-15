@@ -50,6 +50,23 @@ function getTrueFalseChoices(question) {
   return [{ option_text: 'True' }, { option_text: 'False' }]
 }
 
+function participantQuestionHasAnswer(question, response = {}) {
+  if (!question) return false
+  if (question.type === 'MCQ' || question.type === 'True/False') {
+    return Boolean(String(response.selectedOption || '').trim())
+  }
+  if (question.type === 'Rating') {
+    return Number(response.rating) > 0
+  }
+  if (question.type === 'Text' || question.type === 'Ranking') {
+    return Boolean(String(response.textResponse || '').trim())
+  }
+  if (question.type === 'Word Cloud') {
+    return (response.tags || []).length > 0
+  }
+  return false
+}
+
 
 function ParticipantSessionPage() {
   const { sessionId } = useParams()
@@ -62,8 +79,7 @@ function ParticipantSessionPage() {
     questionIndex,
     liveQuestionId,
     submitted,
-    countdownEndsAt,
-    countdownFrozen,
+    quizCountdownByQuestion,
     quizSubmittedQuestionIds,
     setResponses,
     setQuestionIndex,
@@ -79,8 +95,7 @@ function ParticipantSessionPage() {
       questionIndex: s.quizQuestionIndex,
       liveQuestionId: s.quizLiveQuestionId,
       submitted: s.quizSubmitted,
-      countdownEndsAt: s.quizCountdownEndsAt,
-      countdownFrozen: s.quizCountdownFrozen,
+      quizCountdownByQuestion: s.quizCountdownByQuestion,
       quizSubmittedQuestionIds: s.quizSubmittedQuestionIds,
       setResponses: s.setQuizResponses,
       setQuestionIndex: s.setQuizQuestionIndex,
@@ -174,6 +189,11 @@ function ParticipantSessionPage() {
   const questionLockedBySubmission = Boolean((quizSubmittedQuestionIds || {})[String(question?.id)])
   const dbSessionId = session?.session_id
 
+  const questionCountdown = question?.id
+    ? (quizCountdownByQuestion || {})[String(question.id)]
+    : null
+  const countdownEndsAt = questionCountdown?.endsAt ?? null
+  const countdownFrozen = questionCountdown?.frozen ?? null
 
   const timer = useMemo(() => {
     if (hasCountdown && questionLockedBySubmission && countdownFrozen != null) return countdownFrozen
@@ -328,15 +348,35 @@ function ParticipantSessionPage() {
   const isLastDisplayedQuestion =
     mappedQuestions.length > 0 && displayQuestionIndex === mappedQuestions.length - 1
 
+  const currentQuestionAnswered = useMemo(
+    () => participantQuestionHasAnswer(question, responses[question?.id]),
+    [question, responses],
+  )
+
+  /** Timed: forward nav only after an answer or when the per-question timer hits zero */
+  const canGoToNextQuestion = useMemo(() => {
+    if (!hasCountdown) return true
+    if (questionLockedBySubmission) return true
+    if (timer === 0) return true
+    return currentQuestionAnswered
+  }, [hasCountdown, questionLockedBySubmission, timer, currentQuestionAnswered])
 
   const goToQuestionIndex = useCallback(
     (nextIndex) => {
       if (!mappedQuestions.length) return
       const n = clamp(nextIndex, 0, mappedQuestions.length - 1)
+      if (hasCountdown && n > displayQuestionIndex && !canGoToNextQuestion) return
       setLiveQuestionId(null)
       setQuestionIndex(n)
     },
-    [mappedQuestions.length, setLiveQuestionId, setQuestionIndex],
+    [
+      mappedQuestions.length,
+      hasCountdown,
+      displayQuestionIndex,
+      canGoToNextQuestion,
+      setLiveQuestionId,
+      setQuestionIndex,
+    ],
   )
 
 
@@ -356,12 +396,16 @@ function ParticipantSessionPage() {
     const qid = question.id
     const s = useParticipantStore.getState()
     const submittedIds = s.quizSubmittedQuestionIds || {}
-    if (submittedIds[String(qid)]) {
-      setQuizCountdown({ questionId: qid, endsAt: Date.now() })
-      useParticipantStore.getState().freezeCountdownAfterSubmit()
+    const qidStr = String(qid)
+    const byQuestion = s.quizCountdownByQuestion || {}
+    if (submittedIds[qidStr]) {
+      if (!byQuestion[qidStr]) {
+        setQuizCountdown({ questionId: qid, endsAt: Date.now() })
+        useParticipantStore.getState().freezeCountdownAfterSubmit(qid)
+      }
       return
     }
-    if (s.quizCountdownQuestionId === qid && s.quizCountdownEndsAt != null) return
+    if (byQuestion[qidStr]?.endsAt != null) return
     setQuizCountdown({ questionId: qid, endsAt: Date.now() + timeLimit * 1000 })
   }, [step, question?.id, hasCountdown, timeLimit, setQuizCountdown, quizSubmittedQuestionIds])
 
@@ -481,7 +525,7 @@ function ParticipantSessionPage() {
         payloads.map(p => submitResponseApi(participantToken, p))
       )
       markQuestionsSubmitted(payloads.map((p) => p.question_id))
-      if (hadCountdown) freezeCountdownAfterSubmit()
+      if (hadCountdown && question?.id) freezeCountdownAfterSubmit(question.id)
       if (hadCountdown && isLastDisplayedQuestion) {
         setStep('qa')
       }
@@ -753,14 +797,27 @@ function ParticipantSessionPage() {
                 <button
                   type="button"
                   aria-label="Next question"
-                  disabled={displayQuestionIndex >= mappedQuestions.length - 1}
+                  title={
+                    hasCountdown && !canGoToNextQuestion
+                      ? 'Answer this question or wait for the timer'
+                      : undefined
+                  }
+                  disabled={
+                    displayQuestionIndex >= mappedQuestions.length - 1 ||
+                    (hasCountdown && !canGoToNextQuestion)
+                  }
                   onClick={() => goToQuestionIndex(displayQuestionIndex + 1)}
                   className="grid size-9 shrink-0 place-items-center rounded-xl border border-blue-200/70 bg-white text-slate-600 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <ChevronRight className="size-5" />
                 </button>
               </div>
-              {hasCountdown && inputsLocked && (
+              {hasCountdown && !canGoToNextQuestion && (
+                <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
+                  Answer this question or wait for the timer to go to the next question.
+                </p>
+              )}
+              {hasCountdown && canGoToNextQuestion && inputsLocked && (
                 <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
                   Timed: browse with arrows; answers cannot be changed after submit or when time runs out.
                 </p>
