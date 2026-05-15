@@ -1,5 +1,5 @@
-import { Download, ExternalLink, FileText, Search, ShieldCheck } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Search, ShieldCheck } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import KebabMenu from '../components/ui/KebabMenu'
 import { useSessions } from '../context/SessionsContext'
@@ -82,6 +82,8 @@ function exportAllCsv(sessions) {
   downloadText(`reports-all-sessions.csv`, csv, 'text/csv')
 }
 
+const PAGE_SIZE = 10
+
 function ReportsPage() {
   const { sessions } = useSessions()
   const navigate = useNavigate()
@@ -89,6 +91,7 @@ function ReportsPage() {
   const [query, setQuery] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [page, setPage] = useState(1)
   const debounced = useDebouncedValue(query, 250).trim().toLowerCase()
 
   const filtered = useMemo(() => {
@@ -104,6 +107,25 @@ function ReportsPage() {
       })
       .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
   }, [sessions, status, debounced, fromDate, toDate])
+
+  const totalCount = filtered.length
+  const totalPages = totalCount === 0 ? 1 : Math.ceil(totalCount / PAGE_SIZE)
+
+  useEffect(() => {
+    setPage(1)
+  }, [status, debounced, fromDate, toDate])
+
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), totalPages))
+  }, [totalPages])
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return filtered.slice(start, start + PAGE_SIZE)
+  }, [filtered, page])
+
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeEnd = totalCount === 0 ? 0 : Math.min(page * PAGE_SIZE, totalCount)
 
   return (
     <section className="space-y-6">
@@ -189,7 +211,7 @@ function ReportsPage() {
           <div className="text-right">Actions</div>
         </div>
 
-        {filtered.map((s) => (
+        {paginated.map((s) => (
           <div
             key={s.id}
             className="grid min-w-[900px] grid-cols-[minmax(240px,1.6fr)_minmax(90px,0.8fr)_minmax(90px,0.8fr)_minmax(140px,0.8fr)_96px] gap-3 border-b border-blue-50 pl-5 pr-8 py-4 last:border-b-0"
@@ -245,6 +267,41 @@ function ReportsPage() {
 
         {!filtered.length && (
           <div className="p-10 text-center text-sm text-slate-600">No sessions match these filters.</div>
+        )}
+
+        {filtered.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 bg-white/95 px-5 py-3">
+            <p className="text-sm text-slate-600">
+              Showing <span className="font-semibold text-navy-900">{rangeStart}</span>–
+              <span className="font-semibold text-navy-900">{rangeEnd}</span> of{' '}
+              <span className="font-semibold text-navy-900">{totalCount.toLocaleString()}</span>
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                aria-label="Previous page"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="inline-flex h-9 items-center gap-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="size-4" />
+                Previous
+              </button>
+              <span className="rounded-xl bg-blue-50 px-3 py-1.5 text-sm font-semibold text-navy-900">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                aria-label="Next page"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="inline-flex h-9 items-center gap-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </section>
