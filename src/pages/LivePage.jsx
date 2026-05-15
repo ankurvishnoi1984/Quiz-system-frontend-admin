@@ -1,5 +1,5 @@
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { ChevronLeft, ChevronRight, Crown, Eye, Play, Share2, Square, ThumbsDown, ThumbsUp, Trophy, Users, X } from 'lucide-react'
+import { BarChart3, ChevronLeft, ChevronRight, Crown, Eye, PieChart as PieChartIcon, Play, Share2, Square, ThumbsDown, ThumbsUp, Trophy, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -36,6 +36,17 @@ function mapQuestionType(type) {
   return map[type] || type
 }
 
+function questionUsesOptionChart(rawType) {
+  return rawType === 'mcq' || rawType === 'true_false'
+}
+
+function sortTrueFalseOptionData(data) {
+  return [...data].sort((a, b) => {
+    const rank = (name) => (String(name).trim().toLowerCase() === 'true' ? 0 : 1)
+    return rank(a.name) - rank(b.name)
+  })
+}
+
 
 function LivePage() {
   const [searchParams] = useSearchParams()
@@ -54,6 +65,7 @@ function LivePage() {
   const [shareOpen, setShareOpen] = useState(false)
   const [shareQrDataUrl, setShareQrDataUrl] = useState('')
   const [shareCopied, setShareCopied] = useState(false)
+  const [chartView, setChartView] = useState('bar')
 
 
   const sessionQuery = useQuery({
@@ -120,6 +132,10 @@ function LivePage() {
   useEffect(() => {
     setQuestionIndex(0)
   }, [sessionId])
+
+  useEffect(() => {
+    setChartView('bar')
+  }, [activeQuestion?.id])
 
   useEffect(() => {
     const makeQr = async () => {
@@ -216,12 +232,40 @@ function LivePage() {
 
 
   const optionData = useMemo(() => {
+    if (!activeQuestion) return []
     const byOption = questionResultsQuery.data?.by_option || {}
-    return (activeQuestion?.options || []).map((option) => ({
-      name: option.option_text,
-      value: Number(byOption[String(option.option_id)] || 0),
-    }))
-  }, [questionResultsQuery.data, activeQuestion?.options])
+    const opts = activeQuestion.options || []
+
+    if (opts.length > 0) {
+      let rows = opts.map((option) => ({
+        name: option.option_text,
+        value: Number(byOption[String(option.option_id)] || 0),
+      }))
+      if (activeQuestion.rawType === 'true_false') {
+        rows = sortTrueFalseOptionData(rows)
+      }
+      return rows
+    }
+
+    if (activeQuestion.rawType === 'true_false') {
+      const counts = { True: 0, False: 0 }
+      currentResponses.forEach((row) => {
+        const label = (row.question_option?.option_text || '').trim()
+        if (label.toLowerCase() === 'true') counts.True += 1
+        else if (label.toLowerCase() === 'false') counts.False += 1
+      })
+      return [
+        { name: 'True', value: counts.True },
+        { name: 'False', value: counts.False },
+      ]
+    }
+
+    return []
+  }, [questionResultsQuery.data, activeQuestion, currentResponses])
+
+  const usesOptionChart = questionUsesOptionChart(activeQuestion?.rawType)
+  const showOptionBreakdown = usesOptionChart && optionData.length > 0
+  const optionTotal = optionData.reduce((sum, row) => sum + row.value, 0)
 
 
   const attemptsRows = useMemo(
@@ -446,32 +490,101 @@ function LivePage() {
 
         <div className="space-y-4">
           <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Live chart</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Live chart</p>
+                {showOptionBreakdown && (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {optionTotal} response{optionTotal === 1 ? '' : 's'} by answer
+                  </p>
+                )}
+              </div>
+              {showOptionBreakdown && (
+                <div className="inline-flex rounded-xl border border-blue-200/70 bg-white p-0.5 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setChartView('bar')}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      chartView === 'bar'
+                        ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow'
+                        : 'text-slate-600 hover:bg-blue-50'
+                    }`}
+                    aria-pressed={chartView === 'bar'}
+                  >
+                    <BarChart3 className="size-3.5" />
+                    Bar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChartView('pie')}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      chartView === 'pie'
+                        ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow'
+                        : 'text-slate-600 hover:bg-blue-50'
+                    }`}
+                    aria-pressed={chartView === 'pie'}
+                  >
+                    <PieChartIcon className="size-3.5" />
+                    Pie
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="mt-3 h-[300px] rounded-2xl border border-blue-200 bg-white p-3">
               <ResponsiveContainer width="100%" height="100%">
-                {activeQuestion?.rawType === 'mcq' ? (
-                  <BarChart data={optionData}>
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                      {optionData.map((entry, idx) => (
-                        <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
+                {showOptionBreakdown ? (
+                  chartView === 'bar' ? (
+                    <BarChart data={optionData}>
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip formatter={(value) => [`${value} responses`, 'Count']} />
+                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                        {optionData.map((entry, idx) => (
+                          <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  ) : (
+                    <PieChart>
+                      <Tooltip
+                        formatter={(value, name) => [
+                          `${value} (${optionTotal ? Math.round((Number(value) / optionTotal) * 100) : 0}%)`,
+                          name,
+                        ]}
+                      />
+                      <Pie
+                        data={optionData}
+                        dataKey="value"
+                        nameKey="name"
+                        outerRadius={100}
+                        innerRadius={activeQuestion?.rawType === 'true_false' ? 48 : 0}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {optionData.map((entry, idx) => (
+                          <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  )
                 ) : (
                   <PieChart>
                     <Tooltip />
-                    <Pie data={[{ name: 'Responses', value: responded || 0 }]} dataKey="value" nameKey="name" outerRadius={100}>
+                    <Pie
+                      data={[{ name: 'Responses', value: responded || 0 }]}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={100}
+                    >
                       <Cell fill="#2563eb" />
                     </Pie>
                   </PieChart>
                 )}
               </ResponsiveContainer>
             </div>
+            {showOptionBreakdown && !optionTotal && (
+              <p className="mt-2 text-center text-xs text-slate-500">Waiting for participants to answer…</p>
+            )}
           </div>
-
 
           <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5">
             <div className="flex items-center justify-between">
