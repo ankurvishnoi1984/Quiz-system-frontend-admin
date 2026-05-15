@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import KebabMenu from '../components/ui/KebabMenu'
 import { useSessions } from '../context/SessionsContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { listSessionQuestionsApi } from '../services/builderApi'
+import { useAuthStore } from '../store/authStore'
 
 function downloadText(filename, text, mime = 'text/plain') {
   const blob = new Blob([text], { type: mime })
@@ -15,21 +17,106 @@ function downloadText(filename, text, mime = 'text/plain') {
   URL.revokeObjectURL(url)
 }
 
-function exportSessionCsv(session) {
-  const headers = [
-    'sessionId',
-    'sessionTitle',
-    'status',
-    'department',
-    'joinRequirement',
-    'questionIndex',
-    'questionType',
-    'questionText',
-    'sampleResponse',
-  ]
+const REPORT_CSV_HEADERS = [
+  'sessionId',
+  'sessionTitle',
+  'status',
+  'department',
+  'joinRequirement',
+  'questionIndex',
+  'questionType',
+  'questionText',
+  'sampleResponse',
+]
 
-  const rows = (session.questions ?? []).map((q, idx) => {
-    const sample = q.type === 'MCQ' ? (q.options?.[0]?.text ?? '') : 'Sample response'
+function csvEscapeCell(value) {
+  return `"${String(value ?? '').replaceAll('"', '""')}"`
+}
+
+function buildReportCsv(rows) {
+  const lines = [REPORT_CSV_HEADERS.join(','), ...rows.map((r) => r.map(csvEscapeCell).join(','))]
+  return lines.join('\n')
+}
+
+function isBackendSessionId(id) {
+  const n = Number(id)
+  return Number.isFinite(n) && n > 0 && String(n) === String(id).trim()
+}
+
+function apiQuestionTypeToLabel(questionType) {
+  const mapping = {
+    mcq: 'MCQ',
+    word_cloud: 'Word Cloud',
+    rating: 'Rating',
+    open_text: 'Text',
+    true_false: 'True/False',
+    ranking: 'Ranking',
+    fill_blank: 'Text',
+  }
+  return mapping[questionType] || questionType || ''
+}
+
+function sortApiQuestions(questions) {
+  return [...questions].sort(
+    (a, b) => (Number(a.display_order) || 0) - (Number(b.display_order) || 0),
+  )
+}
+
+function sampleResponseFromApiQuestion(q) {
+  const opts = q.question_options || []
+  const t = q.question_type
+  if (t === 'mcq' || t === 'true_false') {
+    return opts[0]?.option_text ?? ''
+  }
+  if (t === 'rating') {
+    const lo = q.rating_min ?? 1
+    const hi = q.rating_max ?? 5
+    return `${lo}–${hi} (rating)`
+  }
+  if (t === 'word_cloud') {
+    return '(words / tags)'
+  }
+  if (t === 'open_text' || t === 'ranking' || t === 'fill_blank') {
+    return '(free text)'
+  }
+  return ''
+}
+
+async function loadQuestionsForReport(accessToken, session) {
+  if (!accessToken || !isBackendSessionId(session.id)) return null
+  try {
+    const list = await listSessionQuestionsApi(accessToken, session.id)
+    return sortApiQuestions(Array.isArray(list) ? list : [])
+  } catch (err) {
+    console.error('Failed to load questions for report', session.id, err)
+    return null
+  }
+}
+
+function rowsFromApiQuestions(session, apiQuestions) {
+  return apiQuestions.map((q, idx) => [
+    session.id,
+    session.title,
+    session.status,
+    session.department ?? '',
+    session.joinRequirement ?? 'name',
+    String(idx + 1),
+    apiQuestionTypeToLabel(q.question_type),
+    q.question_text ?? '',
+    sampleResponseFromApiQuestion(q),
+  ])
+}
+
+function rowsFromFallbackQuestions(session) {
+  return (session.questions ?? []).map((q, idx) => {
+    const sample =
+      q.type === 'MCQ' || q.type === 'True/False'
+        ? (q.options?.[0]?.text ?? '')
+        : q.type === 'Word Cloud'
+          ? '(words / tags)'
+          : q.type === 'Rating'
+            ? '(rating)'
+            : '(free text)'
     return [
       session.id,
       session.title,
@@ -42,56 +129,39 @@ function exportSessionCsv(session) {
       sample,
     ]
   })
-
-  const csv = [headers.join(','), ...rows.map((r) => r.map((x) => `"${String(x ?? '').replaceAll('"', '""')}"`).join(','))].join('\n')
-  downloadText(`report-${session.id}.csv`, csv, 'text/csv')
 }
 
-function exportAllCsv(sessions) {
-  const headers = [
-    'sessionId',
-    'sessionTitle',
-    'status',
-    'department',
-    'joinRequirement',
-    'questionIndex',
-    'questionType',
-    'questionText',
-    'sampleResponse',
-  ]
+async function exportSessionCsvAsync(accessToken, session) {
+  const apiQs = await loadQuestionsForReport(accessToken, session)
+  const rows =
+    apiQs && apiQs.length > 0 ? rowsFromApiQuestions(session, apiQs) : rowsFromFallbackQuestions(session)
+  downloadText(`report-${session.id}.csv`, buildReportCsv(rows), 'text/csv')
+}
 
-  const rows = []
-  sessions.forEach((session) => {
-    ;(session.questions ?? []).forEach((q, idx) => {
-      const sample = q.type === 'MCQ' ? (q.options?.[0]?.text ?? '') : 'Sample response'
-      rows.push([
-        session.id,
-        session.title,
-        session.status,
-        session.department ?? '',
-        session.joinRequirement ?? 'name',
-        String(idx + 1),
-        q.type ?? '',
-        q.text ?? '',
-        sample,
-      ])
-    })
-  })
-
-  const csv = [headers.join(','), ...rows.map((r) => r.map((x) => `"${String(x ?? '').replaceAll('"', '""')}"`).join(','))].join('\n')
-  downloadText(`reports-all-sessions.csv`, csv, 'text/csv')
+async function exportAllCsvAsync(accessToken, sessions) {
+  const rowLists = await Promise.all(
+    sessions.map(async (session) => {
+      const apiQs = await loadQuestionsForReport(accessToken, session)
+      if (apiQs && apiQs.length > 0) return rowsFromApiQuestions(session, apiQs)
+      return rowsFromFallbackQuestions(session)
+    }),
+  )
+  const rows = rowLists.flat()
+  downloadText('reports-all-sessions.csv', buildReportCsv(rows), 'text/csv')
 }
 
 const PAGE_SIZE = 10
 
 function ReportsPage() {
   const { sessions } = useSessions()
+  const accessToken = useAuthStore((s) => s.accessToken)
   const navigate = useNavigate()
   const [status, setStatus] = useState('All')
   const [query, setQuery] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
+  const [exportAllLoading, setExportAllLoading] = useState(false)
   const debounced = useDebouncedValue(query, 250).trim().toLowerCase()
 
   const filtered = useMemo(() => {
@@ -127,6 +197,18 @@ function ReportsPage() {
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = totalCount === 0 ? 0 : Math.min(page * PAGE_SIZE, totalCount)
 
+  const handleExportAll = async () => {
+    if (!filtered.length) return
+    setExportAllLoading(true)
+    try {
+      await exportAllCsvAsync(accessToken, filtered)
+    } catch (err) {
+      console.error('Export all failed', err)
+    } finally {
+      setExportAllLoading(false)
+    }
+  }
+
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -139,11 +221,12 @@ function ReportsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => exportAllCsv(filtered)}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
+            disabled={!filtered.length || exportAllLoading}
+            onClick={() => void handleExportAll()}
+            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Download className="size-4" />
-            Export all (CSV)
+            {exportAllLoading ? 'Exporting…' : 'Export all (CSV)'}
           </button>
           <button
             type="button"
@@ -247,7 +330,7 @@ function ReportsPage() {
               <KebabMenu
                 items={[
                   { id: 'view', label: 'View (Analytics)', icon: ExternalLink, onClick: () => navigate(`/analytics?session=${encodeURIComponent(s.id)}`) },
-                  { id: 'csv', label: 'Download CSV', icon: Download, onClick: () => exportSessionCsv(s) },
+                  { id: 'csv', label: 'Download CSV', icon: Download, onClick: () => void exportSessionCsvAsync(accessToken, s) },
                   {
                     id: 'pdf',
                     label: 'Download PDF',
