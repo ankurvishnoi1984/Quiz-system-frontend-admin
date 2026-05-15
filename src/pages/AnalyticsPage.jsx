@@ -15,10 +15,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import Modal from '../components/ui/Modal'
 import { useShell } from '../context/ShellContext'
-import { useSessions } from '../context/SessionsContext'
+import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
 import { getSessionReportApi } from '../services/analyticsApi'
 import { getSessionDetailApi, listSessionQuestionsApi } from '../services/builderApi'
-import { listDepartmentSessionsApi } from '../services/dashboardApi'
 import { getQuestionResultsApi, getSessionResponsesApi } from '../services/liveApi'
 import { useAuthStore } from '../store/authStore'
 
@@ -128,29 +127,11 @@ function AnalyticsPage() {
   const navigate = useNavigate()
   const accessToken = useAuthStore((s) => s.accessToken)
   const { departmentId } = useShell()
-  const { sessions: contextSessions, getSession } = useSessions()
+  const { sessions } = useDepartmentSessionsList()
 
   const [pdfOpen, setPdfOpen] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-
-  const deptSessionsQuery = useQuery({
-    queryKey: ['analytics-dept-sessions', departmentId],
-    queryFn: () => listDepartmentSessionsApi(accessToken, departmentId),
-    enabled: Boolean(accessToken && departmentId),
-  })
-
-  const apiSessions = useMemo(() => {
-    return (deptSessionsQuery.data || []).map((s) => ({
-      id: String(s.session_id),
-      title: s.title,
-      status: formatStatus(s.status),
-      date: s.created_at ? String(s.created_at).split('T')[0] : '',
-      joinRequirement: s.join_type ?? 'name',
-    }))
-  }, [deptSessionsQuery.data])
-
-  const sessions = apiSessions.length > 0 ? apiSessions : contextSessions
 
   const defaultSessionId =
     sessionId ||
@@ -164,6 +145,20 @@ function AnalyticsPage() {
       navigate(`/analytics?session=${encodeURIComponent(defaultSessionId)}`, { replace: true })
     }
   }, [sessionId, defaultSessionId, navigate])
+
+  useEffect(() => {
+    if (!departmentId || !sessions.length) return
+    if (!sessionId) return
+    const inDept = sessions.some((s) => String(s.id) === String(sessionId))
+    if (inDept) return
+    const next =
+      sessions.find((s) => s.status === 'Completed')?.id ||
+      sessions.find((s) => s.status === 'Live')?.id ||
+      sessions[0]?.id
+    if (next) {
+      navigate(`/analytics?session=${encodeURIComponent(next)}`, { replace: true })
+    }
+  }, [departmentId, sessions, sessionId, navigate])
 
   const activeSessionId = sessionId || defaultSessionId
   const numericSessionId = isBackendSessionId(activeSessionId) ? activeSessionId : null
@@ -227,7 +222,7 @@ function AnalyticsPage() {
   const sessionDetail = sessionDetailQuery.data
   const allResponses = responsesQuery.data || []
 
-  const contextSession = activeSessionId ? getSession(activeSessionId) : null
+  const listSession = activeSessionId ? sessions.find((s) => String(s.id) === String(activeSessionId)) : null
 
   const sessionMeta = useMemo(() => {
     if (report?.session) {
@@ -239,17 +234,17 @@ function AnalyticsPage() {
         endedAt: report.session.ended_at,
       }
     }
-    if (contextSession) {
+    if (listSession) {
       return {
-        id: contextSession.id,
-        title: contextSession.title,
-        status: contextSession.status,
+        id: listSession.id,
+        title: listSession.title,
+        status: listSession.status,
         startedAt: null,
         endedAt: null,
       }
     }
     return null
-  }, [report?.session, contextSession])
+  }, [report?.session, listSession])
 
   const summary = useMemo(() => {
     if (report?.stats) {
@@ -262,12 +257,12 @@ function AnalyticsPage() {
       }
     }
     return {
-      joined: contextSession?.participants ?? 0,
+      joined: listSession?.participants ?? 0,
       responded: 0,
       avg: 0,
       duration: '—',
     }
-  }, [report?.stats, sessionMeta?.startedAt, sessionMeta?.endedAt, contextSession?.participants])
+  }, [report?.stats, sessionMeta?.startedAt, sessionMeta?.endedAt, listSession?.participants])
 
   const perQuestion = useMemo(() => {
     return sortedQuestions.map((q, idx) => {
@@ -297,13 +292,13 @@ function AnalyticsPage() {
     const d = sessionDetail
     if (!d) {
       return {
-        joinRequirement: contextSession?.joinRequirement ?? 'name',
-        timeLimitLabel: contextSession?.timeLimitSeconds ? `${contextSession.timeLimitSeconds}s` : 'Off',
-        quizMode: Boolean(contextSession?.quizMode),
-        maxParticipants: contextSession?.settings?.maxParticipants ?? 0,
-        anonymous: Boolean(contextSession?.settings?.anonymous),
-        password: Boolean(contextSession?.settings?.password),
-        leaderboard: contextSession?.settings?.leaderboard ?? true,
+        joinRequirement: listSession?.joinRequirement ?? 'name',
+        timeLimitLabel: 'Off',
+        quizMode: false,
+        maxParticipants: 0,
+        anonymous: listSession?.joinRequirement === 'anonymous',
+        password: false,
+        leaderboard: true,
       }
     }
     const timed = sortedQuestions.some((q) => Number(q.time_limit_seconds) > 0)
@@ -320,7 +315,7 @@ function AnalyticsPage() {
       password: Boolean(d.password_hash),
       leaderboard: Boolean(d.leaderboard_enabled),
     }
-  }, [sessionDetail, contextSession, sortedQuestions])
+  }, [sessionDetail, listSession, sortedQuestions])
 
   const exportCsv = () => {
     if (!sessionMeta) return

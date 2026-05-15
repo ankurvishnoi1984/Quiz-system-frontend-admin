@@ -19,6 +19,11 @@ function Navbar() {
   const { client, setClient, clientId, setClientId, department, setDepartment, departmentId, setDepartmentId, clients, departments, isSuperAdmin, clientsLoading, departmentsLoading } = useShell()
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
+  const canSwitchDepartment = user?.role === 'super_admin'
+  const departmentLabel =
+    department ||
+    departments.find((d) => String(d.dept_id) === String(departmentId))?.name ||
+    'Department'
 
   const initials = user?.full_name
     ? user.full_name
@@ -69,25 +74,34 @@ function Navbar() {
               ))}
             </select>
           )}
-          {!departmentsLoading && departments.length > 0 && (
-            <select
-              value={departmentId}
-              onChange={(event) => {
-                const selectedDept = departments.find(d => String(d.dept_id) === event.target.value)
-                if (selectedDept) {
-                  setDepartmentId(String(selectedDept.dept_id))
-                  setDepartment(selectedDept.name)
-                }
-              }}
-              className="h-10 rounded-xl border border-blue-200/70 bg-white/90 px-3 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-              aria-label="Department"
-            >
-              {departments.map((d) => (
-                <option key={d.dept_id} value={d.dept_id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+          {!departmentsLoading && (departments.length > 0 || departmentLabel) && (
+            canSwitchDepartment ? (
+              <select
+                value={departmentId}
+                onChange={(event) => {
+                  const selectedDept = departments.find((d) => String(d.dept_id) === event.target.value)
+                  if (selectedDept) {
+                    setDepartmentId(String(selectedDept.dept_id))
+                    setDepartment(selectedDept.name)
+                  }
+                }}
+                className="h-10 rounded-xl border border-blue-200/70 bg-white/90 px-3 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                aria-label="Department"
+              >
+                {departments.map((d) => (
+                  <option key={d.dept_id} value={d.dept_id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div
+                className="flex h-10 items-center rounded-xl border border-blue-200/70 bg-slate-50/90 px-3 text-sm font-medium text-slate-700 shadow-sm shadow-blue-900/5"
+                aria-label="Department"
+              >
+                {departmentLabel}
+              </div>
+            )
           )}
         </div>
 

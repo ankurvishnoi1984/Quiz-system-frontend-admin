@@ -2,8 +2,8 @@ import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Search, Sh
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import KebabMenu from '../components/ui/KebabMenu'
-import { useSessions } from '../context/SessionsContext'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
 import { listSessionQuestionsApi } from '../services/builderApi'
 import { useAuthStore } from '../store/authStore'
 
@@ -153,7 +153,7 @@ async function exportAllCsvAsync(accessToken, sessions) {
 const PAGE_SIZE = 10
 
 function ReportsPage() {
-  const { sessions } = useSessions()
+  const { sessions, isLoading: sessionsLoading } = useDepartmentSessionsList()
   const accessToken = useAuthStore((s) => s.accessToken)
   const navigate = useNavigate()
   const [status, setStatus] = useState('All')
@@ -183,7 +183,7 @@ function ReportsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [status, debounced, fromDate, toDate])
+  }, [status, debounced, fromDate, toDate, sessions])
 
   useEffect(() => {
     setPage((p) => Math.min(Math.max(1, p), totalPages))
@@ -215,7 +215,9 @@ function ReportsPage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Reports</p>
           <h2 className="mt-1 text-2xl font-bold text-navy-900">Download & view session reports</h2>
-          <p className="mt-1 text-sm text-slate-600">Exports are based on your sessions, questions, and settings.</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Sessions for the department selected in the navbar. Exports use live question data.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -349,7 +351,9 @@ function ReportsPage() {
         ))}
 
         {!filtered.length && (
-          <div className="p-10 text-center text-sm text-slate-600">No sessions match these filters.</div>
+          <div className="p-10 text-center text-sm text-slate-600">
+            {sessionsLoading ? 'Loading sessions…' : 'No sessions match these filters.'}
+          </div>
         )}
 
         {filtered.length > 0 && (
