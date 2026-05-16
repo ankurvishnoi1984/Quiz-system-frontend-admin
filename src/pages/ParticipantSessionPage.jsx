@@ -348,6 +348,9 @@ function ParticipantSessionPage() {
   const isLastDisplayedQuestion =
     mappedQuestions.length > 0 && displayQuestionIndex === mappedQuestions.length - 1
 
+  /** Submit is only available on the final question (or when the quiz has one question). */
+  const canSubmitQuiz = mappedQuestions.length <= 1 || isLastDisplayedQuestion
+
   const currentQuestionAnswered = useMemo(
     () => participantQuestionHasAnswer(question, responses[question?.id]),
     [question, responses],
@@ -1016,7 +1019,12 @@ function ParticipantSessionPage() {
               <button
                 type="button"
                 onClick={handleSubmitResponse}
-                disabled={!Object.keys(responses).length || isSubmitting}
+                title={
+                  !canSubmitQuiz
+                    ? 'Use Next to reach the last question before submitting'
+                    : undefined
+                }
+                disabled={!canSubmitQuiz || !Object.keys(responses).length || isSubmitting}
                 className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting
