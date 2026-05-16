@@ -1,5 +1,5 @@
 import { CheckCircle2, ChevronLeft, ChevronRight, Clock3, Crown, Pencil, Send, Star, Trophy, Users, XCircle } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useShallow } from 'zustand/shallow'
@@ -12,7 +12,7 @@ import {
   submitResponseApi,
   upvoteQaApi,
 } from '../services/participantApi'
-import { useRealtimeParticipant } from '../services/realtimeClient'
+import { createRealtimeClient } from '../services/realtimeClient'
 import { useParticipantStore } from '../store/participantStore'
 
 
@@ -211,7 +211,19 @@ function ParticipantSessionPage() {
   }, [questionLockedBySubmission, setSubmitted])
 
 
-  const client = useRealtimeParticipant(sessionId, participantToken)
+  const wsSessionCode = session?.session_code || sessionId
+
+  const client = useMemo(() => {
+    if (!wsSessionCode || !participantToken) return null
+    return createRealtimeClient(
+      '',
+      { session: wsSessionCode, token: participantToken, role: 'participant' },
+      'participant',
+    )
+  }, [wsSessionCode, participantToken])
+
+  const mappedQuestionsRef = useRef(mappedQuestions)
+  mappedQuestionsRef.current = mappedQuestions
 
 
   useEffect(() => {
@@ -250,12 +262,7 @@ function ParticipantSessionPage() {
 
 
   useEffect(() => {
-    if (!sessionId || !participantToken || !dbSessionId) return
-
-
-    const offOpen = client.on('open', () => { })
-    const offClose = client.on('close', () => { })
-
+    if (!client || !sessionId || !participantToken || !dbSessionId) return
 
     const offSession = client.on('session_updated', (data) => {
       if (data.status === 'live') {
@@ -280,7 +287,7 @@ function ParticipantSessionPage() {
 
         // ✅ Sync index (important for counter UI)
         setQuestionIndex((prev) => {
-          const idx = mappedQuestions.findIndex(q => q.id === data.question_id)
+          const idx = mappedQuestionsRef.current.findIndex((q) => q.id === data.question_id)
           return idx !== -1 ? idx : prev
         })
 
@@ -311,15 +318,13 @@ function ParticipantSessionPage() {
 
 
     return () => {
-      offOpen()
-      offClose()
       offSession()
       offQuestion()
       offResp()
       offLeaderboard()
       client.disconnect()
     }
-  }, [sessionId, participantToken, client, queryClient, dbSessionId, mappedQuestions])
+  }, [client, sessionId, participantToken, queryClient, dbSessionId])
 
 
   useEffect(() => {

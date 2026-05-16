@@ -20,7 +20,7 @@ import {
   setQuestionLiveStateApi,
   transitionSessionApi,
 } from '../services/liveApi'
-import { useRealtimeSession } from '../services/realtimeClient'
+import { createRealtimeClient } from '../services/realtimeClient'
 
 
 const COLORS = ['#1d4ed8', '#2563eb', '#4f46e5', '#0891b2', '#0ea5e9', '#6366f1']
@@ -167,9 +167,16 @@ function LivePage() {
     if (!sessionCode || !accessToken) return
 
 
-    const client = useRealtimeSession(sessionCode, accessToken)
+    const client = createRealtimeClient(
+      '',
+      { session: sessionCode, token: accessToken, role: 'host' },
+      'host',
+    )
     const offOpen = client.on('open', () => setSocketStatus('connected'))
     const offClose = client.on('close', () => setSocketStatus('disconnected'))
+    const offError = client.on('error', (data) => {
+      console.warn('[WS host]', data?.message)
+    })
     const offResp = client.on('response_received', () => {
       queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
       queryClient.invalidateQueries({ queryKey: ['live-responses', sessionId] })
@@ -187,6 +194,7 @@ function LivePage() {
     return () => {
       offOpen()
       offClose()
+      offError()
       offResp()
       offSession()
       offQuestion()
