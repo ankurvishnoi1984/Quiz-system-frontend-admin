@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import QRCode from 'qrcode'
+import WordCloudChart from '../components/charts/WordCloudChart'
 import Modal from '../components/ui/Modal'
+import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
 import { useAuthStore } from '../store/authStore'
 import { getSessionQrApi } from '../services/dashboardApi'
 import {
@@ -263,9 +265,18 @@ function LivePage() {
     return []
   }, [questionResultsQuery.data, activeQuestion, currentResponses])
 
+  const wordCloudWords = useMemo(() => {
+    if (activeQuestion?.rawType !== 'word_cloud') return []
+    const fromApi = wordCountsFromApiResults(questionResultsQuery.data)
+    if (fromApi.length) return fromApi
+    return wordCountsFromResponses(currentResponses)
+  }, [activeQuestion?.rawType, questionResultsQuery.data, currentResponses])
+
   const usesOptionChart = questionUsesOptionChart(activeQuestion?.rawType)
+  const showWordCloud = activeQuestion?.rawType === 'word_cloud'
   const showOptionBreakdown = usesOptionChart && optionData.length > 0
   const optionTotal = optionData.reduce((sum, row) => sum + row.value, 0)
+  const wordCloudTotal = wordCloudWords.reduce((sum, row) => sum + row.count, 0)
 
 
   const attemptsRows = useMemo(
@@ -493,6 +504,12 @@ function LivePage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Live chart</p>
+                {showWordCloud && (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {wordCloudWords.length} unique word{wordCloudWords.length === 1 ? '' : 's'} ·{' '}
+                    {wordCloudTotal} submission{wordCloudTotal === 1 ? '' : 's'}
+                  </p>
+                )}
                 {showOptionBreakdown && (
                   <p className="mt-0.5 text-xs text-slate-500">
                     {optionTotal} response{optionTotal === 1 ? '' : 's'} by answer
@@ -531,56 +548,63 @@ function LivePage() {
               )}
             </div>
             <div className="mt-3 h-[300px] rounded-2xl border border-blue-200 bg-white p-3">
-              <ResponsiveContainer width="100%" height="100%">
-                {showOptionBreakdown ? (
-                  chartView === 'bar' ? (
-                    <BarChart data={optionData}>
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip formatter={(value) => [`${value} responses`, 'Count']} />
-                      <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                        {optionData.map((entry, idx) => (
-                          <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
+              {showWordCloud ? (
+                <WordCloudChart words={wordCloudWords} className="h-full" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  {showOptionBreakdown ? (
+                    chartView === 'bar' ? (
+                      <BarChart data={optionData}>
+                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip formatter={(value) => [`${value} responses`, 'Count']} />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                          {optionData.map((entry, idx) => (
+                            <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    ) : (
+                      <PieChart>
+                        <Tooltip
+                          formatter={(value, name) => [
+                            `${value} (${optionTotal ? Math.round((Number(value) / optionTotal) * 100) : 0}%)`,
+                            name,
+                          ]}
+                        />
+                        <Pie
+                          data={optionData}
+                          dataKey="value"
+                          nameKey="name"
+                          outerRadius={100}
+                          innerRadius={activeQuestion?.rawType === 'true_false' ? 48 : 0}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {optionData.map((entry, idx) => (
+                            <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    )
                   ) : (
                     <PieChart>
-                      <Tooltip
-                        formatter={(value, name) => [
-                          `${value} (${optionTotal ? Math.round((Number(value) / optionTotal) * 100) : 0}%)`,
-                          name,
-                        ]}
-                      />
+                      <Tooltip />
                       <Pie
-                        data={optionData}
+                        data={[{ name: 'Responses', value: responded || 0 }]}
                         dataKey="value"
                         nameKey="name"
                         outerRadius={100}
-                        innerRadius={activeQuestion?.rawType === 'true_false' ? 48 : 0}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                       >
-                        {optionData.map((entry, idx) => (
-                          <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
-                        ))}
+                        <Cell fill="#2563eb" />
                       </Pie>
                     </PieChart>
-                  )
-                ) : (
-                  <PieChart>
-                    <Tooltip />
-                    <Pie
-                      data={[{ name: 'Responses', value: responded || 0 }]}
-                      dataKey="value"
-                      nameKey="name"
-                      outerRadius={100}
-                    >
-                      <Cell fill="#2563eb" />
-                    </Pie>
-                  </PieChart>
-                )}
-              </ResponsiveContainer>
+                  )}
+                </ResponsiveContainer>
+              )}
             </div>
+            {showWordCloud && !wordCloudWords.length && (
+              <p className="mt-2 text-center text-xs text-slate-500">Waiting for participants to submit words…</p>
+            )}
             {showOptionBreakdown && !optionTotal && (
               <p className="mt-2 text-center text-xs text-slate-500">Waiting for participants to answer…</p>
             )}

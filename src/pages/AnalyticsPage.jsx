@@ -13,7 +13,9 @@ import { Download, FileText, Loader2, Printer, Trophy } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
+import WordCloudChart from '../components/charts/WordCloudChart'
 import Modal from '../components/ui/Modal'
+import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
 import { useShell } from '../context/ShellContext'
 import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
 import { getSessionReportApi } from '../services/analyticsApi'
@@ -272,6 +274,16 @@ function AnalyticsPage() {
       const responseCount = breakdown?.response_count ?? results?.total_responses ?? 0
       const chart = chartFromQuestionResults(results, q)
       const correctRate = correctRateForQuestion(q, allResponses)
+      const questionResponses = (allResponses || []).filter(
+        (r) => Number(r.question_id) === Number(q.question_id),
+      )
+      const apiWordCounts = wordCountsFromApiResults(results)
+      const wordCloud =
+        q.question_type === 'word_cloud'
+          ? apiWordCounts.length
+            ? apiWordCounts
+            : wordCountsFromResponses(questionResponses)
+          : []
 
       return {
         id: String(q.question_id),
@@ -281,6 +293,7 @@ function AnalyticsPage() {
         responseCount,
         correctRate,
         chart,
+        wordCloud,
         rawType: q.question_type,
       }
     })
@@ -529,51 +542,55 @@ function AnalyticsPage() {
             </div>
 
             <div className="mt-4 h-56 rounded-2xl border border-blue-200/70 bg-white/90 p-3">
-              <ResponsiveContainer width="100%" height="100%">
-                {q.chart.length > 0 && (q.rawType === 'mcq' || q.rawType === 'true_false') ? (
-                  <BarChart data={q.chart}>
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis unit="%" />
-                    <Tooltip formatter={(value, _name, props) => [`${value}% (${props.payload.count} responses)`, 'Share']} />
-                    <Bar dataKey="value" radius={[10, 10, 0, 0]}>
-                      {q.chart.map((entry, idx) => (
-                        <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                ) : (
-                  <PieChart>
-                    <Tooltip />
-                    <Pie
-                      data={[
-                        {
-                          name: 'Responded',
-                          value: clamp(
-                            Math.round((q.responseCount / Math.max(1, summary.joined)) * 100),
-                            0,
-                            100,
-                          ),
-                        },
-                        {
-                          name: 'No response',
-                          value: clamp(
-                            100 - Math.round((q.responseCount / Math.max(1, summary.joined)) * 100),
-                            0,
-                            100,
-                          ),
-                        },
-                      ]}
-                      dataKey="value"
-                      nameKey="name"
-                      outerRadius={90}
-                      innerRadius={50}
-                    >
-                      <Cell fill="#2563eb" />
-                      <Cell fill="#e2e8f0" />
-                    </Pie>
-                  </PieChart>
-                )}
-              </ResponsiveContainer>
+              {q.rawType === 'word_cloud' ? (
+                <WordCloudChart words={q.wordCloud} className="h-full" emptyLabel="No words submitted yet" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  {q.chart.length > 0 && (q.rawType === 'mcq' || q.rawType === 'true_false') ? (
+                    <BarChart data={q.chart}>
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                      <YAxis unit="%" />
+                      <Tooltip formatter={(value, _name, props) => [`${value}% (${props.payload.count} responses)`, 'Share']} />
+                      <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                        {q.chart.map((entry, idx) => (
+                          <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  ) : (
+                    <PieChart>
+                      <Tooltip />
+                      <Pie
+                        data={[
+                          {
+                            name: 'Responded',
+                            value: clamp(
+                              Math.round((q.responseCount / Math.max(1, summary.joined)) * 100),
+                              0,
+                              100,
+                            ),
+                          },
+                          {
+                            name: 'No response',
+                            value: clamp(
+                              100 - Math.round((q.responseCount / Math.max(1, summary.joined)) * 100),
+                              0,
+                              100,
+                            ),
+                          },
+                        ]}
+                        dataKey="value"
+                        nameKey="name"
+                        outerRadius={90}
+                        innerRadius={50}
+                      >
+                        <Cell fill="#2563eb" />
+                        <Cell fill="#e2e8f0" />
+                      </Pie>
+                    </PieChart>
+                  )}
+                </ResponsiveContainer>
+              )}
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
