@@ -9,6 +9,7 @@ import Modal from '../components/ui/Modal'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
 import { useAuthStore } from '../store/authStore'
 import { getSessionQrApi } from '../services/dashboardApi'
+import { buildSessionJoinUrl, resolveSessionJoinUrl } from '../utils/joinUrl'
 import {
   getQuestionResultsApi,
   getSessionDetailApi,
@@ -65,6 +66,7 @@ function LivePage() {
   const [socketStatus, setSocketStatus] = useState('disconnected')
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [shareJoinUrl, setShareJoinUrl] = useState('')
   const [shareQrDataUrl, setShareQrDataUrl] = useState('')
   const [shareCopied, setShareCopied] = useState(false)
   const [chartView, setChartView] = useState('bar')
@@ -140,25 +142,28 @@ function LivePage() {
   }, [activeQuestion?.id])
 
   useEffect(() => {
-    const makeQr = async () => {
+    const resolveShareLink = async () => {
       const s = sessionQuery.data
       if (!shareOpen || !s) {
+        setShareJoinUrl('')
         setShareQrDataUrl('')
         return
       }
-      let link = `${window.location.origin}/join/${s.session_code || s.session_id}`
+      const sessionCode = s.session_code || s.session_id
+      let link = buildSessionJoinUrl(sessionCode)
       if (accessToken && s.session_id) {
         try {
           const qrPayload = await getSessionQrApi(accessToken, s.session_id)
-          if (qrPayload?.join_url) link = qrPayload.join_url
+          link = resolveSessionJoinUrl(qrPayload?.join_url, sessionCode)
         } catch {
-          // Fall back to local join link shape if QR endpoint fails.
+          // Use public join URL when QR endpoint fails.
         }
       }
+      setShareJoinUrl(link)
       const data = await QRCode.toDataURL(link, { margin: 1, width: 280 })
       setShareQrDataUrl(data)
     }
-    makeQr()
+    resolveShareLink()
   }, [shareOpen, sessionQuery.data, accessToken])
 
 
@@ -325,11 +330,6 @@ function LivePage() {
   const session = sessionQuery.data
   const statusLabel = session?.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : '—'
   const canEditLive = session?.status === 'live'
-
-  const shareJoinUrl = session
-    ? `${window.location.origin}/join/${session.session_code || session.session_id}`
-    : ''
-
 
   if (!sessionId) {
     return (
@@ -660,6 +660,7 @@ function LivePage() {
         title="Share Session"
         onClose={() => {
           setShareOpen(false)
+          setShareJoinUrl('')
           setShareQrDataUrl('')
           setShareCopied(false)
         }}

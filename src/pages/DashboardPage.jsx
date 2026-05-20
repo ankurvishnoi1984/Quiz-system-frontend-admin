@@ -19,6 +19,10 @@ import {
   listDepartmentSessionsApi,
   transitionSessionApi,
 } from '../services/dashboardApi'
+import {
+  buildSessionJoinUrl,
+  resolveSessionJoinUrl,
+} from '../utils/joinUrl'
 
 const tabItems = ['All', 'Draft', 'Live', 'Completed']
 
@@ -43,6 +47,7 @@ function DashboardPage() {
   const [toDate, setToDate] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [shareSession, setShareSession] = useState(null)
+  const [shareJoinUrl, setShareJoinUrl] = useState('')
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [dashboardError, setDashboardError] = useState('')
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
@@ -108,24 +113,27 @@ function DashboardPage() {
   })
 
   useEffect(() => {
-    const makeQr = async () => {
+    const resolveShareLink = async () => {
       if (!shareSession) {
+        setShareJoinUrl('')
         setQrDataUrl('')
         return
       }
-      let link = `${window.location.origin}/join/${shareSession.session_code || shareSession.id}`
+      const sessionCode = shareSession.session_code || shareSession.id
+      let link = buildSessionJoinUrl(sessionCode)
       if (accessToken && shareSession?.id) {
         try {
           const qrPayload = await getSessionQrApi(accessToken, shareSession.id)
-          if (qrPayload?.join_url) link = qrPayload.join_url
+          link = resolveSessionJoinUrl(qrPayload?.join_url, sessionCode)
         } catch {
-          // Fall back to local join link shape if QR endpoint fails.
+          // Use public join URL when QR endpoint fails.
         }
       }
+      setShareJoinUrl(link)
       const data = await QRCode.toDataURL(link, { margin: 1, width: 280 })
       setQrDataUrl(data)
     }
-    makeQr()
+    resolveShareLink()
   }, [shareSession, accessToken])
 
   useEffect(() => {
@@ -480,13 +488,14 @@ function DashboardPage() {
                 <div className="flex gap-2">
                   <input
                     readOnly
-                    value={`${window.location.origin}/join/${shareSession.session_code || shareSession.id}`}
+                    value={shareJoinUrl}
                     className="h-11 flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/join/${shareSession.session_code || shareSession.id}`)
+                      if (!shareJoinUrl) return
+                      navigator.clipboard.writeText(shareJoinUrl)
                       setCopied(true)
 
                       setTimeout(() => {
