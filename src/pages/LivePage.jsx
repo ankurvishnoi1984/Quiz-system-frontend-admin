@@ -3,13 +3,11 @@ import { BarChart3, ChevronLeft, ChevronRight, Crown, Eye, PieChart as PieChartI
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import QRCode from 'qrcode'
 import WordCloudChart from '../components/charts/WordCloudChart'
+import ShareSessionPanel from '../components/dashboard/ShareSessionPanel'
 import Modal from '../components/ui/Modal'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
 import { useAuthStore } from '../store/authStore'
-import { getSessionQrApi } from '../services/dashboardApi'
-import { buildSessionJoinUrl, resolveSessionJoinUrl } from '../utils/joinUrl'
 import {
   getQuestionResultsApi,
   getSessionDetailApi,
@@ -66,9 +64,6 @@ function LivePage() {
   const [socketStatus, setSocketStatus] = useState('disconnected')
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
-  const [shareJoinUrl, setShareJoinUrl] = useState('')
-  const [shareQrDataUrl, setShareQrDataUrl] = useState('')
-  const [shareCopied, setShareCopied] = useState(false)
   const [chartView, setChartView] = useState('bar')
 
 
@@ -140,32 +135,6 @@ function LivePage() {
   useEffect(() => {
     setChartView('bar')
   }, [activeQuestion?.id])
-
-  useEffect(() => {
-    const resolveShareLink = async () => {
-      const s = sessionQuery.data
-      if (!shareOpen || !s) {
-        setShareJoinUrl('')
-        setShareQrDataUrl('')
-        return
-      }
-      const sessionCode = s.session_code || s.session_id
-      let link = buildSessionJoinUrl(sessionCode)
-      if (accessToken && s.session_id) {
-        try {
-          const qrPayload = await getSessionQrApi(accessToken, s.session_id)
-          link = resolveSessionJoinUrl(qrPayload?.join_url, sessionCode)
-        } catch {
-          // Use public join URL when QR endpoint fails.
-        }
-      }
-      setShareJoinUrl(link)
-      const data = await QRCode.toDataURL(link, { margin: 1, width: 280 })
-      setShareQrDataUrl(data)
-    }
-    resolveShareLink()
-  }, [shareOpen, sessionQuery.data, accessToken])
-
 
   useEffect(() => {
     const sessionCode = sessionQuery.data?.session_code
@@ -405,7 +374,6 @@ function LivePage() {
             type="button"
             onClick={() => {
               setShareOpen(true)
-              setShareCopied(false)
             }}
             className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
           >
@@ -658,57 +626,14 @@ function LivePage() {
       <Modal
         open={shareOpen}
         title="Share Session"
-        onClose={() => {
-          setShareOpen(false)
-          setShareJoinUrl('')
-          setShareQrDataUrl('')
-          setShareCopied(false)
-        }}
+        onClose={() => setShareOpen(false)}
       >
         {session ? (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session</p>
-              <p className="mt-1 text-lg font-bold text-navy-900">{session.title}</p>
-              <p className="mt-1 text-sm text-slate-600">Link for participants to join session {session.session_id}</p>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-[1fr_280px]">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">Share link</label>
-                <div className="flex gap-2">
-                  <input
-                    readOnly
-                    value={shareJoinUrl}
-                    className="h-11 flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!shareJoinUrl) return
-                      navigator.clipboard.writeText(shareJoinUrl)
-                      setShareCopied(true)
-                      setTimeout(() => setShareCopied(false), 1500)
-                    }}
-                    className={`h-11 rounded-xl border px-4 text-sm font-semibold transition ${
-                      shareCopied
-                        ? 'scale-95 border-green-300 bg-green-100 text-green-700'
-                        : 'border-blue-200 bg-white text-slate-700 hover:bg-blue-50'
-                    }`}
-                  >
-                    {shareCopied ? 'Copied ✓' : 'Copy'}
-                  </button>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-blue-200/70 bg-white p-3">
-                {shareQrDataUrl ? (
-                  <img src={shareQrDataUrl} alt="Session QR" className="mx-auto h-[240px] w-[240px]" />
-                ) : (
-                  <div className="grid h-[240px] place-items-center text-sm text-slate-500">Generating QR...</div>
-                )}
-              </div>
-            </div>
-          </div>
+          <ShareSessionPanel
+            session={session}
+            accessToken={accessToken}
+            sessionDbId={session.session_id}
+          />
         ) : null}
       </Modal>
 

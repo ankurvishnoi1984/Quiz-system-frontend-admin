@@ -1,6 +1,6 @@
 import { CheckCircle2, ChevronLeft, ChevronRight, Clock3, Crown, Pencil, Send, Star, Trophy, Users, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useShallow } from 'zustand/shallow'
 import {
@@ -14,6 +14,7 @@ import {
 } from '../services/participantApi'
 import { createRealtimeClient } from '../services/realtimeClient'
 import { useParticipantStore } from '../store/participantStore'
+import { hasSessionCodeInJoinPath, normalizeSessionCode } from '../utils/joinUrl'
 
 
 function clamp(n, min, max) {
@@ -98,8 +99,15 @@ function participantQuestionHasAnswer(question, response = {}) {
 
 function ParticipantSessionPage() {
   const { sessionId } = useParams()
+  const location = useLocation()
   const queryClient = useQueryClient()
-  const { participantToken, joinedUser, setParticipant } = useParticipantStore()
+  const { participantToken, joinedUser, joinedSessionCode, setParticipant } = useParticipantStore()
+
+  const hasSessionCodeInUrl = hasSessionCodeInJoinPath(location.pathname, sessionId)
+  const [sessionCodeInput, setSessionCodeInput] = useState('')
+  const effectiveSessionCode = normalizeSessionCode(
+    hasSessionCodeInUrl ? sessionId : sessionCodeInput,
+  )
 
 
   const {
@@ -164,9 +172,9 @@ function ParticipantSessionPage() {
 
 
   const sessionQuery = useQuery({
-    queryKey: ['participant-session', sessionId],
-    queryFn: () => lookupSessionApi(sessionId),
-    enabled: !!sessionId,
+    queryKey: ['participant-session', effectiveSessionCode],
+    queryFn: () => lookupSessionApi(effectiveSessionCode),
+    enabled: Boolean(effectiveSessionCode),
     retry: false,
   })
 
@@ -245,7 +253,7 @@ function ParticipantSessionPage() {
   }, [questionLockedBySubmission, setSubmitted])
 
 
-  const wsSessionCode = session?.session_code || sessionId
+  const wsSessionCode = session?.session_code || effectiveSessionCode
 
   const client = useMemo(() => {
     if (!wsSessionCode || !participantToken) return null
@@ -272,19 +280,28 @@ function ParticipantSessionPage() {
 
 
   useEffect(() => {
-    if (!participantHydrated || !sessionId) return
-    const { participantToken: token, joinedSessionCode, clearParticipant } = useParticipantStore.getState()
-    if (token && joinedSessionCode && joinedSessionCode !== sessionId) {
-      clearParticipant()
-      setStep('join')
+    if (!participantHydrated || hasSessionCodeInUrl || sessionCodeInput) return
+    const { joinedSessionCode: storedCode } = useParticipantStore.getState()
+    if (storedCode) {
+      setSessionCodeInput(storedCode)
     }
-  }, [participantHydrated, sessionId])
+  }, [participantHydrated, hasSessionCodeInUrl, sessionCodeInput])
 
 
   useEffect(() => {
-    if (!participantHydrated || !session || !sessionId) return
+    if (!participantHydrated || !effectiveSessionCode) return
+    const { participantToken: token, joinedSessionCode, clearParticipant } = useParticipantStore.getState()
+    if (token && joinedSessionCode && joinedSessionCode !== effectiveSessionCode) {
+      clearParticipant()
+      setStep('join')
+    }
+  }, [participantHydrated, effectiveSessionCode])
+
+
+  useEffect(() => {
+    if (!participantHydrated || !session || !effectiveSessionCode) return
     const { participantToken: token, joinedSessionCode } = useParticipantStore.getState()
-    if (!token || joinedSessionCode !== sessionId) return
+    if (!token || joinedSessionCode !== effectiveSessionCode) return
     setStep((current) => {
       if (current !== 'join') return current
       const s = session.status
@@ -292,15 +309,15 @@ function ParticipantSessionPage() {
       if (s === 'live' || s === 'paused') return 'active'
       return 'waiting'
     })
-  }, [participantHydrated, session, sessionId])
+  }, [participantHydrated, session, effectiveSessionCode])
 
 
   useEffect(() => {
-    if (!client || !sessionId || !participantToken || !dbSessionId) return
+    if (!client || !effectiveSessionCode || !participantToken || !dbSessionId) return
 
     const offSession = client.on('session_updated', (data) => {
       if (data.status === 'live') {
-        queryClient.invalidateQueries({ queryKey: ['participant-session', sessionId] })
+        queryClient.invalidateQueries({ queryKey: ['participant-session', effectiveSessionCode] })
         queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
       }
       if (data.status === 'completed' && data.leaderboard) {
@@ -347,7 +364,7 @@ function ParticipantSessionPage() {
       offLeaderboard()
       client.disconnect()
     }
-  }, [client, sessionId, participantToken, queryClient, dbSessionId])
+  }, [client, effectiveSessionCode, participantToken, queryClient, dbSessionId])
 
 
   useEffect(() => {
@@ -597,10 +614,25 @@ function ParticipantSessionPage() {
     submitQuestionById,
   ])
 
+  const sessionLookupFailed =
+    Boolean(effectiveSessionCode) &&
+    sessionQuery.isFetched &&
+    !sessionQuery.isLoading &&
+    (!session || sessionQuery.isError)
+
   const handleJoin = async (event) => {
     event.preventDefault()
-    if (!session) return
+    setJoinError('')
 
+    if (!effectiveSessionCode) {
+      setJoinError('Please enter a session code')
+      return
+    }
+
+    if (!session) {
+      setJoinError('Session not found. Check the code and try again.')
+      return
+    }
 
     try {
       let nickname, checkEmail, isAnonymous
@@ -633,7 +665,7 @@ function ParticipantSessionPage() {
       }
 
 
-      const result = await joinSessionApi(sessionId, {
+      const result = await joinSessionApi(effectiveSessionCode, {
         nickname,
         email: checkEmail,
         is_anonymous: isAnonymous,
@@ -646,7 +678,7 @@ function ParticipantSessionPage() {
           email: result.participant.email,
           anonymous: result.participant.is_anonymous,
         },
-        sessionCode: sessionId,
+        sessionCode: effectiveSessionCode,
       })
       if (session.status === 'completed' || session.status === 'archived') {
         setStep('qa')
@@ -699,41 +731,68 @@ function ParticipantSessionPage() {
   const allowAnonymousQa = session?.allow_anonymous_qa || false
 
 
-  if (!participantHydrated || sessionQuery.isLoading) {
+  if (!participantHydrated) {
     return (
       <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
         <div className="w-full max-w-lg rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
-          <p className="text-slate-600">{!participantHydrated ? 'Restoring session...' : 'Loading session...'}</p>
+          <p className="text-slate-600">Restoring session...</p>
         </div>
       </main>
     )
   }
 
 
-  if (!session && !sessionQuery.isLoading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
-        <div className="w-full max-w-lg rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-bold text-navy-900">Session not found</h1>
-          <p className="mt-2 text-slate-600">The join link is invalid or this session was removed.</p>
-        </div>
-      </main>
-    )
-  }
+  const canUseStoredJoin =
+    Boolean(participantToken) &&
+    Boolean(joinedSessionCode) &&
+    Boolean(effectiveSessionCode) &&
+    joinedSessionCode === effectiveSessionCode
 
+  const showJoinForm = !canUseStoredJoin && step === 'join'
 
-  if (!participantToken && step === 'join') {
+  if (showJoinForm) {
+    const showJoinDetails = Boolean(session)
+
     return (
       <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
         <form onSubmit={handleJoin} className="w-full max-w-lg space-y-4 rounded-2xl border border-blue-200/70 bg-white p-8 shadow-sm">
           <div className="text-center">
             <img src="/logo.svg" alt="Logo" className="mx-auto mb-4 h-12 w-42" />
-            <h1 className="text-2xl font-bold text-navy-900">{session.title}</h1>
-            <p className="mt-1 text-sm text-slate-600">Join session {session.session_id}</p>
+            <h1 className="text-2xl font-bold text-navy-900">
+              {showJoinDetails ? session.title : 'Join a session'}
+            </h1>
+            <p className="mt-1 text-sm text-slate-600">
+              {showJoinDetails
+                ? `Session code: ${session.session_code || effectiveSessionCode}`
+                : 'Enter your session code to continue'}
+            </p>
           </div>
 
 
-          {joinRequirement === 'anonymous' ? (
+          {!hasSessionCodeInUrl && (
+            <div>
+              <label className="text-sm font-semibold text-slate-700">Session code</label>
+              <input
+                value={sessionCodeInput}
+                onChange={(e) => setSessionCodeInput(e.target.value.toUpperCase())}
+                className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 font-mono text-sm font-semibold tracking-widest text-navy-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                placeholder="Enter session code"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {sessionLookupFailed && effectiveSessionCode ? (
+                <p className="mt-2 text-sm font-semibold text-red-700">
+                  Session not found. Check the code and try again.
+                </p>
+              ) : null}
+              {effectiveSessionCode && sessionQuery.isLoading ? (
+                <p className="mt-2 text-sm text-slate-500">Looking up session...</p>
+              ) : null}
+            </div>
+          )}
+
+
+          {showJoinDetails && joinRequirement === 'anonymous' ? (
             <div>
               <label className="text-sm font-semibold text-slate-700">Name</label>
               <input
@@ -742,7 +801,7 @@ function ParticipantSessionPage() {
                 className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-slate-50 px-3 text-sm text-slate-500 cursor-not-allowed"
               />
             </div>
-          ) : (
+          ) : showJoinDetails ? (
             <>
               <div>
                 <label className="text-sm font-semibold text-slate-700">Name</label>
@@ -768,7 +827,7 @@ function ParticipantSessionPage() {
                 </div>
               )}
             </>
-          )}
+          ) : null}
 
 
           {joinError && (
@@ -778,11 +837,46 @@ function ParticipantSessionPage() {
 
           <button
             type="submit"
-            className="h-11 w-full rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110"
+            disabled={!showJoinDetails}
+            className="h-11 w-full rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Join
           </button>
         </form>
+      </main>
+    )
+  }
+
+
+  if (effectiveSessionCode && sessionQuery.isLoading) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
+        <div className="w-full max-w-lg rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
+          <p className="text-slate-600">Loading session...</p>
+        </div>
+      </main>
+    )
+  }
+
+
+  if (effectiveSessionCode && sessionLookupFailed) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
+        <div className="w-full max-w-lg rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-bold text-navy-900">Session not found</h1>
+          <p className="mt-2 text-slate-600">The join link is invalid or this session was removed.</p>
+        </div>
+      </main>
+    )
+  }
+
+
+  if (!session) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-linear-to-br from-sky-50 via-white to-indigo-50 p-6">
+        <div className="w-full max-w-lg rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
+          <p className="text-slate-600">Loading session...</p>
+        </div>
       </main>
     )
   }

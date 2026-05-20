@@ -23,6 +23,30 @@ export function buildSessionJoinUrl(sessionCodeOrId) {
   return `${origin}/join/${encodeURIComponent(code)}`
 }
 
+/** Base join page — participants enter the session code on this URL. */
+export function buildGenericJoinUrl() {
+  const origin = getPublicAppOrigin()
+  if (!origin) return '/join'
+  return `${origin}/join`
+}
+
+/** True when URL path is `/join/:code` with a non-empty code segment. */
+export function hasSessionCodeInJoinPath(pathname, sessionCodeParam) {
+  if (sessionCodeParam != null && String(sessionCodeParam).trim() !== '') {
+    return true
+  }
+  const parts = String(pathname || '')
+    .split('/')
+    .filter(Boolean)
+  return parts[0] === 'join' && parts.length >= 2 && parts[1].trim() !== ''
+}
+
+export function normalizeSessionCode(code) {
+  return String(code || '')
+    .trim()
+    .toUpperCase()
+}
+
 function isLocalhostHost(hostname) {
   return (
     hostname === 'localhost' ||

@@ -45,6 +45,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/join/:sessionId" element={<ParticipantSessionPage />} />
+          <Route path="/join" element={<ParticipantSessionPage />} />
           <Route
             path="/login"
             element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />}
