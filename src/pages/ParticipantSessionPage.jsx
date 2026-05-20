@@ -12,8 +12,9 @@ import {
   submitResponseApi,
   upvoteQaApi,
 } from '../services/participantApi'
-import { createRealtimeClient } from '../services/realtimeClient'
+import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 import { useParticipantStore } from '../store/participantStore'
+import { getChoiceRevealClasses, isOptionCorrectForReveal } from '../utils/answerReveal'
 import { hasSessionCodeInJoinPath, normalizeSessionCode } from '../utils/joinUrl'
 
 
@@ -169,6 +170,8 @@ function ParticipantSessionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [leaderboard, setLeaderboard] = useState([])
   const [showLeaderboard, setShowLeaderboard] = useState(false)
+  /** { [questionId]: { revealed: boolean, correctOptionIds: number[] } } */
+  const [answerRevealByQuestion, setAnswerRevealByQuestion] = useState({})
 
 
   const sessionQuery = useQuery({
@@ -202,11 +205,32 @@ function ParticipantSessionPage() {
         type: mapQuestionType(q.question_type),
         rawType: q.question_type,
         isLive: Boolean(q.is_live),
+        answerRevealed: Boolean(q.answer_revealed),
         options: q.question_options || [],
         timeLimit: q.time_limit_seconds || 0,
       })),
     [questionsQuery.data],
   )
+
+  useEffect(() => {
+    setAnswerRevealByQuestion((prev) => {
+      const merged = { ...prev }
+      mappedQuestions.forEach((q) => {
+        const key = String(q.id)
+        if (q.answerRevealed) {
+          merged[key] = {
+            revealed: true,
+            correctOptionIds: (q.options || [])
+              .filter((o) => o.is_correct)
+              .map((o) => Number(o.option_id)),
+          }
+        } else if (merged[key]) {
+          merged[key] = { revealed: false, correctOptionIds: [] }
+        }
+      })
+      return merged
+    })
+  }, [mappedQuestions])
 
   /** Only host-activated questions are visible (Slido-style). */
   const activeQuestions = useMemo(
@@ -341,6 +365,19 @@ function ParticipantSessionPage() {
       }
     })
 
+    const offAnswerReveal = client.on(RealtimeEvent.ANSWER_REVEALED, (data) => {
+      const qid = String(data?.question_id ?? '')
+      if (!qid) return
+      setAnswerRevealByQuestion((prev) => ({
+        ...prev,
+        [qid]: {
+          revealed: Boolean(data.answer_revealed),
+          correctOptionIds: (data.correct_option_ids || []).map(Number),
+        },
+      }))
+      queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+    })
+
 
     const offResp = client.on('response_received', () => {
       queryClient.invalidateQueries({ queryKey: ['participant-qa', dbSessionId] })
@@ -360,6 +397,7 @@ function ParticipantSessionPage() {
     return () => {
       offSession()
       offQuestion()
+      offAnswerReveal()
       offResp()
       offLeaderboard()
       client.disconnect()
@@ -499,6 +537,17 @@ function ParticipantSessionPage() {
 
 
   const currentResponse = responses[question?.id] || {}
+  const answerRevealMeta =
+    answerRevealByQuestion[String(question?.id)] ||
+    (question?.answerRevealed
+      ? {
+          revealed: true,
+          correctOptionIds: (question?.options || [])
+            .filter((o) => o.is_correct)
+            .map((o) => Number(o.option_id)),
+        }
+      : null)
+  const isAnswerRevealed = Boolean(answerRevealMeta?.revealed)
 
 
   const buildFinalPayload = useCallback(
@@ -1019,12 +1068,21 @@ function ParticipantSessionPage() {
             )}
 
 
+            {isAnswerRevealed && (question.type === 'MCQ' || question.type === 'True/False') ? (
+              <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                Correct answer revealed — your choice is highlighted in green or red.
+              </p>
+            ) : null}
+
             {question.type === 'MCQ' && (
               <div className="grid gap-2 md:grid-cols-2">
-                {(question.options || []).map((o, idx) => (
+                {(question.options || []).map((o, idx) => {
+                  const isSelected = currentResponse.selectedOption === o.option_text
+                  const isCorrect = isOptionCorrectForReveal(o, question, answerRevealMeta)
+                  return (
                   <button
                     key={o.option_id}
-                    disabled={inputsLocked}
+                    disabled={inputsLocked || isAnswerRevealed}
                     type="button"
                     onClick={() => {
                       setResponses((prev) => ({
@@ -1035,15 +1093,19 @@ function ParticipantSessionPage() {
                         },
                       }))
                     }}
-                    className={`rounded-2xl border px-4 py-4 text-left text-sm font-semibold transition ${currentResponse.selectedOption === o.option_text ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                      }`}
+                    className={`rounded-2xl border px-4 py-4 text-left text-sm font-semibold transition ${getChoiceRevealClasses({
+                      isSelected,
+                      isCorrectOption: isCorrect,
+                      answerRevealed: isAnswerRevealed,
+                    })}`}
                   >
                     <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs">
                       {String.fromCharCode(65 + idx)}
                     </span>
                     {o.option_text}
                   </button>
-                ))}
+                  )
+                })}
               </div>
             )}
 
@@ -1149,9 +1211,13 @@ function ParticipantSessionPage() {
               <div className="grid gap-2 sm:grid-cols-2">
                 {getTrueFalseChoices(question).map((o) => {
                   const label = o.option_text
+                  const isSelected =
+                    String(currentResponse.selectedOption || '').trim().toLowerCase() ===
+                    String(label).trim().toLowerCase()
+                  const isCorrect = isOptionCorrectForReveal(o, question, answerRevealMeta)
                   return (
                     <button
-                      disabled={inputsLocked}
+                      disabled={inputsLocked || isAnswerRevealed}
                       key={label}
                       type="button"
                       onClick={() => {
@@ -1163,12 +1229,11 @@ function ParticipantSessionPage() {
                           },
                         }))
                       }}
-                      className={`rounded-2xl border px-4 py-4 text-sm font-semibold transition ${
-                        String(currentResponse.selectedOption || '').trim().toLowerCase() ===
-                        String(label).trim().toLowerCase()
-                          ? 'border-blue-400 bg-blue-50 text-blue-900'
-                          : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                      }`}
+                      className={`rounded-2xl border px-4 py-4 text-sm font-semibold transition ${getChoiceRevealClasses({
+                        isSelected,
+                        isCorrectOption: isCorrect,
+                        answerRevealed: isAnswerRevealed,
+                      })}`}
                     >
                       {label}
                     </button>

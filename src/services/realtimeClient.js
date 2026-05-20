@@ -391,6 +391,7 @@ export const RealtimeEvent = {
   RESPONSE_RECEIVED: 'response_received',
   SESSION_UPDATED: 'session_updated',
   QUESTION_CHANGED: 'question_changed',
+  ANSWER_REVEALED: 'answer_revealed',
   LEADERBOARD_UPDATE: 'leaderboard_update',
   PARTICIPANT_JOINED: 'participant_joined',
   PARTICIPANT_LEFT: 'participant_left',

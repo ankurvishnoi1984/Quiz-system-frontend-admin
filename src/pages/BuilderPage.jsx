@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Cloud,
   Eye,
+  EyeOff,
   FileUp,
   GripVertical,
   ListChecks,
@@ -33,6 +34,9 @@ import {
   updateQuestionApi,
   updateSessionApi,
 } from '../services/builderApi'
+import { setQuestionAnswerRevealedApi } from '../services/liveApi'
+import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
+import { questionSupportsAnswerReveal } from '../utils/answerReveal'
 
 const QUESTION_TYPES = [
   { type: 'MCQ', icon: ListChecks, description: 'Multiple choice with options' },
@@ -644,6 +648,7 @@ function BuilderPage() {
           }
         : null,
       points: question.points_value ?? 10,
+      answerRevealed: Boolean(question.answer_revealed),
       options,
     }
   }
@@ -668,6 +673,37 @@ function BuilderPage() {
     })
     setJoinRequirement(sessionQuery.data.is_anonymous_default ? 'anonymous' : 'name')
   }, [sessionQuery.data])
+
+  useEffect(() => {
+    const sessionCode = sessionQuery.data?.session_code
+    const isLive = sessionQuery.data?.status === 'live' || sessionQuery.data?.status === 'paused'
+    if (!sessionCode || !accessToken || !isLive) return
+
+    const client = createRealtimeClient('', {
+      session: sessionCode,
+      token: accessToken,
+      role: 'host',
+    })
+    const offAnswerReveal = client.on(RealtimeEvent.ANSWER_REVEALED, () => {
+      queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
+    })
+    client.connect()
+    return () => {
+      offAnswerReveal()
+      client.disconnect()
+    }
+  }, [sessionQuery.data?.session_code, sessionQuery.data?.status, accessToken, queryClient, sessionId])
+
+  const answerRevealMutation = useMutation({
+    mutationFn: ({ questionId, revealed }) =>
+      setQuestionAnswerRevealedApi(accessToken, questionId, revealed),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
+    },
+    onError: (error) => {
+      setSaveError(error.message || 'Unable to reveal answer')
+    },
+  })
 
   const session = useMemo(() => {
     if (!sessionQuery.data) return null
@@ -1223,7 +1259,7 @@ function BuilderPage() {
                 <h3 className="mt-1 text-lg font-bold text-navy-900">{selected.type}</h3>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   disabled={!isDraftSession}
@@ -1236,6 +1272,40 @@ function BuilderPage() {
                   {quizMode ? <ToggleRight className="size-4 text-emerald-600" /> : <ToggleLeft className="size-4 text-slate-500" />}
                   Quiz mode
                 </button>
+                {questionSupportsAnswerReveal(selected.type, quizMode) ? (
+                  <button
+                    type="button"
+                    disabled={isDraftSession || !selected.questionId || answerRevealMutation.isPending}
+                    onClick={() =>
+                      answerRevealMutation.mutate({
+                        questionId: selected.questionId,
+                        revealed: !selected.answerRevealed,
+                      })
+                    }
+                    title={
+                      isDraftSession
+                        ? 'Reveal answer is available when the session is live'
+                        : undefined
+                    }
+                    className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                      selected.answerRevealed
+                        ? 'bg-linear-to-r from-slate-600 to-slate-700'
+                        : 'bg-linear-to-r from-amber-500 to-orange-600'
+                    }`}
+                  >
+                    {selected.answerRevealed ? (
+                      <>
+                        <EyeOff className="size-4" />
+                        Hide Answer
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="size-4" />
+                        Reveal Answer
+                      </>
+                    )}
+                  </button>
+                ) : null}
                 <div className="flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-3 py-2">
                   <p className="text-sm font-semibold text-slate-700">Points</p>
                   <input

@@ -1,5 +1,5 @@
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { BarChart3, ChevronLeft, ChevronRight, Crown, Eye, PieChart as PieChartIcon, Play, Share2, Square, ThumbsDown, ThumbsUp, Trophy, Users, X } from 'lucide-react'
+import { BarChart3, ChevronLeft, ChevronRight, Crown, Eye, EyeOff, PieChart as PieChartIcon, Play, Share2, Square, ThumbsDown, ThumbsUp, Trophy, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -16,10 +16,12 @@ import {
   listQaQuestionsApi,
   listSessionQuestionsApi,
   qaModerateApi,
+  setQuestionAnswerRevealedApi,
   setQuestionLiveStateApi,
   transitionSessionApi,
 } from '../services/liveApi'
-import { createRealtimeClient } from '../services/realtimeClient'
+import { questionSupportsAnswerReveal } from '../utils/answerReveal'
+import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 
 
 const COLORS = ['#1d4ed8', '#2563eb', '#4f46e5', '#0891b2', '#0ea5e9', '#6366f1']
@@ -47,7 +49,6 @@ function sortTrueFalseOptionData(data) {
     return rank(a.name) - rank(b.name)
   })
 }
-
 
 function LivePage() {
   const [searchParams] = useSearchParams()
@@ -111,6 +112,8 @@ function LivePage() {
         type: mapQuestionType(q.question_type),
         rawType: q.question_type,
         isLive: Boolean(q.is_live),
+        isQuizMode: Boolean(q.is_quiz_mode),
+        answerRevealed: Boolean(q.answer_revealed),
         options: q.question_options || [],
       })),
     [questionsQuery.data],
@@ -162,6 +165,9 @@ function LivePage() {
     const offQuestion = client.on('question_changed', () => {
       queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
     })
+    const offAnswerReveal = client.on(RealtimeEvent.ANSWER_REVEALED, () => {
+      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+    })
 
 
     client.connect()
@@ -172,6 +178,7 @@ function LivePage() {
       offResp()
       offSession()
       offQuestion()
+      offAnswerReveal()
       client.disconnect()
     }
   }, [sessionQuery.data?.session_code, accessToken, queryClient, sessionId])
@@ -191,6 +198,15 @@ function LivePage() {
       queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
     },
     onError: (error) => setErrorMessage(error.message || 'Unable to update question live state'),
+  })
+
+  const answerRevealMutation = useMutation({
+    mutationFn: ({ questionId, revealed }) =>
+      setQuestionAnswerRevealedApi(accessToken, questionId, revealed),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+    },
+    onError: (error) => setErrorMessage(error.message || 'Unable to update answer visibility'),
   })
 
 
@@ -415,14 +431,45 @@ function LivePage() {
 
 
           {activeQuestion ? (
-            <button
-              type="button"
-              disabled={!canEditLive}
-              onClick={() => questionLiveMutation.mutate({ questionId: activeQuestion.id, isLive: !activeQuestion.isLive })}
-              className="rounded-2xl bg-linear-to-r from-emerald-600 to-teal-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {activeQuestion.isLive ? 'Deactivate Question' : 'Activate Question'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!canEditLive}
+                onClick={() => questionLiveMutation.mutate({ questionId: activeQuestion.id, isLive: !activeQuestion.isLive })}
+                className="rounded-2xl bg-linear-to-r from-emerald-600 to-teal-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {activeQuestion.isLive ? 'Deactivate Question' : 'Activate Question'}
+              </button>
+              {questionSupportsAnswerReveal(activeQuestion.type, activeQuestion.isQuizMode) ? (
+                <button
+                  type="button"
+                  disabled={!canEditLive || answerRevealMutation.isPending}
+                  onClick={() =>
+                    answerRevealMutation.mutate({
+                      questionId: activeQuestion.id,
+                      revealed: !activeQuestion.answerRevealed,
+                    })
+                  }
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${
+                    activeQuestion.answerRevealed
+                      ? 'bg-linear-to-r from-slate-600 to-slate-700'
+                      : 'bg-linear-to-r from-amber-500 to-orange-600'
+                  }`}
+                >
+                  {activeQuestion.answerRevealed ? (
+                    <>
+                      <EyeOff className="size-4" />
+                      Hide Answer
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="size-4" />
+                      Reveal Answer
+                    </>
+                  )}
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
 

@@ -45,6 +45,12 @@ export async function setQuestionLiveStateApi(accessToken, questionId, isLive) {
   return data?.question || null
 }
 
+export async function setQuestionAnswerRevealedApi(accessToken, questionId, revealed) {
+  const endpoint = revealed ? 'reveal-answer' : 'hide-answer'
+  const data = await authRequest(`/questions/${questionId}/${endpoint}`, accessToken, { method: 'POST' })
+  return data?.question || null
+}
+
 export async function qaModerateApi(accessToken, qaId, action, body = null) {
   const data = await authRequest(`/qa/${qaId}/${action}`, accessToken, {
     method: 'PUT',
