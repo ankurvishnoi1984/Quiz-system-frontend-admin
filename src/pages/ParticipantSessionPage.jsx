@@ -379,8 +379,16 @@ function ParticipantSessionPage() {
     activeQuestions.length > 0 &&
     displayQuestionIndex === activeQuestions.length - 1
 
-  /** Submit is only available on the final active question (or when only one is open). */
-  const canSubmitQuiz = activeQuestions.length <= 1 || isLastDisplayedQuestion
+  /** Payload across all active open questions — used only for final Submit. */
+  const hasFinalizePayload = useMemo(
+    () =>
+      activeQuestions.some(
+        (q) =>
+          !(quizSubmittedQuestionIds || {})[String(q.id)] &&
+          buildResponsePayloadForQuestion(q, responses[q.id]) != null,
+      ),
+    [activeQuestions, responses, quizSubmittedQuestionIds],
+  )
 
   const currentQuestionAnswered = useMemo(
     () => participantQuestionHasAnswer(question, responses[question?.id]),
@@ -479,9 +487,10 @@ function ParticipantSessionPage() {
   const buildFinalPayload = useCallback(
     () =>
       activeQuestions
+        .filter((q) => !(quizSubmittedQuestionIds || {})[String(q.id)])
         .map((q) => buildResponsePayloadForQuestion(q, responses[q.id]))
         .filter(Boolean),
-    [activeQuestions, responses],
+    [activeQuestions, responses, quizSubmittedQuestionIds],
   )
 
   const submitQuestionById = useCallback(
@@ -526,9 +535,7 @@ function ParticipantSessionPage() {
       await Promise.all(payloads.map((p) => submitResponseApi(participantToken, p)))
       markQuestionsSubmitted(payloads.map((p) => p.question_id))
       if (hadCountdown && question?.id) freezeCountdownAfterSubmit(question.id)
-      if (isLastDisplayedQuestion) {
-        setStep('qa')
-      }
+      setStep('qa')
     } catch (err) {
       console.error(err)
     } finally {
@@ -536,8 +543,13 @@ function ParticipantSessionPage() {
     }
   }
 
-  const handleNextQuestion = async () => {
-    if (isLastDisplayedQuestion || !question?.id) return
+  /** Next on open questions saves + advances; final button runs full finalize (Submit). */
+  const handleNextOrSubmit = async () => {
+    if (!question?.id) return
+    if (isLastDisplayedQuestion) {
+      await handleSubmitResponse()
+      return
+    }
     if (participantQuestionHasAnswer(question, responses[question.id])) {
       await submitQuestionById(question.id)
     }
@@ -884,7 +896,7 @@ function ParticipantSessionPage() {
               )}
               {!hasCountdown && hasAnyQuestionSaved && (
                 <p className="max-w-[min(100%,18rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
-                  No timer: revisit open questions and use Save changes on the last question to update.
+                  No timer: revisit open questions and use Submit on the last question to update.
                 </p>
               )}
             </div>
@@ -1073,41 +1085,42 @@ function ParticipantSessionPage() {
 
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* <button
+              <button
                 type="button"
-                onClick={handleSubmitResponse}
-                title={
-                  !canSubmitQuiz
-                    ? 'Use Next to reach the last question before submitting'
-                    : undefined
+                aria-label={
+                  isLastDisplayedQuestion ? 'Submit all answers and finish' : 'Next question'
                 }
-                disabled={!canSubmitQuiz || !Object.keys(responses).length || isSubmitting}
-                className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={
+                  isSubmitting ||
+                  (isLastDisplayedQuestion
+                    ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
+                    : hasCountdown && !canGoToNextQuestion)
+                }
+                title={
+                  isLastDisplayedQuestion
+                    ? !hasFinalizePayload
+                      ? 'Answer the open question(s) before submitting'
+                      : hasCountdown && !canGoToNextQuestion
+                        ? 'Answer this question or wait for the timer'
+                        : undefined
+                    : hasCountdown && !canGoToNextQuestion
+                      ? 'Answer this question or wait for the timer'
+                      : undefined
+                }
+                onClick={() => handleNextOrSubmit()}
+                className={`h-11 rounded-xl px-4 text-sm font-semibold shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  isLastDisplayedQuestion
+                    ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow-lg shadow-blue-900/20'
+                    : 'border border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                }`}
               >
                 {isSubmitting
                   ? hasCountdown
                     ? 'Submitting...'
                     : 'Saving...'
-                  : hasCountdown
+                  : isLastDisplayedQuestion
                     ? 'Submit'
-                    : submitted
-                      ? 'Save changes'
-                      : 'Submit'}
-              </button> */}
-              <button
-                type="button"
-                disabled={
-                  isLastDisplayedQuestion || (hasCountdown && !canGoToNextQuestion)
-                }
-                title={
-                  hasCountdown && !canGoToNextQuestion && !isLastDisplayedQuestion
-                    ? 'Answer this question or wait for the timer'
-                    : undefined
-                }
-                onClick={() => handleNextQuestion()}
-                className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Next question
+                    : 'Next question'}
               </button>
               {isLastDisplayedQuestion && submitted && !hasCountdown && (
                 <button
@@ -1136,7 +1149,7 @@ function ParticipantSessionPage() {
                 <div>
                   <p className="text-sm font-semibold text-navy-900">Modify your responses anytime</p>
                   <p className="mt-1 text-xs text-slate-600">
-                    There is no timer on this question. Change your answer above and press Save changes to update your submission.
+                    There is no timer on this question. Change your answer above and use Submit on the last question to update your submission.
                   </p>
                 </div>
               </div>
