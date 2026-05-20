@@ -1,4 +1,5 @@
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock3, Crown, Pencil, Send, Star, Trophy, Users, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock3, Crown, Pencil, Send, Star, Trophy, Users, XCircle } from 'lucide-react'
+// ChevronLeft, ChevronRight — kept for optional future arrow navigation
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -609,18 +610,34 @@ function ParticipantSessionPage() {
     }
   }
 
-  /** Next on open questions saves + advances; final button runs full finalize (Submit). */
+  /** Next on open questions saves + advances; Submit runs full finalize on the last question. */
+  const handleNext = async () => {
+    if (!question?.id || isLastDisplayedQuestion) return
+    if (participantQuestionHasAnswer(question, responses[question.id])) {
+      await submitQuestionById(question.id)
+    }
+    goToQuestionIndex(displayQuestionIndex + 1)
+    setSubmitted(false)
+  }
+
+  const handlePrevious = () => {
+    if (displayQuestionIndex <= 0) return
+    goToQuestionIndex(displayQuestionIndex - 1)
+  }
+
+  const handleSubmit = async () => {
+    if (!isLastDisplayedQuestion) return
+    await handleSubmitResponse()
+  }
+
+  /** @deprecated use handleNext / handleSubmit — kept for timer auto-advance */
   const handleNextOrSubmit = async () => {
     if (!question?.id) return
     if (isLastDisplayedQuestion) {
       await handleSubmitResponse()
       return
     }
-    if (participantQuestionHasAnswer(question, responses[question.id])) {
-      await submitQuestionById(question.id)
-    }
-    goToQuestionIndex(displayQuestionIndex + 1)
-    setSubmitted(false)
+    await handleNext()
   }
 
   useEffect(() => {
@@ -997,6 +1014,7 @@ function ParticipantSessionPage() {
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 flex-1 items-center gap-2">
+                {/*
                 <button
                   type="button"
                   aria-label="Previous question"
@@ -1006,17 +1024,14 @@ function ParticipantSessionPage() {
                 >
                   <ChevronLeft className="size-5" />
                 </button>
+                */}
                 <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-navy-700">
                   Question {displayQuestionIndex + 1} / {activeQuestions.length}
                 </p>
+                {/*
                 <button
                   type="button"
                   aria-label="Next question"
-                  title={
-                    hasCountdown && !canGoToNextQuestion
-                      ? 'Answer this question or wait for the timer'
-                      : undefined
-                  }
                   disabled={
                     displayQuestionIndex >= activeQuestions.length - 1 ||
                     (hasCountdown && !canGoToNextQuestion)
@@ -1026,15 +1041,16 @@ function ParticipantSessionPage() {
                 >
                   <ChevronRight className="size-5" />
                 </button>
+                */}
               </div>
               {hasCountdown && !canGoToNextQuestion && (
                 <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
-                  Answer this question or wait for the timer to go to the next question.
+                  Answer this question or wait for the timer to use Next.
                 </p>
               )}
               {hasCountdown && canGoToNextQuestion && inputsLocked && (
                 <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
-                  Timed: browse with arrows; answers cannot be changed after submit or when time runs out.
+                  Timed: use Previous and Next to browse; answers cannot be changed after submit or when time runs out.
                 </p>
               )}
               {!hasCountdown && hasAnyQuestionSaved && (
@@ -1070,7 +1086,7 @@ function ParticipantSessionPage() {
 
             {isAnswerRevealed && (question.type === 'MCQ' || question.type === 'True/False') ? (
               <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
-                Correct answer revealed — your choice is highlighted in green or red.
+                Correct answer revealed
               </p>
             ) : null}
 
@@ -1246,40 +1262,55 @@ function ParticipantSessionPage() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                aria-label={
-                  isLastDisplayedQuestion ? 'Submit all answers and finish' : 'Next question'
-                }
+                aria-label="Previous question"
+                disabled={displayQuestionIndex <= 0}
+                onClick={handlePrevious}
+                className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                aria-label="Next question"
                 disabled={
                   isSubmitting ||
-                  (isLastDisplayedQuestion
-                    ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
-                    : hasCountdown && !canGoToNextQuestion)
+                  isLastDisplayedQuestion ||
+                  (hasCountdown && !canGoToNextQuestion)
                 }
                 title={
-                  isLastDisplayedQuestion
-                    ? !hasFinalizePayload
+                  hasCountdown && !canGoToNextQuestion
+                    ? 'Answer this question or wait for the timer'
+                    : isLastDisplayedQuestion
+                      ? 'You are on the last question — use Submit to finish'
+                      : undefined
+                }
+                onClick={() => handleNext()}
+                className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSubmitting && !isLastDisplayedQuestion ? 'Saving...' : 'Next'}
+              </button>
+              <button
+                type="button"
+                aria-label="Submit all answers and finish"
+                disabled={
+                  isSubmitting ||
+                  !isLastDisplayedQuestion ||
+                  !hasFinalizePayload ||
+                  (hasCountdown && !canGoToNextQuestion)
+                }
+                title={
+                  !isLastDisplayedQuestion
+                    ? 'Complete every question — Submit is available on the last question'
+                    : !hasFinalizePayload
                       ? 'Answer the open question(s) before submitting'
                       : hasCountdown && !canGoToNextQuestion
                         ? 'Answer this question or wait for the timer'
                         : undefined
-                    : hasCountdown && !canGoToNextQuestion
-                      ? 'Answer this question or wait for the timer'
-                      : undefined
                 }
-                onClick={() => handleNextOrSubmit()}
-                className={`h-11 rounded-xl px-4 text-sm font-semibold shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  isLastDisplayedQuestion
-                    ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow-lg shadow-blue-900/20'
-                    : 'border border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                }`}
+                onClick={() => handleSubmit()}
+                className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isSubmitting
-                  ? hasCountdown
-                    ? 'Submitting...'
-                    : 'Saving...'
-                  : isLastDisplayedQuestion
-                    ? 'Submit'
-                    : 'Next question'}
+                {isSubmitting && isLastDisplayedQuestion ? 'Submitting...' : 'Submit'}
               </button>
               {isLastDisplayedQuestion && submitted && !hasCountdown && (
                 <button
