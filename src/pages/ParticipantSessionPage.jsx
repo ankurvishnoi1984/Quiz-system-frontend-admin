@@ -50,6 +50,34 @@ function getTrueFalseChoices(question) {
   return [{ option_text: 'True' }, { option_text: 'False' }]
 }
 
+function buildResponsePayloadForQuestion(q, res) {
+  if (!q || !res) return null
+
+  const payload = { question_id: q.id }
+
+  if (q.type === 'MCQ' || q.type === 'True/False') {
+    const opt = findOptionForSelection(q.options, res.selectedOption)
+    if (!opt?.option_id) return null
+    payload.option_id = opt.option_id
+  }
+
+  if (q.type === 'Rating') payload.rating_value = res.rating
+
+  if (q.type === 'Text' || q.type === 'Ranking') {
+    const text = res.textResponse?.trim()
+    if (!text) return null
+    payload.text_response = text
+  }
+
+  if (q.type === 'Word Cloud') {
+    const tags = (res.tags || []).join(', ')
+    if (!tags) return null
+    payload.text_response = tags
+  }
+
+  return payload
+}
+
 function participantQuestionHasAnswer(question, response = {}) {
   if (!question) return false
   if (question.type === 'MCQ' || question.type === 'True/False') {
@@ -172,17 +200,23 @@ function ParticipantSessionPage() {
     [questionsQuery.data],
   )
 
-
-  // const currentLiveQuestion = useMemo(
-  //   () => mappedQuestions.find((q) => q.isLive) || null,
-  //   [mappedQuestions],
-  // )
-
+  /** Only host-activated questions are visible (Slido-style). */
+  const activeQuestions = useMemo(
+    () => mappedQuestions.filter((q) => q.isLive),
+    [mappedQuestions],
+  )
 
   const session = sessionQuery.data
-  const question = liveQuestionId
-    ? mappedQuestions.find((q) => q.id === liveQuestionId)
-    : mappedQuestions[questionIndex]
+
+  const question = useMemo(() => {
+    if (!activeQuestions.length) return null
+    if (liveQuestionId) {
+      const live = activeQuestions.find((q) => q.id === liveQuestionId)
+      if (live) return live
+    }
+    const idx = clamp(questionIndex, 0, activeQuestions.length - 1)
+    return activeQuestions[idx] ?? null
+  }, [activeQuestions, liveQuestionId, questionIndex])
   const joinRequirement = session?.join_type || 'name'
   const timeLimit = question?.timeLimit ?? 0
   const hasCountdown = Number(timeLimit) > 0
@@ -222,8 +256,8 @@ function ParticipantSessionPage() {
     )
   }, [wsSessionCode, participantToken])
 
-  const mappedQuestionsRef = useRef(mappedQuestions)
-  mappedQuestionsRef.current = mappedQuestions
+  const activeQuestionsRef = useRef(activeQuestions)
+  activeQuestionsRef.current = activeQuestions
 
 
   useEffect(() => {
@@ -279,25 +313,14 @@ function ParticipantSessionPage() {
     const offQuestion = client.on('question_changed', (data) => {
       queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
 
+      if (!data.question_id) return
 
-      if (data.is_live && data.question_id) {
-        // ✅ Set live question
+      if (data.is_live) {
         setLiveQuestionId(data.question_id)
-
-
-        // ✅ Sync index (important for counter UI)
-        setQuestionIndex((prev) => {
-          const idx = mappedQuestionsRef.current.findIndex((q) => q.id === data.question_id)
-          return idx !== -1 ? idx : prev
-        })
-
-
-        // ✅ Only reset submission state
-        useParticipantStore.getState().clearQuizSubmissionLocks()
-        setSubmitted(false)
-
-
-        // ❌ DO NOT reset responses or input state
+      } else {
+        setLiveQuestionId((current) =>
+          current === data.question_id ? null : current,
+        )
       }
     })
 
@@ -328,33 +351,36 @@ function ParticipantSessionPage() {
 
 
   useEffect(() => {
-    if (!liveQuestionId || !mappedQuestions.length) return
-
-
-    const exists = mappedQuestions.some(q => q.id === liveQuestionId)
-
-
-    if (!exists) {
+    if (!activeQuestions.length) {
       setLiveQuestionId(null)
-      setQuestionIndex((prev) =>
-        clamp(prev, 0, mappedQuestions.length - 1)
-      )
+      setQuestionIndex(0)
+      return
     }
-  }, [mappedQuestions, liveQuestionId])
 
+    if (liveQuestionId) {
+      const idx = activeQuestions.findIndex((q) => q.id === liveQuestionId)
+      if (idx !== -1) {
+        setQuestionIndex(idx)
+        return
+      }
+      setLiveQuestionId(null)
+    }
+
+    setQuestionIndex((prev) => clamp(prev, 0, activeQuestions.length - 1))
+  }, [activeQuestions, liveQuestionId])
 
   const displayQuestionIndex = useMemo(() => {
-    if (!question?.id || !mappedQuestions.length) return questionIndex
-    const idx = mappedQuestions.findIndex((q) => q.id === question.id)
-    return idx !== -1 ? idx : questionIndex
-  }, [question?.id, mappedQuestions, questionIndex])
-
+    if (!question?.id || !activeQuestions.length) return 0
+    const idx = activeQuestions.findIndex((q) => q.id === question.id)
+    return idx !== -1 ? idx : clamp(questionIndex, 0, activeQuestions.length - 1)
+  }, [question?.id, activeQuestions, questionIndex])
 
   const isLastDisplayedQuestion =
-    mappedQuestions.length > 0 && displayQuestionIndex === mappedQuestions.length - 1
+    activeQuestions.length > 0 &&
+    displayQuestionIndex === activeQuestions.length - 1
 
-  /** Submit is only available on the final question (or when the quiz has one question). */
-  const canSubmitQuiz = mappedQuestions.length <= 1 || isLastDisplayedQuestion
+  /** Submit is only available on the final active question (or when only one is open). */
+  const canSubmitQuiz = activeQuestions.length <= 1 || isLastDisplayedQuestion
 
   const currentQuestionAnswered = useMemo(
     () => participantQuestionHasAnswer(question, responses[question?.id]),
@@ -371,14 +397,14 @@ function ParticipantSessionPage() {
 
   const goToQuestionIndex = useCallback(
     (nextIndex) => {
-      if (!mappedQuestions.length) return
-      const n = clamp(nextIndex, 0, mappedQuestions.length - 1)
+      if (!activeQuestions.length) return
+      const n = clamp(nextIndex, 0, activeQuestions.length - 1)
       if (hasCountdown && n > displayQuestionIndex && !canGoToNextQuestion) return
       setLiveQuestionId(null)
       setQuestionIndex(n)
     },
     [
-      mappedQuestions.length,
+      activeQuestions.length,
       hasCountdown,
       displayQuestionIndex,
       canGoToNextQuestion,
@@ -431,41 +457,6 @@ function ParticipantSessionPage() {
   }, [session, step])
 
 
-  useEffect(() => {
-    if (step !== 'active') return
-    if (!hasCountdown) return
-    if (timer > 0) return
-    // Revisiting a finalized timed question shows timer 0; do not auto-advance or re-submit
-    if (questionLockedBySubmission) return
-
-
-    const isLast = isLastDisplayedQuestion
-
-
-    if (!isLast) {
-      const qid = question?.id
-      const nextIdx = displayQuestionIndex + 1
-      const timeout = setTimeout(() => {
-        if (qid != null) {
-          useParticipantStore.getState().markQuestionsSubmitted([qid])
-        }
-        setLiveQuestionId(null)
-        setQuestionIndex(nextIdx)
-      }, 800) // small delay for UX
-
-
-      return () => clearTimeout(timeout)
-    } else if (!questionLockedBySubmission) {
-      const timeout = setTimeout(() => {
-        handleSubmitResponse()
-      }, 500)
-
-
-      return () => clearTimeout(timeout)
-    }
-  }, [timer, step, displayQuestionIndex, mappedQuestions.length, questionLockedBySubmission, responses, hasCountdown, question?.id, isLastDisplayedQuestion])
-
-
   const approvedQa = useMemo(
     () => (qaQuery.data || []).filter((q) => q.moderation_status === 'approved'),
     [qaQuery.data],
@@ -485,56 +476,57 @@ function ParticipantSessionPage() {
   const currentResponse = responses[question?.id] || {}
 
 
-  const buildFinalPayload = () => {
-    return Object.entries(responses).map(([questionId, res]) => {
-      const q = mappedQuestions.find(q => q.id == questionId)
-      if (!q) return null
+  const buildFinalPayload = useCallback(
+    () =>
+      activeQuestions
+        .map((q) => buildResponsePayloadForQuestion(q, responses[q.id]))
+        .filter(Boolean),
+    [activeQuestions, responses],
+  )
 
+  const submitQuestionById = useCallback(
+    async (questionId) => {
+      if (!participantToken || !questionId) return false
+      const q = activeQuestions.find((item) => item.id === questionId)
+      if (!q) return false
+      const payload = buildResponsePayloadForQuestion(q, responses[questionId])
+      if (!payload) return false
+      if ((quizSubmittedQuestionIds || {})[String(questionId)]) return true
 
-      const payload = {
-        question_id: q.id,
+      try {
+        await submitResponseApi(participantToken, payload)
+        markQuestionsSubmitted([questionId])
+        if (Number(q.timeLimit) > 0) {
+          freezeCountdownAfterSubmit(questionId)
+        }
+        return true
+      } catch (err) {
+        console.error(err)
+        return false
       }
+    },
+    [
+      participantToken,
+      activeQuestions,
+      responses,
+      quizSubmittedQuestionIds,
+      markQuestionsSubmitted,
+      freezeCountdownAfterSubmit,
+    ],
+  )
 
-
-      if (q.type === 'MCQ' || q.type === 'True/False') {
-        const opt = findOptionForSelection(q.options, res.selectedOption)
-        if (!opt?.option_id) return null
-        payload.option_id = opt.option_id
-      }
-
-
-      if (q.type === 'Rating') payload.rating_value = res.rating
-
-
-      if (q.type === 'Text' || q.type === 'Ranking') {
-        payload.text_response = res.textResponse?.trim()
-      }
-
-
-      if (q.type === 'Word Cloud') {
-        payload.text_response = (res.tags || []).join(', ')
-      }
-
-
-      return payload
-    }).filter(Boolean)
-  }
   const handleSubmitResponse = async () => {
     const payloads = buildFinalPayload()
 
-
     if (!payloads.length || !participantToken) return
-
 
     setIsSubmitting(true)
     const hadCountdown = hasCountdown
     try {
-      await Promise.all(
-        payloads.map(p => submitResponseApi(participantToken, p))
-      )
+      await Promise.all(payloads.map((p) => submitResponseApi(participantToken, p)))
       markQuestionsSubmitted(payloads.map((p) => p.question_id))
       if (hadCountdown && question?.id) freezeCountdownAfterSubmit(question.id)
-      if (hadCountdown && isLastDisplayedQuestion) {
+      if (isLastDisplayedQuestion) {
         setStep('qa')
       }
     } catch (err) {
@@ -544,6 +536,54 @@ function ParticipantSessionPage() {
     }
   }
 
+  const handleNextQuestion = async () => {
+    if (isLastDisplayedQuestion || !question?.id) return
+    if (participantQuestionHasAnswer(question, responses[question.id])) {
+      await submitQuestionById(question.id)
+    }
+    goToQuestionIndex(displayQuestionIndex + 1)
+    setSubmitted(false)
+  }
+
+  useEffect(() => {
+    if (step !== 'active') return
+    if (!hasCountdown) return
+    if (timer > 0) return
+    if (questionLockedBySubmission) return
+
+    const isLast = isLastDisplayedQuestion
+
+    if (!isLast) {
+      const qid = question?.id
+      const nextIdx = displayQuestionIndex + 1
+      const timeout = setTimeout(async () => {
+        if (qid != null) {
+          await submitQuestionById(qid)
+        }
+        setLiveQuestionId(null)
+        setQuestionIndex(nextIdx)
+      }, 800)
+
+      return () => clearTimeout(timeout)
+    }
+
+    if (!questionLockedBySubmission) {
+      const timeout = setTimeout(() => {
+        handleSubmitResponse()
+      }, 500)
+      return () => clearTimeout(timeout)
+    }
+  }, [
+    timer,
+    step,
+    displayQuestionIndex,
+    activeQuestions.length,
+    questionLockedBySubmission,
+    hasCountdown,
+    question?.id,
+    isLastDisplayedQuestion,
+    submitQuestionById,
+  ])
 
   const handleJoin = async (event) => {
     event.preventDefault()
@@ -786,6 +826,18 @@ function ParticipantSessionPage() {
         </div>
 
 
+        {step === 'active' && !activeQuestions.length && (
+          <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
+            <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+              <Clock3 className="size-7 animate-pulse" />
+            </div>
+            <h2 className="text-xl font-bold text-navy-900">Waiting for a question</h2>
+            <p className="text-sm text-slate-600">
+              The host will open each question one at a time (or several at once). This page updates automatically when a question is activated.
+            </p>
+          </section>
+        )}
+
         {step === 'active' && question && (
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -800,7 +852,7 @@ function ParticipantSessionPage() {
                   <ChevronLeft className="size-5" />
                 </button>
                 <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-navy-700">
-                  Question {displayQuestionIndex + 1} / {mappedQuestions.length}
+                  Question {displayQuestionIndex + 1} / {activeQuestions.length}
                 </p>
                 <button
                   type="button"
@@ -811,7 +863,7 @@ function ParticipantSessionPage() {
                       : undefined
                   }
                   disabled={
-                    displayQuestionIndex >= mappedQuestions.length - 1 ||
+                    displayQuestionIndex >= activeQuestions.length - 1 ||
                     (hasCountdown && !canGoToNextQuestion)
                   }
                   onClick={() => goToQuestionIndex(displayQuestionIndex + 1)}
@@ -832,7 +884,7 @@ function ParticipantSessionPage() {
               )}
               {!hasCountdown && hasAnyQuestionSaved && (
                 <p className="max-w-[min(100%,18rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
-                  No timer: revisit any question and use Save changes to update.
+                  No timer: revisit open questions and use Save changes on the last question to update.
                 </p>
               )}
             </div>
@@ -1021,7 +1073,7 @@ function ParticipantSessionPage() {
 
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              {/* <button
                 type="button"
                 onClick={handleSubmitResponse}
                 title={
@@ -1041,6 +1093,21 @@ function ParticipantSessionPage() {
                     : submitted
                       ? 'Save changes'
                       : 'Submit'}
+              </button> */}
+              <button
+                type="button"
+                disabled={
+                  isLastDisplayedQuestion || (hasCountdown && !canGoToNextQuestion)
+                }
+                title={
+                  hasCountdown && !canGoToNextQuestion && !isLastDisplayedQuestion
+                    ? 'Answer this question or wait for the timer'
+                    : undefined
+                }
+                onClick={() => handleNextQuestion()}
+                className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next question
               </button>
               {isLastDisplayedQuestion && submitted && !hasCountdown && (
                 <button
