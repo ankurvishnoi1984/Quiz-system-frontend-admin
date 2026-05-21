@@ -17,6 +17,7 @@ import {
   listSessionQuestionsApi,
   qaModerateApi,
   setQuestionAnswerRevealedApi,
+  setQuestionLeaderboardVisibleApi,
   setQuestionLiveStateApi,
   transitionSessionApi,
 } from '../services/liveApi'
@@ -114,6 +115,7 @@ function LivePage() {
         isLive: Boolean(q.is_live),
         isQuizMode: Boolean(q.is_quiz_mode),
         answerRevealed: Boolean(q.answer_revealed),
+        showLeaderboard: Boolean(q.show_leaderboard),
         options: q.question_options || [],
       })),
     [questionsQuery.data],
@@ -168,6 +170,9 @@ function LivePage() {
     const offAnswerReveal = client.on(RealtimeEvent.ANSWER_REVEALED, () => {
       queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
     })
+    const offQuestionLb = client.on(RealtimeEvent.QUESTION_LEADERBOARD_VISIBILITY, () => {
+      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+    })
 
 
     client.connect()
@@ -179,6 +184,7 @@ function LivePage() {
       offSession()
       offQuestion()
       offAnswerReveal()
+      offQuestionLb()
       client.disconnect()
     }
   }, [sessionQuery.data?.session_code, accessToken, queryClient, sessionId])
@@ -198,6 +204,15 @@ function LivePage() {
       queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
     },
     onError: (error) => setErrorMessage(error.message || 'Unable to update question live state'),
+  })
+
+  const questionLeaderboardMutation = useMutation({
+    mutationFn: ({ questionId, visible }) =>
+      setQuestionLeaderboardVisibleApi(accessToken, questionId, visible),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+    },
+    onError: (error) => setErrorMessage(error.message || 'Unable to update question leaderboard'),
   })
 
   const answerRevealMutation = useMutation({
@@ -469,9 +484,30 @@ function LivePage() {
                   )}
                 </button>
               ) : null}
+              {canEditLive && activeQuestion.isQuizMode ? (
+                <button
+                  type="button"
+                  disabled={questionLeaderboardMutation.isPending}
+                  onClick={() =>
+                    questionLeaderboardMutation.mutate({
+                      questionId: activeQuestion.id,
+                      visible: !activeQuestion.showLeaderboard,
+                    })
+                  }
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${
+                    activeQuestion.showLeaderboard
+                      ? 'bg-linear-to-r from-amber-600 to-orange-600'
+                      : 'bg-linear-to-r from-slate-500 to-slate-600'
+                  }`}
+                >
+                  <Trophy className="size-4" />
+                  {activeQuestion.showLeaderboard
+                    ? 'Hide leaderboard for this question'
+                    : 'Show leaderboard for this question'}
+                </button>
+              ) : null}
             </div>
           ) : null}
-
 
           <div className="rounded-2xl border border-blue-200 bg-white p-4">
             <div className="flex items-center justify-between text-sm font-semibold text-slate-700">

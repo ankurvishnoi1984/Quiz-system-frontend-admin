@@ -28,9 +28,7 @@ export function getChoiceRevealClasses({
   return 'border-blue-200/60 bg-white text-slate-500'
 }
 
-export function isOptionCorrectForReveal(option, question, revealMeta) {
-  if (revealMeta?.correctOptionIds?.length) {
-    return revealMeta.correctOptionIds.includes(Number(option.option_id))
-  }
-  return Boolean(option.is_correct)
+export function isOptionCorrectForReveal(option, revealMeta) {
+  if (!revealMeta?.correctOptionIds?.length) return false
+  return revealMeta.correctOptionIds.includes(Number(option.option_id))
 }

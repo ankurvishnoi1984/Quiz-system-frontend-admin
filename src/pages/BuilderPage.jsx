@@ -14,6 +14,7 @@ import {
   MessageSquareText,
   Plus,
   Star,
+  Trophy,
   ToggleLeft,
   ToggleRight,
   Trash2,
@@ -34,7 +35,7 @@ import {
   updateQuestionApi,
   updateSessionApi,
 } from '../services/builderApi'
-import { setQuestionAnswerRevealedApi } from '../services/liveApi'
+import { setQuestionAnswerRevealedApi, setQuestionLeaderboardVisibleApi } from '../services/liveApi'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 import { questionSupportsAnswerReveal } from '../utils/answerReveal'
 
@@ -572,7 +573,12 @@ function BuilderPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [questions, setQuestions] = useState([])
-  const [settings, setSettings] = useState({ anonymous: false, leaderboard: true, maxParticipants: 300, password: '' })
+  const [settings, setSettings] = useState({
+    anonymous: false,
+    leaderboard: true,
+    maxParticipants: 300,
+    password: '',
+  })
   const [joinRequirement, setJoinRequirement] = useState('name')
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState('')
@@ -649,6 +655,7 @@ function BuilderPage() {
         : null,
       points: question.points_value ?? 10,
       answerRevealed: Boolean(question.answer_revealed),
+      showLeaderboard: Boolean(question.show_leaderboard),
       options,
     }
   }
@@ -687,12 +694,68 @@ function BuilderPage() {
     const offAnswerReveal = client.on(RealtimeEvent.ANSWER_REVEALED, () => {
       queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
     })
+    const offSessionSettings = client.on(RealtimeEvent.SESSION_SETTINGS_UPDATED, () => {
+      queryClient.invalidateQueries({ queryKey: ['builder-session', sessionId] })
+    })
+    const offQuestionLb = client.on(RealtimeEvent.QUESTION_LEADERBOARD_VISIBILITY, () => {
+      queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
+    })
     client.connect()
     return () => {
       offAnswerReveal()
+      offSessionSettings()
+      offQuestionLb()
       client.disconnect()
     }
   }, [sessionQuery.data?.session_code, sessionQuery.data?.status, accessToken, queryClient, sessionId])
+
+  const sessionSettingsMutation = useMutation({
+    mutationFn: (payload) => updateSessionApi(accessToken, sessionId, payload),
+    onSuccess: (updated) => {
+      if (updated) {
+        setSettings((prev) => ({
+          ...prev,
+          leaderboard: Boolean(updated.leaderboard_enabled),
+        }))
+      }
+      queryClient.invalidateQueries({ queryKey: ['builder-session', sessionId] })
+      setSaveError('')
+    },
+    onError: (error) => {
+      setSaveError(error.message || 'Unable to update session settings')
+    },
+  })
+
+  const patchSessionSettings = (partial) => {
+    const next = {
+      leaderboard: partial.leaderboard ?? settings.leaderboard,
+    }
+    setSettings((prev) => ({ ...prev, ...partial }))
+    sessionSettingsMutation.mutate({
+      leaderboard_enabled: next.leaderboard,
+    })
+  }
+
+  const questionLeaderboardMutation = useMutation({
+    mutationFn: ({ questionId, visible }) =>
+      setQuestionLeaderboardVisibleApi(accessToken, questionId, visible),
+    onSuccess: (updated) => {
+      if (updated?.question_id && selectedId) {
+        setQuestions((prev) =>
+          prev.map((q) =>
+            String(q.questionId) === String(updated.question_id)
+              ? { ...q, showLeaderboard: Boolean(updated.show_leaderboard) }
+              : q,
+          ),
+        )
+      }
+      queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
+      setSaveError('')
+    },
+    onError: (error) => {
+      setSaveError(error.message || 'Unable to update question leaderboard')
+    },
+  })
 
   const answerRevealMutation = useMutation({
     mutationFn: ({ questionId, revealed }) =>
@@ -909,13 +972,15 @@ function BuilderPage() {
         await reorderQuestionsApi(accessToken, sessionNumericId, orderedIds)
       }
 
-      if (isDraft) {
-        await updateSessionApi(accessToken, sessionNumericId, {
-          is_anonymous_default: settings.anonymous,
-          leaderboard_enabled: settings.leaderboard,
-          max_participants: settings.maxParticipants,
-        })
-      }
+      await updateSessionApi(accessToken, sessionNumericId, {
+        ...(isDraft
+          ? {
+              is_anonymous_default: settings.anonymous,
+              max_participants: settings.maxParticipants,
+            }
+          : {}),
+        leaderboard_enabled: settings.leaderboard,
+      })
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
@@ -1272,6 +1337,28 @@ function BuilderPage() {
                   {quizMode ? <ToggleRight className="size-4 text-emerald-600" /> : <ToggleLeft className="size-4 text-slate-500" />}
                   Quiz mode
                 </button>
+                {!isDraftSession && quizMode && selected.questionId ? (
+                  <button
+                    type="button"
+                    disabled={questionLeaderboardMutation.isPending}
+                    onClick={() =>
+                      questionLeaderboardMutation.mutate({
+                        questionId: selected.questionId,
+                        visible: !selected.showLeaderboard,
+                      })
+                    }
+                    className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                      selected.showLeaderboard
+                        ? 'bg-linear-to-r from-amber-600 to-orange-600'
+                        : 'bg-linear-to-r from-slate-500 to-slate-600'
+                    }`}
+                  >
+                    <Trophy className="size-4" />
+                    {selected.showLeaderboard
+                      ? 'Hide leaderboard (this question)'
+                      : 'Show leaderboard (this question)'}
+                  </button>
+                ) : null}
                 {questionSupportsAnswerReveal(selected.type, quizMode) ? (
                   <button
                     type="button"
@@ -1451,20 +1538,29 @@ function BuilderPage() {
 
               <label className="flex items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white p-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-700">Leaderboard</p>
-                  <p className="text-xs text-slate-500">Show top scores</p>
+                  <p className="text-sm font-semibold text-slate-700">Overall leaderboard (Q&A)</p>
+                  <p className="text-xs text-slate-500">Session-wide rankings on the Q&A page</p>
                 </div>
                 <input
                   type="checkbox"
-                  disabled={!isDraftSession}
                   checked={settings.leaderboard}
                   onChange={(e) => {
-                    setDirty(true)
-                    setSettings((prev) => ({ ...prev, leaderboard: e.target.checked }))
+                    const next = e.target.checked
+                    if (isDraftSession) {
+                      setDirty(true)
+                      setSettings((prev) => ({ ...prev, leaderboard: next }))
+                    } else {
+                      patchSessionSettings({ leaderboard: next })
+                    }
                   }}
-                  className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40 disabled:cursor-not-allowed"
+                  className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
                 />
               </label>
+
+              <div className="rounded-2xl border border-blue-200/70 bg-sky-50/80 p-3 text-xs text-slate-600">
+                Per-question leaderboard visibility is controlled from the question editor (or Live page) for each
+                quiz question while the session is live.
+              </div>
 
               <div className="rounded-2xl border border-blue-200/70 bg-white p-3">
                 <label className="text-sm font-semibold text-slate-700">Max participants</label>

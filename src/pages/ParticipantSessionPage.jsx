@@ -161,8 +161,6 @@ function ParticipantSessionPage() {
   const [joinError, setJoinError] = useState('')
   const [transitioningLive, setTransitioningLive] = useState(false)
   const [tagsInput, setTagsInput] = useState('')
-  const [showLiveResult, setShowLiveResult] = useState(true)
-
 
   const [askText, setAskText] = useState('')
   const [askAnonymous, setAskAnonymous] = useState(false)
@@ -170,6 +168,8 @@ function ParticipantSessionPage() {
   const [ownQuestions, setOwnQuestions] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [leaderboard, setLeaderboard] = useState([])
+  const [questionLeaderboardByQuestion, setQuestionLeaderboardByQuestion] = useState({})
+  const [questionLbVisibleByQuestion, setQuestionLbVisibleByQuestion] = useState({})
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   /** { [questionId]: { revealed: boolean, correctOptionIds: number[] } } */
   const [answerRevealByQuestion, setAnswerRevealByQuestion] = useState({})
@@ -207,11 +207,23 @@ function ParticipantSessionPage() {
         rawType: q.question_type,
         isLive: Boolean(q.is_live),
         answerRevealed: Boolean(q.answer_revealed),
+        correctOptionIds: (q.correct_option_ids || []).map(Number),
+        showLeaderboard: Boolean(q.show_leaderboard),
         options: q.question_options || [],
         timeLimit: q.time_limit_seconds || 0,
       })),
     [questionsQuery.data],
   )
+
+  useEffect(() => {
+    setQuestionLbVisibleByQuestion((prev) => {
+      const next = { ...prev }
+      mappedQuestions.forEach((q) => {
+        next[String(q.id)] = Boolean(q.showLeaderboard)
+      })
+      return next
+    })
+  }, [mappedQuestions])
 
   useEffect(() => {
     setAnswerRevealByQuestion((prev) => {
@@ -221,9 +233,7 @@ function ParticipantSessionPage() {
         if (q.answerRevealed) {
           merged[key] = {
             revealed: true,
-            correctOptionIds: (q.options || [])
-              .filter((o) => o.is_correct)
-              .map((o) => Number(o.option_id)),
+            correctOptionIds: q.correctOptionIds || [],
           }
         } else if (merged[key]) {
           merged[key] = { revealed: false, correctOptionIds: [] }
@@ -240,6 +250,7 @@ function ParticipantSessionPage() {
   )
 
   const session = sessionQuery.data
+  const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
 
   const question = useMemo(() => {
     if (!activeQuestions.length) return null
@@ -385,11 +396,48 @@ function ParticipantSessionPage() {
     })
 
 
-    const offLeaderboard = client.on('leaderboard_update', (data) => {
-      if (data.leaderboard) {
+    const offLeaderboard = client.on(RealtimeEvent.LEADERBOARD_UPDATE, (data) => {
+      if (data.leaderboard?.length) {
         setLeaderboard(data.leaderboard)
       }
+      if (data.question_id != null && data.question_leaderboard) {
+        setQuestionLeaderboardByQuestion((prev) => ({
+          ...prev,
+          [String(data.question_id)]: data.question_leaderboard,
+        }))
+      }
     })
+
+    const offSessionSettings = client.on(RealtimeEvent.SESSION_SETTINGS_UPDATED, (data) => {
+      queryClient.setQueryData(['participant-session', effectiveSessionCode], (old) =>
+        old
+          ? {
+              ...old,
+              leaderboard_enabled: data.leaderboard_enabled ?? old.leaderboard_enabled,
+            }
+          : old,
+      )
+    })
+
+    const offQuestionLbVisibility = client.on(
+      RealtimeEvent.QUESTION_LEADERBOARD_VISIBILITY,
+      (data) => {
+        const qid = String(data?.question_id ?? '')
+        if (!qid) return
+        setQuestionLbVisibleByQuestion((prev) => ({
+          ...prev,
+          [qid]: Boolean(data.show_leaderboard),
+        }))
+        if (!data.show_leaderboard) {
+          setQuestionLeaderboardByQuestion((prev) => {
+            const next = { ...prev }
+            delete next[qid]
+            return next
+          })
+        }
+        queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+      },
+    )
 
 
     client.connect()
@@ -401,6 +449,8 @@ function ParticipantSessionPage() {
       offAnswerReveal()
       offResp()
       offLeaderboard()
+      offSessionSettings()
+      offQuestionLbVisibility()
       client.disconnect()
     }
   }, [client, effectiveSessionCode, participantToken, queryClient, dbSessionId])
@@ -543,12 +593,26 @@ function ParticipantSessionPage() {
     (question?.answerRevealed
       ? {
           revealed: true,
-          correctOptionIds: (question?.options || [])
-            .filter((o) => o.is_correct)
-            .map((o) => Number(o.option_id)),
+          correctOptionIds: question.correctOptionIds || [],
         }
       : null)
   const isAnswerRevealed = Boolean(answerRevealMeta?.revealed)
+
+  /** Only show reveal styling after the participant has submitted or the timer ended. */
+  const hasAttemptedQuestion = Boolean(
+    questionLockedBySubmission || (hasCountdown && timer === 0),
+  )
+  const canSeeAnswerReveal = isAnswerRevealed && hasAttemptedQuestion
+  const currentQuestionLeaderboard = question?.id
+    ? questionLeaderboardByQuestion[String(question.id)] || []
+    : []
+  const isCurrentQuestionLeaderboardVisible = question?.id
+    ? Boolean(questionLbVisibleByQuestion[String(question.id)])
+    : false
+  const showCurrentQuestionLeaderboard =
+    isCurrentQuestionLeaderboardVisible &&
+    step === 'active' &&
+    Boolean(questionLockedBySubmission || submitted)
 
 
   const buildFinalPayload = useCallback(
@@ -1084,9 +1148,14 @@ function ParticipantSessionPage() {
             )}
 
 
-            {isAnswerRevealed && (question.type === 'MCQ' || question.type === 'True/False') ? (
+            {canSeeAnswerReveal && (question.type === 'MCQ' || question.type === 'True/False') ? (
               <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
-                Correct answer revealed
+                Correct answer revealed — your choice is highlighted in green or red.
+              </p>
+            ) : null}
+            {isAnswerRevealed && !hasAttemptedQuestion && (question.type === 'MCQ' || question.type === 'True/False') ? (
+              <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-slate-600">
+                Answer this question first. The correct answer will be shown after you submit or when time runs out.
               </p>
             ) : null}
 
@@ -1094,11 +1163,11 @@ function ParticipantSessionPage() {
               <div className="grid gap-2 md:grid-cols-2">
                 {(question.options || []).map((o, idx) => {
                   const isSelected = currentResponse.selectedOption === o.option_text
-                  const isCorrect = isOptionCorrectForReveal(o, question, answerRevealMeta)
+                  const isCorrect = isOptionCorrectForReveal(o, answerRevealMeta)
                   return (
                   <button
                     key={o.option_id}
-                    disabled={inputsLocked || isAnswerRevealed}
+                    disabled={inputsLocked}
                     type="button"
                     onClick={() => {
                       setResponses((prev) => ({
@@ -1112,7 +1181,7 @@ function ParticipantSessionPage() {
                     className={`rounded-2xl border px-4 py-4 text-left text-sm font-semibold transition ${getChoiceRevealClasses({
                       isSelected,
                       isCorrectOption: isCorrect,
-                      answerRevealed: isAnswerRevealed,
+                      answerRevealed: canSeeAnswerReveal,
                     })}`}
                   >
                     <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs">
@@ -1230,10 +1299,10 @@ function ParticipantSessionPage() {
                   const isSelected =
                     String(currentResponse.selectedOption || '').trim().toLowerCase() ===
                     String(label).trim().toLowerCase()
-                  const isCorrect = isOptionCorrectForReveal(o, question, answerRevealMeta)
+                  const isCorrect = isOptionCorrectForReveal(o, answerRevealMeta)
                   return (
                     <button
-                      disabled={inputsLocked || isAnswerRevealed}
+                      disabled={inputsLocked}
                       key={label}
                       type="button"
                       onClick={() => {
@@ -1248,7 +1317,7 @@ function ParticipantSessionPage() {
                       className={`rounded-2xl border px-4 py-4 text-sm font-semibold transition ${getChoiceRevealClasses({
                         isSelected,
                         isCorrectOption: isCorrect,
-                        answerRevealed: isAnswerRevealed,
+                        answerRevealed: canSeeAnswerReveal,
                       })}`}
                     >
                       {label}
@@ -1321,15 +1390,6 @@ function ParticipantSessionPage() {
                   Go to Q&A
                 </button>
               )}
-              <label className="ml-auto inline-flex items-center gap-2 text-sm text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={showLiveResult}
-                  onChange={(e) => setShowLiveResult(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
-                />
-                Show live result after submit
-              </label>
             </div>
 
 
@@ -1346,9 +1406,35 @@ function ParticipantSessionPage() {
             )}
 
 
-            {submitted && hasCountdown && !showLiveResult && (
+            {submitted && hasCountdown && (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                 <p className="text-sm font-semibold text-emerald-800">Response received!</p>
+              </div>
+            )}
+
+            {showCurrentQuestionLeaderboard && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-bold text-amber-900">
+                  <Trophy className="mr-2 inline size-4" />
+                  Question leaderboard
+                </p>
+                {currentQuestionLeaderboard.length > 0 ? (
+                  <div className="mt-2 space-y-1">
+                    {currentQuestionLeaderboard.slice(0, 5).map((entry, idx) => (
+                      <div key={entry.participant_id} className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-2 text-slate-700">
+                          {idx === 0 ? <Crown className="size-4 text-amber-500" /> : `${idx + 1}.`}
+                          {entry.name || entry.nickname || 'Anonymous'}
+                        </span>
+                        <span className="font-semibold text-amber-700">{entry.score}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-amber-700">
+                    Rankings will appear as participants answer this question.
+                  </p>
+                )}
               </div>
             )}
           </section>
@@ -1358,7 +1444,7 @@ function ParticipantSessionPage() {
         {step === 'qa' && (
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
             <h2 className="text-xl font-bold text-navy-900">Q&A</h2>
-            {(hasAnyQuestionSaved || session?.status === 'completed') && (
+            {showOverallLeaderboard && (hasAnyQuestionSaved || session?.status === 'completed') && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-bold text-amber-900">
@@ -1381,7 +1467,7 @@ function ParticipantSessionPage() {
                       <div key={entry.participant_id} className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-2 text-slate-700">
                           {idx === 0 ? <Crown className="size-4 text-amber-500" /> : `${idx + 1}.`}
-                          {entry.nickname || `Participant ${entry.participant_id}`}
+                          {entry.name || entry.nickname || 'Anonymous'}
                         </span>
                         <span className="font-semibold text-amber-700">{entry.score}</span>
                       </div>
@@ -1507,7 +1593,7 @@ function ParticipantSessionPage() {
                     <div className="grid size-9 place-items-center rounded-2xl bg-linear-to-br from-amber-400 to-amber-600 text-white">
                       {idx === 0 ? <Crown className="size-4" /> : idx + 1}
                     </div>
-                    <p className="font-semibold text-navy-900">{row.nickname || `Participant ${row.participant_id}`}</p>
+                    <p className="font-semibold text-navy-900">{row.name || row.nickname || 'Anonymous'}</p>
                   </div>
                   <p className="text-sm font-bold text-navy-900">{row.score}</p>
                 </div>

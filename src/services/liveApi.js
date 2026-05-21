@@ -9,6 +9,14 @@ export async function getSessionDetailApi(accessToken, sessionId) {
   return data?.session || null
 }
 
+export async function updateSessionApi(accessToken, sessionId, payload) {
+  const data = await authRequest(`/sessions/${sessionId}`, accessToken, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+  return data?.session || null
+}
+
 export async function listDepartmentSessionsApi(accessToken, deptId) {
   const data = await authRequest(`/departments/${deptId}/sessions`, accessToken)
   return data?.sessions || []
@@ -47,6 +55,12 @@ export async function setQuestionLiveStateApi(accessToken, questionId, isLive) {
 
 export async function setQuestionAnswerRevealedApi(accessToken, questionId, revealed) {
   const endpoint = revealed ? 'reveal-answer' : 'hide-answer'
+  const data = await authRequest(`/questions/${questionId}/${endpoint}`, accessToken, { method: 'POST' })
+  return data?.question || null
+}
+
+export async function setQuestionLeaderboardVisibleApi(accessToken, questionId, visible) {
+  const endpoint = visible ? 'show-leaderboard' : 'hide-leaderboard'
   const data = await authRequest(`/questions/${questionId}/${endpoint}`, accessToken, { method: 'POST' })
   return data?.question || null
 }

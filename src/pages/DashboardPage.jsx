@@ -44,7 +44,8 @@ function DashboardPage() {
   const [shareSession, setShareSession] = useState(null)
   const [dashboardError, setDashboardError] = useState('')
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
-  const [join_type,setJoinType] = useState("name");
+  const [join_type, setJoinType] = useState('name')
+  const [overallLeaderboard, setOverallLeaderboard] = useState(true)
 
   const { departmentId, departments } = useShell()
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
@@ -273,8 +274,8 @@ function DashboardPage() {
         is_anonymous_default: joinRequirement === 'anonymous',
         show_results_to_participants: true,
         allow_late_join: true,
-        leaderboard_enabled: true,
-        join_type:join_type || 'name'
+        leaderboard_enabled: overallLeaderboard,
+        join_type: join_type || 'name',
       },
     })
     setCreateOpen(false)
@@ -421,12 +422,26 @@ function DashboardPage() {
               name="joinRequirement"
               defaultValue={join_type}
               className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-              onChange={(e)=>setJoinType(e.target.value)}
+              onChange={(e) => setJoinType(e.target.value)}
             >
               <option value="anonymous">Anonymous (no name/email)</option>
               <option value="name">Name only</option>
               <option value="name_email">Name + Email</option>
             </select>
+          </div>
+          <div className="md:col-span-2">
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-blue-200/70 bg-white px-3 py-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Overall leaderboard (Q&A)</p>
+                <p className="text-xs text-slate-500">Show session-wide rankings to participants on the Q&A page</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={overallLeaderboard}
+                onChange={(e) => setOverallLeaderboard(e.target.checked)}
+                className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
+              />
+            </label>
           </div>
           <div className="flex items-end gap-2 md:justify-end md:col-span-2">
             <button type="button" onClick={() => setCreateOpen(false)} className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50">
