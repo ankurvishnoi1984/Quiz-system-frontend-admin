@@ -341,7 +341,7 @@ function ParticipantSessionPage() {
     setStep((current) => {
       if (current !== 'join') return current
       const s = session.status
-      if (s === 'completed' || s === 'archived') return 'qa'
+      if (s === 'completed' || s === 'archived') return 'active'
       if (s === 'live' || s === 'paused') return 'active'
       return 'waiting'
     })
@@ -358,7 +358,6 @@ function ParticipantSessionPage() {
       }
       if (data.status === 'completed' && data.leaderboard) {
         setLeaderboard(data.leaderboard)
-        setStep('qa')
       }
     })
 
@@ -666,7 +665,6 @@ function ParticipantSessionPage() {
       await Promise.all(payloads.map((p) => submitResponseApi(participantToken, p)))
       markQuestionsSubmitted(payloads.map((p) => p.question_id))
       if (hadCountdown && question?.id) freezeCountdownAfterSubmit(question.id)
-      setStep('qa')
     } catch (err) {
       console.error(err)
     } finally {
@@ -811,7 +809,7 @@ function ParticipantSessionPage() {
         sessionCode: effectiveSessionCode,
       })
       if (session.status === 'completed' || session.status === 'archived') {
-        setStep('qa')
+        setStep('active')
       } else if (session.status === 'live' || session.status === 'paused') {
         setStep('active')
       } else {
