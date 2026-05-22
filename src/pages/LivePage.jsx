@@ -477,8 +477,16 @@ function LivePage() {
               <button
                 type="button"
                 disabled={!canEditLive}
-                onClick={() => questionLiveMutation.mutate({ questionId: activeQuestion.id, isLive: !activeQuestion.isLive })}
-                className="rounded-2xl bg-linear-to-r from-emerald-600 to-teal-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                onClick={() =>
+                  questionLiveMutation.mutate({
+                    questionId: activeQuestion.id,
+                    isLive: !activeQuestion.isLive,
+                  })
+                }
+                className={`rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${activeQuestion.isLive
+                    ? 'bg-linear-to-r from-slate-600 to-slate-700'
+                    : 'bg-linear-to-r from-emerald-600 to-teal-600'
+                  }`}
               >
                 {activeQuestion.isLive ? 'Deactivate Question' : 'Activate Question'}
               </button>
@@ -492,11 +500,10 @@ function LivePage() {
                       revealed: !activeQuestion.answerRevealed,
                     })
                   }
-                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${
-                    activeQuestion.answerRevealed
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${activeQuestion.answerRevealed
                       ? 'bg-linear-to-r from-slate-600 to-slate-700'
-                      : 'bg-linear-to-r from-amber-500 to-orange-600'
-                  }`}
+                      : 'bg-linear-to-r from-emerald-500 to-green-600'
+                    }`}
                 >
                   {activeQuestion.answerRevealed ? (
                     <>
@@ -521,11 +528,10 @@ function LivePage() {
                       visible: !activeQuestion.showLeaderboard,
                     })
                   }
-                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${
-                    activeQuestion.showLeaderboard
-                      ? 'bg-linear-to-r from-amber-600 to-orange-600'
+                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${activeQuestion.showLeaderboard
+                      ? 'bg-linear-to-r from-emerald-600 to-green-600'
                       : 'bg-linear-to-r from-slate-500 to-slate-600'
-                  }`}
+                    }`}
                 >
                   <Trophy className="size-4" />
                   {activeQuestion.showLeaderboard

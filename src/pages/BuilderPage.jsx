@@ -1350,62 +1350,61 @@ function BuilderPage() {
                   {quizMode ? <ToggleRight className="size-4 text-emerald-600" /> : <ToggleLeft className="size-4 text-slate-500" />}
                   Quiz mode
                 </button>
-                {!isDraftSession && quizMode && selected.questionId ? (
-                  <button
-                    type="button"
-                    disabled={questionLeaderboardMutation.isPending}
-                    onClick={() =>
-                      questionLeaderboardMutation.mutate({
-                        questionId: selected.questionId,
-                        visible: !selected.showLeaderboard,
-                      })
-                    }
-                    className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                      selected.showLeaderboard
-                        ? 'bg-linear-to-r from-amber-600 to-orange-600'
-                        : 'bg-linear-to-r from-slate-500 to-slate-600'
-                    }`}
-                  >
-                    <Trophy className="size-4" />
-                    {selected.showLeaderboard
-                      ? 'Hide leaderboard (this question)'
-                      : 'Show leaderboard (this question)'}
-                  </button>
-                ) : null}
-                {questionSupportsAnswerReveal(selected.type, quizMode) ? (
-                  <button
-                    type="button"
-                    disabled={isDraftSession || !selected.questionId || answerRevealMutation.isPending}
-                    onClick={() =>
-                      answerRevealMutation.mutate({
-                        questionId: selected.questionId,
-                        revealed: !selected.answerRevealed,
-                      })
-                    }
-                    title={
-                      isDraftSession
-                        ? 'Reveal answer is available when the session is live'
-                        : undefined
-                    }
-                    className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                      selected.answerRevealed
-                        ? 'bg-linear-to-r from-slate-600 to-slate-700'
-                        : 'bg-linear-to-r from-amber-500 to-orange-600'
-                    }`}
-                  >
-                    {selected.answerRevealed ? (
-                      <>
-                        <EyeOff className="size-4" />
-                        Hide Answer
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="size-4" />
-                        Reveal Answer
-                      </>
-                    )}
-                  </button>
-                ) : null}
+                      {!isDraftSession && quizMode && selected.questionId ? (
+                        <button
+                          type="button"
+                          disabled={questionLeaderboardMutation.isPending}
+                          onClick={() =>
+                            questionLeaderboardMutation.mutate({
+                              questionId: selected.questionId,
+                              visible: !selected.showLeaderboard,
+                            })
+                          }
+                          className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${selected.showLeaderboard
+                              ? 'bg-linear-to-r from-emerald-600 to-green-600'
+                              : 'bg-linear-to-r from-slate-500 to-slate-600'
+                            }`}
+                        >
+                          <Trophy className="size-4" />
+                          {selected.showLeaderboard
+                            ? 'Hide leaderboard (this question)'
+                            : 'Show leaderboard (this question)'}
+                        </button>
+                      ) : null}
+
+                      {questionSupportsAnswerReveal(selected.type, quizMode) ? (
+                        <button
+                          type="button"
+                          disabled={isDraftSession || !selected.questionId || answerRevealMutation.isPending}
+                          onClick={() =>
+                            answerRevealMutation.mutate({
+                              questionId: selected.questionId,
+                              revealed: !selected.answerRevealed,
+                            })
+                          }
+                          title={
+                            isDraftSession
+                              ? 'Reveal answer is available when the session is live'
+                              : undefined
+                          }
+                          className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${selected.answerRevealed
+                              ? 'bg-linear-to-r from-slate-600 to-slate-700'
+                              : 'bg-linear-to-r from-emerald-500 to-green-600'
+                            }`}
+                        >
+                          {selected.answerRevealed ? (
+                            <>
+                              <EyeOff className="size-4" />
+                              Hide Answer
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="size-4" />
+                              Reveal Answer
+                            </>
+                          )}
+                        </button>
+                      ) : null}
                 <div className="flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-3 py-2">
                   <p className="text-sm font-semibold text-slate-700">Points</p>
                   <input

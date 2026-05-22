@@ -1194,11 +1194,11 @@ function ParticipantSessionPage() {
             )}
 
 
-            {canSeeAnswerReveal && (question.type === 'MCQ' || question.type === 'True/False') ? (
+            {/* {canSeeAnswerReveal && (question.type === 'MCQ' || question.type === 'True/False') ? (
               <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
                 Correct answer revealed — your choice is highlighted in green or red.
               </p>
-            ) : null}
+            ) : null} */}
             {isAnswerRevealed && !hasAttemptedQuestion && (question.type === 'MCQ' || question.type === 'True/False') ? (
               <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-slate-600">
                 Answer this question first. The correct answer will be shown after you submit or when time runs out.
