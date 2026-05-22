@@ -1,9 +1,9 @@
 const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:5000/ws'
 
-const RECONNECT_BASE_DELAY_MS = 3000
+const RECONNECT_BASE_DELAY_MS = 1000
 const RECONNECT_MAX_DELAY_MS = 30000
 const MAX_RECONNECT_ATTEMPTS = 8
-const STRICT_MODE_CONNECT_DELAY_MS = 80
+const STRICT_MODE_CONNECT_DELAY_MS = 0
 
 /** Log in dev or when VITE_WS_DEBUG=true */
 const WS_DEBUG =

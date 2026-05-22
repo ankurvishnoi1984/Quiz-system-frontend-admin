@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useShallow } from 'zustand/shallow'
 import {
   askQaQuestionApi,
+  getSessionLeaderboardApi,
   joinSessionApi,
   listQaQuestionsApi,
   listSessionQuestionsApi,
@@ -180,6 +181,11 @@ function ParticipantSessionPage() {
     queryFn: () => lookupSessionApi(effectiveSessionCode),
     enabled: Boolean(effectiveSessionCode),
     retry: false,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      if (step === 'waiting' || status === 'draft') return 3000
+      return false
+    },
   })
 
 
@@ -187,6 +193,7 @@ function ParticipantSessionPage() {
     queryKey: ['participant-questions', sessionQuery.data?.session_id, participantToken],
     queryFn: () => listSessionQuestionsApi(participantToken, sessionQuery.data?.session_id),
     enabled: Boolean(participantToken && sessionQuery.data?.session_id),
+    refetchInterval: step === 'active' || step === 'waiting' ? 5000 : false,
   })
 
 
@@ -196,7 +203,6 @@ function ParticipantSessionPage() {
     enabled: Boolean(participantToken && sessionQuery.data?.session_id),
     refetchInterval: 10000,
   })
-
 
   const mappedQuestions = useMemo(
     () =>
@@ -289,16 +295,14 @@ function ParticipantSessionPage() {
   }, [questionLockedBySubmission, setSubmitted])
 
 
-  const wsSessionCode = session?.session_code || effectiveSessionCode
-
   const client = useMemo(() => {
-    if (!wsSessionCode || !participantToken) return null
+    if (!effectiveSessionCode || !participantToken) return null
     return createRealtimeClient(
       '',
-      { session: wsSessionCode, token: participantToken, role: 'participant' },
+      { session: effectiveSessionCode, token: participantToken, role: 'participant' },
       'participant',
     )
-  }, [wsSessionCode, participantToken])
+  }, [effectiveSessionCode, participantToken])
 
   const activeQuestionsRef = useRef(activeQuestions)
   activeQuestionsRef.current = activeQuestions
@@ -351,12 +355,18 @@ function ParticipantSessionPage() {
   useEffect(() => {
     if (!client || !effectiveSessionCode || !participantToken || !dbSessionId) return
 
+    const offConnected = client.on(RealtimeEvent.CONNECTED, () => {
+      queryClient.invalidateQueries({ queryKey: ['participant-session', effectiveSessionCode] })
+      queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+    })
+
     const offSession = client.on('session_updated', (data) => {
-      if (data.status === 'live') {
-        queryClient.invalidateQueries({ queryKey: ['participant-session', effectiveSessionCode] })
-        queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+      queryClient.invalidateQueries({ queryKey: ['participant-session', effectiveSessionCode] })
+      queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+      if (data.status === 'completed' || data.status === 'live') {
+        queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
       }
-      if (data.status === 'completed' && data.leaderboard) {
+      if (Array.isArray(data.leaderboard)) {
         setLeaderboard(data.leaderboard)
       }
     })
@@ -396,7 +406,7 @@ function ParticipantSessionPage() {
 
 
     const offLeaderboard = client.on(RealtimeEvent.LEADERBOARD_UPDATE, (data) => {
-      if (data.leaderboard?.length) {
+      if (Array.isArray(data.leaderboard)) {
         setLeaderboard(data.leaderboard)
       }
       if (data.question_id != null && data.question_leaderboard) {
@@ -443,6 +453,7 @@ function ParticipantSessionPage() {
 
 
     return () => {
+      offConnected()
       offSession()
       offQuestion()
       offAnswerReveal()
@@ -453,6 +464,12 @@ function ParticipantSessionPage() {
       client.disconnect()
     }
   }, [client, effectiveSessionCode, participantToken, queryClient, dbSessionId])
+
+  useEffect(() => {
+    if (step === 'qa' && showOverallLeaderboard && dbSessionId) {
+      queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
+    }
+  }, [step, showOverallLeaderboard, dbSessionId, queryClient])
 
 
   useEffect(() => {
@@ -581,10 +598,23 @@ function ParticipantSessionPage() {
     [quizSubmittedQuestionIds],
   )
 
+  const leaderboardQuery = useQuery({
+    queryKey: ['participant-leaderboard', dbSessionId, participantToken],
+    queryFn: () => getSessionLeaderboardApi(participantToken, dbSessionId),
+    enabled: Boolean(
+      participantToken &&
+        dbSessionId &&
+        showOverallLeaderboard &&
+        (step === 'qa' || hasAnyQuestionSaved || session?.status === 'completed'),
+    ),
+    staleTime: 5000,
+  })
 
-
-
-
+  useEffect(() => {
+    if (leaderboardQuery.data != null) {
+      setLeaderboard(leaderboardQuery.data)
+    }
+  }, [leaderboardQuery.data])
 
   const currentResponse = responses[question?.id] || {}
   const answerRevealMeta =
@@ -665,6 +695,9 @@ function ParticipantSessionPage() {
       await Promise.all(payloads.map((p) => submitResponseApi(participantToken, p)))
       markQuestionsSubmitted(payloads.map((p) => p.question_id))
       if (hadCountdown && question?.id) freezeCountdownAfterSubmit(question.id)
+      if (dbSessionId) {
+        queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
+      }
     } catch (err) {
       console.error(err)
     } finally {

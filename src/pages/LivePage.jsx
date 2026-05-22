@@ -73,6 +73,11 @@ function LivePage() {
     queryKey: ['live-session', sessionId],
     queryFn: () => getSessionDetailApi(accessToken, sessionId),
     enabled: Boolean(accessToken && sessionId),
+    staleTime: 0,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      return status && status !== 'live' ? 2000 : false
+    },
   })
 
 
@@ -151,7 +156,15 @@ function LivePage() {
       { session: sessionCode, token: accessToken, role: 'host' },
       'host',
     )
-    const offOpen = client.on('open', () => setSocketStatus('connected'))
+    const offOpen = client.on('open', () => {
+      setSocketStatus('connected')
+      queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+    })
+    const offConnected = client.on(RealtimeEvent.CONNECTED, () => {
+      queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+    })
     const offClose = client.on('close', () => setSocketStatus('disconnected'))
     const offError = client.on('error', (data) => {
       console.warn('[WS host]', data?.message)
@@ -160,9 +173,14 @@ function LivePage() {
       queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
       queryClient.invalidateQueries({ queryKey: ['live-responses', sessionId] })
     })
-    const offSession = client.on('session_updated', () => {
+    const offSession = client.on('session_updated', (data) => {
       queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
       queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+      if (data?.status) {
+        queryClient.setQueryData(['live-session', sessionId], (old) =>
+          old ? { ...old, status: data.status } : old,
+        )
+      }
     })
     const offQuestion = client.on('question_changed', () => {
       queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
@@ -178,6 +196,7 @@ function LivePage() {
     client.connect()
     return () => {
       offOpen()
+      offConnected()
       offClose()
       offError()
       offResp()
@@ -192,7 +211,15 @@ function LivePage() {
 
   const transitionMutation = useMutation({
     mutationFn: ({ action }) => transitionSessionApi(accessToken, sessionId, action),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] }),
+    onSuccess: (updated) => {
+      if (updated) {
+        queryClient.setQueryData(['live-session', sessionId], (old) =>
+          old ? { ...old, ...updated, status: updated.status } : updated,
+        )
+      }
+      queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+    },
     onError: (error) => setErrorMessage(error.message || 'Unable to update session state'),
   })
 

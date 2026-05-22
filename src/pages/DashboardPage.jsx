@@ -144,12 +144,22 @@ function DashboardPage() {
         }))
       })
 
+      const unsubSession = client.on('session_updated', (payload) => {
+        if (payload?.status) {
+          queryClient.setQueryData(['live-session', String(session.session_id)], (old) =>
+            old ? { ...old, status: payload.status } : old,
+          )
+        }
+        queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
+      })
+
       client.connect()
       return {
         client,
         cleanup: () => {
           unsubResponse()
           unsubProgress()
+          unsubSession()
           client.disconnect()
         },
       }
@@ -242,10 +252,25 @@ function DashboardPage() {
       return
     }
     if (action === 'launch') {
+      const goLive = () => navigate(`/live?session=${encodeURIComponent(session.id)}`)
       if (session.status === 'Draft') {
-        transitionMutation.mutate({ sessionId: session.id, action: 'start' })
+        transitionMutation.mutate(
+          { sessionId: session.id, action: 'start' },
+          {
+            onSuccess: (updated) => {
+              if (updated) {
+                queryClient.setQueryData(['live-session', String(session.id)], (old) =>
+                  old ? { ...old, ...updated, status: updated.status } : updated,
+                )
+              }
+              goLive()
+            },
+            onError: () => goLive(),
+          },
+        )
+        return
       }
-      navigate(`/live?session=${encodeURIComponent(session.id)}`)
+      goLive()
       return
     }
     if (action === 'share') {

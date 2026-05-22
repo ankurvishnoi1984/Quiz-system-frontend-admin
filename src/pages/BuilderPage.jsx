@@ -700,11 +700,24 @@ function BuilderPage() {
     const offQuestionLb = client.on(RealtimeEvent.QUESTION_LEADERBOARD_VISIBILITY, () => {
       queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
     })
+    const offSession = client.on('session_updated', () => {
+      queryClient.invalidateQueries({ queryKey: ['builder-session', sessionId] })
+    })
+    const offQuestion = client.on('question_changed', () => {
+      queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
+    })
+    const offConnected = client.on(RealtimeEvent.CONNECTED, () => {
+      queryClient.invalidateQueries({ queryKey: ['builder-session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
+    })
     client.connect()
     return () => {
       offAnswerReveal()
       offSessionSettings()
       offQuestionLb()
+      offSession()
+      offQuestion()
+      offConnected()
       client.disconnect()
     }
   }, [sessionQuery.data?.session_code, sessionQuery.data?.status, accessToken, queryClient, sessionId])

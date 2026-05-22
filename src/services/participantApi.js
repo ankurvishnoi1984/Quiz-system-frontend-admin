@@ -114,3 +114,8 @@ export async function getQuestionResultsApi(participantToken, questionId) {
   const data = await authRequest(`/responses/question/${questionId}`, participantToken)
   return data?.results || null
 }
+
+export async function getSessionLeaderboardApi(participantToken, sessionId) {
+  const data = await authRequest(`/sessions/${sessionId}/leaderboard`, participantToken)
+  return data?.leaderboard || []
+}
