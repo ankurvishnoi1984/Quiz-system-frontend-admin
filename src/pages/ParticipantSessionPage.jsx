@@ -687,7 +687,7 @@ function ParticipantSessionPage() {
   const handleSubmitResponse = async () => {
     const payloads = buildFinalPayload()
 
-    if (!payloads.length || !participantToken) return
+    if (!payloads.length || !participantToken) return false
 
     setIsSubmitting(true)
     const hadCountdown = hasCountdown
@@ -698,8 +698,10 @@ function ParticipantSessionPage() {
       if (dbSessionId) {
         queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
       }
+      return true
     } catch (err) {
       console.error(err)
+      return false
     } finally {
       setIsSubmitting(false)
     }
@@ -722,11 +724,24 @@ function ParticipantSessionPage() {
 
   const handleSubmit = async () => {
     if (!isLastDisplayedQuestion) return
-    await handleSubmitResponse()
+    const ok = await handleSubmitResponse()
+    if (ok) {
+      window.alert('Your answers were submitted successfully.')
+    } else {
+      window.alert('Could not submit your answers. Please try again.')
+    }
   }
 
-  /** @deprecated use handleNext / handleSubmit — kept for timer auto-advance */
   const handleNextOrSubmit = async () => {
+    if (isLastDisplayedQuestion) {
+      await handleSubmit()
+      return
+    }
+    await handleNext()
+  }
+
+  /** Timer auto-advance on the last question (no submit alert). */
+  const handleTimerFinalize = async () => {
     if (!question?.id) return
     if (isLastDisplayedQuestion) {
       await handleSubmitResponse()
@@ -759,7 +774,7 @@ function ParticipantSessionPage() {
 
     if (!questionLockedBySubmission) {
       const timeout = setTimeout(() => {
-        handleSubmitResponse()
+        handleTimerFinalize()
       }, 500)
       return () => clearTimeout(timeout)
     }
@@ -1150,7 +1165,7 @@ function ParticipantSessionPage() {
               )}
               {!hasCountdown && hasAnyQuestionSaved && (
                 <p className="max-w-[min(100%,18rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
-                  No timer: revisit open questions and use Submit on the last question to update.
+                  No timer: revisit questions with Previous; use Submit on the last question to update.
                 </p>
               )}
             </div>
@@ -1359,7 +1374,7 @@ function ParticipantSessionPage() {
             )}
 
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center justify-between gap-2">
               <button
                 type="button"
                 aria-label="Previous question"
@@ -1369,58 +1384,48 @@ function ParticipantSessionPage() {
               >
                 Previous
               </button>
-              <button
-                type="button"
-                aria-label="Next question"
-                disabled={
-                  isSubmitting ||
-                  isLastDisplayedQuestion ||
-                  (hasCountdown && !canGoToNextQuestion)
-                }
-                title={
-                  hasCountdown && !canGoToNextQuestion
-                    ? 'Answer this question or wait for the timer'
-                    : isLastDisplayedQuestion
-                      ? 'You are on the last question — use Submit to finish'
-                      : undefined
-                }
-                onClick={() => handleNext()}
-                className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isSubmitting && !isLastDisplayedQuestion ? 'Saving...' : 'Next'}
-              </button>
-              <button
-                type="button"
-                aria-label="Submit all answers and finish"
-                disabled={
-                  isSubmitting ||
-                  !isLastDisplayedQuestion ||
-                  !hasFinalizePayload ||
-                  (hasCountdown && !canGoToNextQuestion)
-                }
-                title={
-                  !isLastDisplayedQuestion
-                    ? 'Complete every question — Submit is available on the last question'
-                    : !hasFinalizePayload
-                      ? 'Answer the open question(s) before submitting'
-                      : hasCountdown && !canGoToNextQuestion
-                        ? 'Answer this question or wait for the timer'
-                        : undefined
-                }
-                onClick={() => handleSubmit()}
-                className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isSubmitting && isLastDisplayedQuestion ? 'Submitting...' : 'Submit'}
-              </button>
-              {isLastDisplayedQuestion && submitted && !hasCountdown && (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {isLastDisplayedQuestion && submitted && !hasCountdown && (
+                  <button
+                    type="button"
+                    onClick={() => setStep('qa')}
+                    className="h-11 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100"
+                  >
+                    Go to Q&A
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setStep('qa')}
-                  className="h-11 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100"
+                  aria-label={isLastDisplayedQuestion ? 'Submit all answers and finish' : 'Next question'}
+                  disabled={
+                    isSubmitting ||
+                    (isLastDisplayedQuestion
+                      ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
+                      : hasCountdown && !canGoToNextQuestion)
+                  }
+                  title={
+                    hasCountdown && !canGoToNextQuestion
+                      ? 'Answer this question or wait for the timer'
+                      : isLastDisplayedQuestion && !hasFinalizePayload
+                        ? 'Answer the open question(s) before submitting'
+                        : undefined
+                  }
+                  onClick={() => handleNextOrSubmit()}
+                  className={`h-11 rounded-xl px-4 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    isLastDisplayedQuestion
+                      ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow-lg shadow-blue-900/20 hover:brightness-110'
+                      : 'border border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                  }`}
                 >
-                  Go to Q&A
+                  {isSubmitting
+                    ? isLastDisplayedQuestion
+                      ? 'Submitting...'
+                      : 'Saving...'
+                    : isLastDisplayedQuestion
+                      ? 'Submit'
+                      : 'Next'}
                 </button>
-              )}
+              </div>
             </div>
 
 
@@ -1430,7 +1435,7 @@ function ParticipantSessionPage() {
                 <div>
                   <p className="text-sm font-semibold text-navy-900">Modify your responses anytime</p>
                   <p className="mt-1 text-xs text-slate-600">
-                    There is no timer on this question. Change your answer above and use Submit on the last question to update your submission.
+                    There is no timer on this question. Change your answer above and use Submit when you are on the last question to update your submission.
                   </p>
                 </div>
               </div>
