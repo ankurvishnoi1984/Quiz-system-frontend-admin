@@ -24,6 +24,85 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n))
 }
 
+function SubmitFeedbackModal({ open, type, message, onClose }) {
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, onClose])
+
+  if (!open || !type) return null
+
+  const isSuccess = type === 'success'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-navy-950/30 backdrop-blur-sm"
+        aria-label="Close"
+        onClick={onClose}
+      />
+      <div
+        role="alertdialog"
+        aria-labelledby="submit-feedback-title"
+        aria-describedby="submit-feedback-message"
+        className={`relative w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl ${
+          isSuccess
+            ? 'border-emerald-200/80 bg-linear-to-b from-emerald-50 to-white shadow-emerald-900/15'
+            : 'border-red-200/80 bg-linear-to-b from-red-50 to-white shadow-red-900/15'
+        }`}
+      >
+        <div
+          className={`h-1.5 w-full ${isSuccess ? 'bg-linear-to-r from-emerald-500 to-teal-500' : 'bg-linear-to-r from-red-500 to-rose-500'}`}
+          aria-hidden
+        />
+        <div className="p-6 text-center">
+          <div
+            className={`mx-auto grid size-16 place-items-center rounded-full ${
+              isSuccess
+                ? 'bg-emerald-100 text-emerald-600 ring-4 ring-emerald-50'
+                : 'bg-red-100 text-red-600 ring-4 ring-red-50'
+            }`}
+          >
+            {isSuccess ? (
+              <CheckCircle2 className="size-9" strokeWidth={2.25} aria-hidden />
+            ) : (
+              <XCircle className="size-9" strokeWidth={2.25} aria-hidden />
+            )}
+          </div>
+          <p
+            id="submit-feedback-title"
+            className={`mt-5 text-xl font-bold ${isSuccess ? 'text-emerald-900' : 'text-red-900'}`}
+          >
+            {isSuccess ? 'Submission successful' : 'Submission failed'}
+          </p>
+          <p
+            id="submit-feedback-message"
+            className={`mt-2 text-sm leading-relaxed ${isSuccess ? 'text-emerald-800/90' : 'text-red-800/90'}`}
+          >
+            {message}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`mt-6 h-11 w-full rounded-xl text-sm font-semibold text-white shadow-md transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+              isSuccess
+                ? 'bg-linear-to-r from-emerald-600 to-teal-600 focus:ring-emerald-500'
+                : 'bg-linear-to-r from-red-600 to-rose-600 focus:ring-red-500'
+            }`}
+          >
+            {isSuccess ? 'Continue' : 'Try again'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 function mapQuestionType(type) {
   const map = {
@@ -168,6 +247,7 @@ function ParticipantSessionPage() {
   const [upvotes, setUpvotes] = useState({})
   const [ownQuestions, setOwnQuestions] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitModal, setSubmitModal] = useState(null)
   const [leaderboard, setLeaderboard] = useState([])
   const [questionLeaderboardByQuestion, setQuestionLeaderboardByQuestion] = useState({})
   const [questionLbVisibleByQuestion, setQuestionLbVisibleByQuestion] = useState({})
@@ -726,9 +806,15 @@ function ParticipantSessionPage() {
     if (!isLastDisplayedQuestion) return
     const ok = await handleSubmitResponse()
     if (ok) {
-      window.alert('Your answers were submitted successfully.')
+      setSubmitModal({
+        type: 'success',
+        message: 'Your answers were submitted successfully. You can keep browsing questions or open Q&A when ready.',
+      })
     } else {
-      window.alert('Could not submit your answers. Please try again.')
+      setSubmitModal({
+        type: 'error',
+        message: 'We could not submit your answers. Check your connection and try again.',
+      })
     }
   }
 
@@ -1596,6 +1682,13 @@ function ParticipantSessionPage() {
         )}
       </div>
 
+
+      <SubmitFeedbackModal
+        open={Boolean(submitModal)}
+        type={submitModal?.type}
+        message={submitModal?.message ?? ''}
+        onClose={() => setSubmitModal(null)}
+      />
 
       {showLeaderboard && (
         <div className="fixed inset-0 z-40">
