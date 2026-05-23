@@ -1,4 +1,16 @@
-import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import {
   BarChart3,
   CheckCircle2,
@@ -24,6 +36,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import WordCloudChart from '../components/charts/WordCloudChart'
+import { renderPieLabel } from '../components/charts/renderPieLabel'
+import { CHART_COLORS, CHART_TOOLTIP_STYLE, getChartColor } from '../utils/chartColors'
 import ShareSessionPanel from '../components/dashboard/ShareSessionPanel'
 import Modal from '../components/ui/Modal'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
@@ -46,8 +60,6 @@ import { questionSupportsAnswerReveal } from '../utils/answerReveal'
 import { formatQuizSubmitTime } from '../utils/quizResponseTime'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 
-
-const COLORS = ['#1d4ed8', '#2563eb', '#4f46e5', '#0891b2', '#0ea5e9', '#6366f1']
 
 /** Same pattern as Activate / Deactivate: emerald = off action, slate = on / hide */
 function hostQuestionActionBtnClass(isActive) {
@@ -829,48 +841,70 @@ function LivePage() {
                 <ResponsiveContainer width="100%" height="100%">
                   {showOptionBreakdown ? (
                     chartView === 'bar' ? (
-                      <BarChart data={optionData}>
-                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip formatter={(value) => [`${value} responses`, 'Count']} />
-                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                      <BarChart data={optionData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" vertical={false} />
+                        <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          cursor={{ fill: 'rgba(79, 70, 229, 0.06)' }}
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                          formatter={(value) => [`${value} responses`, 'Count']}
+                        />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={56}>
                           {optionData.map((entry, idx) => (
-                            <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
+                            <Cell
+                              key={entry.name}
+                              fill={getChartColor(entry.name, idx, activeQuestion?.rawType)}
+                            />
                           ))}
                         </Bar>
                       </BarChart>
                     ) : (
                       <PieChart>
                         <Tooltip
+                          contentStyle={CHART_TOOLTIP_STYLE}
                           formatter={(value, name) => [
                             `${value} (${optionTotal ? Math.round((Number(value) / optionTotal) * 100) : 0}%)`,
                             name,
                           ]}
                         />
+                        <Legend
+                          verticalAlign="bottom"
+                          height={28}
+                          formatter={(value) => <span className="text-xs font-medium text-slate-600">{value}</span>}
+                        />
                         <Pie
                           data={optionData}
                           dataKey="value"
                           nameKey="name"
-                          outerRadius={100}
-                          innerRadius={activeQuestion?.rawType === 'true_false' ? 48 : 0}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={92}
+                          innerRadius={activeQuestion?.rawType === 'true_false' ? 44 : 0}
+                          paddingAngle={2}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          label={renderPieLabel}
+                          labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
                         >
                           {optionData.map((entry, idx) => (
-                            <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
+                            <Cell
+                              key={entry.name}
+                              fill={getChartColor(entry.name, idx, activeQuestion?.rawType)}
+                            />
                           ))}
                         </Pie>
                       </PieChart>
                     )
                   ) : (
                     <PieChart>
-                      <Tooltip />
+                      <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                       <Pie
                         data={[{ name: 'Responses', value: responded || 0 }]}
                         dataKey="value"
                         nameKey="name"
                         outerRadius={100}
+                        fill={CHART_COLORS[0]}
                       >
-                        <Cell fill="#2563eb" />
+                        <Cell fill={CHART_COLORS[0]} />
                       </Pie>
                     </PieChart>
                   )}

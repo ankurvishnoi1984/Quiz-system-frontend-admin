@@ -1,7 +1,9 @@
 import {
   Bar,
   BarChart,
+  CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -14,7 +16,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import WordCloudChart from '../components/charts/WordCloudChart'
+import { renderPieLabel } from '../components/charts/renderPieLabel'
 import Modal from '../components/ui/Modal'
+import { CHART_TOOLTIP_STYLE, getChartColor, RESPONSE_RATE_PIE_COLORS } from '../utils/chartColors'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
 import { useShell } from '../context/ShellContext'
 import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
@@ -22,8 +26,6 @@ import { getSessionReportApi } from '../services/analyticsApi'
 import { getSessionDetailApi, listSessionQuestionsApi } from '../services/builderApi'
 import { getQuestionResultsApi, getSessionResponsesApi } from '../services/liveApi'
 import { useAuthStore } from '../store/authStore'
-
-const COLORS = ['#1d4ed8', '#2563eb', '#4f46e5', '#0891b2', '#0ea5e9', '#6366f1']
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n))
@@ -123,6 +125,78 @@ function correctRateForQuestion(question, responses) {
   return Math.round((correct / qResponses.length) * 100)
 }
 
+function QuestionAnalyticsChart({ question, participantsJoined }) {
+  if (!question) return null
+
+  if (question.rawType === 'word_cloud') {
+    return (
+      <WordCloudChart words={question.wordCloud} className="h-full" emptyLabel="No words submitted yet" />
+    )
+  }
+
+  const hasOptionChart =
+    question.chart.length > 0 && (question.rawType === 'mcq' || question.rawType === 'true_false')
+
+  if (hasOptionChart) {
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={question.chart} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" vertical={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+          <YAxis unit="%" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+          <Tooltip
+            cursor={{ fill: 'rgba(79, 70, 229, 0.06)' }}
+            contentStyle={CHART_TOOLTIP_STYLE}
+            formatter={(value, _name, props) => [`${value}% (${props.payload.count} responses)`, 'Share']}
+          />
+          <Bar dataKey="value" radius={[10, 10, 0, 0]} maxBarSize={56}>
+            {question.chart.map((entry, idx) => (
+              <Cell key={entry.name} fill={getChartColor(entry.name, idx, question.rawType)} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    )
+  }
+
+  const respondedPct = clamp(
+    Math.round((question.responseCount / Math.max(1, participantsJoined)) * 100),
+    0,
+    100,
+  )
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+        <Legend
+          verticalAlign="bottom"
+          height={28}
+          formatter={(value) => <span className="text-xs font-medium text-slate-600">{value}</span>}
+        />
+        <Pie
+          data={[
+            { name: 'Responded', value: respondedPct },
+            { name: 'No response', value: clamp(100 - respondedPct, 0, 100) },
+          ]}
+          dataKey="value"
+          nameKey="name"
+          outerRadius={92}
+          innerRadius={50}
+          paddingAngle={2}
+          stroke="#ffffff"
+          strokeWidth={2}
+          label={renderPieLabel}
+          labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
+        >
+          <Cell fill={RESPONSE_RATE_PIE_COLORS.responded} />
+          <Cell fill={RESPONSE_RATE_PIE_COLORS.empty} />
+        </Pie>
+      </PieChart>
+    </ResponsiveContainer>
+  )
+}
+
 function AnalyticsPage() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session')
@@ -134,6 +208,7 @@ function AnalyticsPage() {
   const [pdfOpen, setPdfOpen] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [selectedQuestionId, setSelectedQuestionId] = useState(null)
 
   const defaultSessionId =
     sessionId ||
@@ -298,6 +373,26 @@ function AnalyticsPage() {
       }
     })
   }, [sortedQuestions, breakdownByQuestionId, resultsByQuestionId, allResponses])
+
+  useEffect(() => {
+    setSelectedQuestionId(null)
+  }, [numericSessionId])
+
+  useEffect(() => {
+    if (!perQuestion.length) {
+      setSelectedQuestionId(null)
+      return
+    }
+    const isValid = selectedQuestionId && perQuestion.some((q) => q.id === selectedQuestionId)
+    if (!isValid) {
+      setSelectedQuestionId(perQuestion[0].id)
+    }
+  }, [perQuestion, selectedQuestionId])
+
+  const selectedQuestion = useMemo(() => {
+    if (!perQuestion.length) return null
+    return perQuestion.find((q) => q.id === selectedQuestionId) ?? perQuestion[0]
+  }, [perQuestion, selectedQuestionId])
 
   const leaderboard = useMemo(() => buildLeaderboard(allResponses), [allResponses])
 
@@ -504,109 +599,118 @@ function AnalyticsPage() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4 shadow-sm shadow-blue-900/5 backdrop-blur">
+      <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-navy-900">Per-question breakdown</p>
             <p className="text-xs text-slate-600">
-              {perQuestion.length} question{perQuestion.length === 1 ? '' : 's'} • live response data
+              {perQuestion.length} question{perQuestion.length === 1 ? '' : 's'} • select a question to view its chart
             </p>
           </div>
         </div>
-      </div>
 
-      {!perQuestion.length && !isLoading && (
-        <div className="rounded-2xl border border-dashed border-blue-200 bg-white/80 p-8 text-center text-sm text-slate-600">
-          No questions in this session yet.
-        </div>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {perQuestion.map((q) => (
-          <div
-            key={q.id}
-            className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">Q{q.index}</span>
-                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-navy-700">{q.type}</span>
-                </div>
-                <p className="mt-2 line-clamp-2 text-base font-semibold text-navy-900">{q.text || 'Untitled question'}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Responses</p>
-                <p className="mt-1 text-lg font-bold text-navy-900">{q.responseCount}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 h-56 rounded-2xl border border-blue-200/70 bg-white/90 p-3">
-              {q.rawType === 'word_cloud' ? (
-                <WordCloudChart words={q.wordCloud} className="h-full" emptyLabel="No words submitted yet" />
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  {q.chart.length > 0 && (q.rawType === 'mcq' || q.rawType === 'true_false') ? (
-                    <BarChart data={q.chart}>
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis unit="%" />
-                      <Tooltip formatter={(value, _name, props) => [`${value}% (${props.payload.count} responses)`, 'Share']} />
-                      <Bar dataKey="value" radius={[10, 10, 0, 0]}>
-                        {q.chart.map((entry, idx) => (
-                          <Cell key={entry.name} fill={COLORS[idx % COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  ) : (
-                    <PieChart>
-                      <Tooltip />
-                      <Pie
-                        data={[
-                          {
-                            name: 'Responded',
-                            value: clamp(
-                              Math.round((q.responseCount / Math.max(1, summary.joined)) * 100),
-                              0,
-                              100,
-                            ),
-                          },
-                          {
-                            name: 'No response',
-                            value: clamp(
-                              100 - Math.round((q.responseCount / Math.max(1, summary.joined)) * 100),
-                              0,
-                              100,
-                            ),
-                          },
-                        ]}
-                        dataKey="value"
-                        nameKey="name"
-                        outerRadius={90}
-                        innerRadius={50}
-                      >
-                        <Cell fill="#2563eb" />
-                        <Cell fill="#e2e8f0" />
-                      </Pie>
-                    </PieChart>
-                  )}
-                </ResponsiveContainer>
-              )}
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Correct-answer rate</p>
-                <p className="mt-1 text-lg font-bold text-navy-900">{q.correctRate == null ? '—' : `${q.correctRate}%`}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {q.correctRate == null ? 'Not a scored question' : 'Based on marked correct options'}
-                </p>
-              </div>
-            </div>
+        {!perQuestion.length && !isLoading ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-blue-200 bg-white/80 p-8 text-center text-sm text-slate-600">
+            No questions in this session yet.
           </div>
-        ))}
+        ) : (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="max-h-[min(520px,70vh)] space-y-2 overflow-y-auto pr-1">
+              {perQuestion.map((q) => {
+                const isSelected = selectedQuestion?.id === q.id
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    onClick={() => setSelectedQuestionId(q.id)}
+                    className={`w-full rounded-2xl border p-3 text-left transition ${
+                      isSelected
+                        ? 'border-navy-600 bg-linear-to-r from-navy-900 via-navy-800 to-navy-700 text-white shadow-md shadow-navy-900/20'
+                        : 'border-blue-200/70 bg-white hover:border-blue-300 hover:bg-blue-50/60'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            isSelected ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          Q{q.index}
+                        </span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            isSelected ? 'bg-white/15 text-white' : 'bg-blue-50 text-navy-700'
+                          }`}
+                        >
+                          {q.type}
+                        </span>
+                      </div>
+                      <span className={`text-xs font-semibold ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                        {q.responseCount} resp.
+                      </span>
+                    </div>
+                    <p
+                      className={`mt-2 line-clamp-2 text-sm font-semibold ${
+                        isSelected ? 'text-white' : 'text-navy-900'
+                      }`}
+                    >
+                      {q.text || 'Untitled question'}
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
+
+            {selectedQuestion ? (
+              <div className="min-h-[320px] rounded-2xl border border-blue-200/70 bg-white/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-100 pb-4">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        Q{selectedQuestion.index}
+                      </span>
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-navy-700">
+                        {selectedQuestion.type}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-lg font-semibold text-navy-900">
+                      {selectedQuestion.text || 'Untitled question'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Responses</p>
+                    <p className="mt-1 text-2xl font-bold text-navy-900">{selectedQuestion.responseCount}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 h-72 rounded-2xl border border-blue-200/70 bg-white p-3">
+                  <QuestionAnalyticsChart
+                    question={selectedQuestion}
+                    participantsJoined={summary.joined}
+                  />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white p-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Correct-answer rate</p>
+                    <p className="mt-1 text-lg font-bold text-navy-900">
+                      {selectedQuestion.correctRate == null ? '—' : `${selectedQuestion.correctRate}%`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {selectedQuestion.correctRate == null
+                        ? 'Not a scored question'
+                        : 'Based on marked correct options'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
