@@ -59,6 +59,39 @@ export function buildResponsePayloadForQuestion(q, res) {
   return payload
 }
 
+export function getParticipantCurrentQuestion(activeQuestions, { liveQuestionId, questionIndex }) {
+  if (!activeQuestions?.length) return null
+  if (liveQuestionId) {
+    const live = activeQuestions.find((q) => q.id === liveQuestionId)
+    if (live) return live
+  }
+  const idx = clamp(questionIndex, 0, activeQuestions.length - 1)
+  return activeQuestions[idx] ?? null
+}
+
+/**
+ * The participant is "attempting" a question when there is one currently
+ * displayed and they have not submitted it yet. Otherwise they are idle and
+ * safe to auto-navigate.
+ */
+export function isParticipantAttemptingQuestion(question, submittedIds) {
+  if (!question) return false
+  return !submittedIds?.[String(question.id)]
+}
+
+export function canAutoNavigateToActivatedQuestion({
+  activeQuestions,
+  liveQuestionId,
+  questionIndex,
+  quizSubmittedQuestionIds,
+}) {
+  const currentQuestion = getParticipantCurrentQuestion(activeQuestions, {
+    liveQuestionId,
+    questionIndex,
+  })
+  return !isParticipantAttemptingQuestion(currentQuestion, quizSubmittedQuestionIds)
+}
+
 export function participantQuestionHasAnswer(question, response = {}) {
   if (!question) return false
   if (question.type === 'MCQ' || question.type === 'True/False') {

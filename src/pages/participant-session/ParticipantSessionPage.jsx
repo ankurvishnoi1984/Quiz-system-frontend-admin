@@ -27,6 +27,7 @@ import { WaitingForQuestion } from './components/WaitingForQuestion'
 import { WaitingView } from './components/WaitingView'
 import {
   buildResponsePayloadForQuestion,
+  canAutoNavigateToActivatedQuestion,
   clamp,
   mapQuestionType,
   participantQuestionHasAnswer,
@@ -216,6 +217,52 @@ function ParticipantSessionPage() {
 
   const inputsLocked = hasCountdown && (questionLockedBySubmission || timer === 0)
 
+  const activeQuestionsRef = useRef(activeQuestions)
+  activeQuestionsRef.current = activeQuestions
+
+  /** Host activated a question while participant was mid-timed-attempt — apply when idle. */
+  const pendingActivatedQuestionIdRef = useRef(null)
+
+  const tryApplyPendingActivatedQuestion = useCallback(() => {
+    const pendingId = pendingActivatedQuestionIdRef.current
+    if (pendingId == null) return false
+
+    const visibleActiveQuestions = activeQuestionsRef.current
+    if (!visibleActiveQuestions.some((q) => q.id === pendingId)) return false
+
+    const store = useParticipantStore.getState()
+
+    if (store.quizLiveQuestionId === pendingId) {
+      pendingActivatedQuestionIdRef.current = null
+      return false
+    }
+
+    const canNavigate = canAutoNavigateToActivatedQuestion({
+      activeQuestions: visibleActiveQuestions,
+      liveQuestionId: store.quizLiveQuestionId,
+      questionIndex: store.quizQuestionIndex,
+      quizSubmittedQuestionIds: store.quizSubmittedQuestionIds,
+    })
+    if (!canNavigate) return false
+
+    pendingActivatedQuestionIdRef.current = null
+    setStep('active')
+    setLiveQuestionId(pendingId)
+    return true
+  }, [setLiveQuestionId])
+
+  const handleHostQuestionActivated = useCallback(
+    (questionId) => {
+      pendingActivatedQuestionIdRef.current = questionId
+      tryApplyPendingActivatedQuestion()
+    },
+    [tryApplyPendingActivatedQuestion],
+  )
+
+  useEffect(() => {
+    tryApplyPendingActivatedQuestion()
+  }, [tryApplyPendingActivatedQuestion, activeQuestions, quizSubmittedQuestionIds, step])
+
   useEffect(() => {
     setSubmitted(questionLockedBySubmission)
   }, [questionLockedBySubmission, setSubmitted])
@@ -228,9 +275,6 @@ function ParticipantSessionPage() {
       'participant',
     )
   }, [effectiveSessionCode, participantToken])
-
-  const activeQuestionsRef = useRef(activeQuestions)
-  activeQuestionsRef.current = activeQuestions
 
   useEffect(() => {
     const unsub = useParticipantStore.persist.onFinishHydration(() => {
@@ -320,8 +364,11 @@ function ParticipantSessionPage() {
       if (!data.question_id) return
 
       if (data.is_live) {
-        setLiveQuestionId(data.question_id)
+        handleHostQuestionActivated(data.question_id)
       } else {
+        if (pendingActivatedQuestionIdRef.current === data.question_id) {
+          pendingActivatedQuestionIdRef.current = null
+        }
         setLiveQuestionId((current) => (current === data.question_id ? null : current))
       }
     })
@@ -410,6 +457,7 @@ function ParticipantSessionPage() {
     dbSessionId,
     unlockQuestionForReattempt,
     setLiveQuestionId,
+    handleHostQuestionActivated,
   ])
 
   useEffect(() => {
@@ -666,6 +714,10 @@ function ParticipantSessionPage() {
     if (participantQuestionHasAnswer(question, responses[question.id])) {
       await submitQuestionById(question.id)
     }
+    if (tryApplyPendingActivatedQuestion()) {
+      setSubmitted(false)
+      return
+    }
     goToQuestionIndex(displayQuestionIndex + 1)
     setSubmitted(false)
   }
@@ -708,6 +760,7 @@ function ParticipantSessionPage() {
     if (!question?.id) return
     if (isLastDisplayedQuestion) {
       await handleSubmitResponse()
+      tryApplyPendingActivatedQuestion()
       return
     }
     await handleNext()
@@ -728,6 +781,7 @@ function ParticipantSessionPage() {
         if (qid != null) {
           await submitQuestionById(qid)
         }
+        if (tryApplyPendingActivatedQuestion()) return
         setLiveQuestionId(null)
         setQuestionIndex(nextIdx)
       }, 800)
@@ -751,6 +805,7 @@ function ParticipantSessionPage() {
     question?.id,
     isLastDisplayedQuestion,
     submitQuestionById,
+    tryApplyPendingActivatedQuestion,
     setLiveQuestionId,
     setQuestionIndex,
   ])
