@@ -491,8 +491,6 @@ function LivePage() {
   const wordCloudTotal = wordCloudWords.reduce((sum, row) => sum + row.count, 0)
 
 
-  const questionTimeLimitSec = activeQuestion?.timeLimit ?? 0
-
   const attemptsRows = useMemo(() => {
     const rows = currentResponses.map((row) => {
       const responseTimeMs =
@@ -507,7 +505,7 @@ function LivePage() {
             ? String(row.rating_value)
             : '—'),
         responseTimeMs,
-        quizTimeLabel: formatQuizSubmitTime(responseTimeMs, questionTimeLimitSec),
+        quizTimeLabel: formatQuizSubmitTime(responseTimeMs),
       }
     })
 
@@ -519,7 +517,7 @@ function LivePage() {
     })
 
     return rows.slice(0, 100)
-  }, [currentResponses, questionTimeLimitSec])
+  }, [currentResponses])
 
 
   const leaderboard = useMemo(() => {
@@ -835,7 +833,7 @@ function LivePage() {
                   <tr className="border-b border-blue-100">
                     <th className="px-3 py-2 font-semibold text-slate-700">Participant</th>
                     <th className="px-3 py-2 font-semibold text-slate-700">Response</th>
-                    <th className="px-3 py-2 font-semibold text-slate-700">Quiz time</th>
+                    <th className="px-3 py-2 font-semibold text-slate-700">Response time</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -843,7 +841,7 @@ function LivePage() {
                     <tr key={row.id} className="border-b border-blue-50 last:border-b-0">
                       <td className="px-3 py-2 text-slate-700">{row.participant}</td>
                       <td className="px-3 py-2 text-slate-700">{row.response}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-slate-600 tabular-nums">
+                      <td className="px-3 py-2 text-xs text-slate-600">
                         {row.quizTimeLabel}
                       </td>
                     </tr>

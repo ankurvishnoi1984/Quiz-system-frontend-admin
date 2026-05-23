@@ -21,16 +21,34 @@ export function computeResponseTimeMs(question, quizCountdownByQuestion, quizQue
   return Math.max(0, Math.round(Date.now() - openedAt))
 }
 
-/** e.g. 10.234s or 10.234s / 30s for timed questions */
-export function formatQuizSubmitTime(responseTimeMs, timeLimitSeconds = 0) {
-  if (responseTimeMs == null || Number.isNaN(Number(responseTimeMs))) return '—'
-  const ms = Math.max(0, Math.round(Number(responseTimeMs)))
-  const seconds = Math.floor(ms / 1000)
-  const millis = ms % 1000
-  const elapsed = `${seconds}.${String(millis).padStart(3, '0')}s`
-  const limit = Number(timeLimitSeconds) || 0
-  if (limit > 0) {
-    return `${elapsed} / ${limit}s`
+function unitLabel(value, singular, plural) {
+  return `${value} ${value === 1 ? singular : plural}`
+}
+
+/** e.g. "1 second 883 milliseconds" or "1 minute 52 seconds 123 milliseconds" */
+export function formatDurationMs(ms) {
+  const total = Math.max(0, Math.round(Number(ms)))
+  const minutes = Math.floor(total / 60000)
+  const remainderAfterMinutes = total % 60000
+  const seconds = Math.floor(remainderAfterMinutes / 1000)
+  const millis = remainderAfterMinutes % 1000
+
+  const parts = []
+  if (minutes > 0) {
+    parts.push(unitLabel(minutes, 'minute', 'minutes'))
   }
-  return elapsed
+  if (seconds > 0) {
+    parts.push(unitLabel(seconds, 'second', 'seconds'))
+  }
+  if (millis > 0 || parts.length === 0) {
+    parts.push(unitLabel(millis, 'millisecond', 'milliseconds'))
+  }
+
+  return parts.join(' ')
+}
+
+/** Elapsed time for host live view (Attempts & responses). */
+export function formatQuizSubmitTime(responseTimeMs) {
+  if (responseTimeMs == null || Number.isNaN(Number(responseTimeMs))) return '—'
+  return formatDurationMs(responseTimeMs)
 }
