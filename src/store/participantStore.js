@@ -128,6 +128,25 @@ export const useParticipantStore = create(
         }))
       },
 
+      /** Stop all per-question timers when the host ends the session */
+      freezeAllCountdowns: () => {
+        const s = get()
+        const byQ = s.quizCountdownByQuestion || {}
+        const now = Date.now()
+        let changed = false
+        const next = { ...byQ }
+        for (const [qid, entry] of Object.entries(byQ)) {
+          if (!entry?.endsAt) continue
+          const remaining =
+            entry.frozen != null
+              ? entry.frozen
+              : Math.max(0, Math.ceil((entry.endsAt - now) / 1000))
+          next[qid] = { ...entry, frozen: remaining }
+          changed = true
+        }
+        if (changed) set({ quizCountdownByQuestion: next })
+      },
+
       /** Call after a successful submit while a per-question timer is active */
       freezeCountdownAfterSubmit: (questionId) => {
         const s = get()

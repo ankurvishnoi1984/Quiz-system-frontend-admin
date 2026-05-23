@@ -264,6 +264,7 @@ function LivePage() {
   const [shareOpen, setShareOpen] = useState(false)
   const [chartView, setChartView] = useState('bar')
   const [hostAlert, setHostAlert] = useState(null)
+  const [endSessionConfirmOpen, setEndSessionConfirmOpen] = useState(false)
 
 
   const sessionQuery = useQuery({
@@ -613,6 +614,7 @@ function LivePage() {
   const session = sessionQuery.data
   const statusLabel = session?.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : '—'
   const canEditLive = session?.status === 'live'
+  const showSessionControls = session?.status === 'live' || session?.status === 'paused'
 
   if (!sessionId) {
     return (
@@ -655,21 +657,31 @@ function LivePage() {
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={() => transitionMutation.mutate({ action: session.status === 'live' ? 'pause' : 'resume' })}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200 bg-white px-4 text-sm font-semibold text-slate-700"
-          >
-            {session.status === 'live' ? <Square className="size-4" /> : <Play className="size-4" />}
-            {session.status === 'live' ? 'Pause' : 'Resume'}
-          </button>
-          <button
-            type="button"
-            onClick={() => transitionMutation.mutate({ action: 'end' })}
-            className="h-11 rounded-2xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700"
-          >
-            End Session
-          </button>
+          {showSessionControls ? (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  transitionMutation.mutate({
+                    action: session.status === 'live' ? 'pause' : 'resume',
+                  })
+                }
+                disabled={transitionMutation.isPending}
+                className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-60"
+              >
+                {session.status === 'live' ? <Square className="size-4" /> : <Play className="size-4" />}
+                {session.status === 'live' ? 'Pause' : 'Resume'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEndSessionConfirmOpen(true)}
+                disabled={transitionMutation.isPending}
+                className="h-11 rounded-2xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 disabled:opacity-60"
+              >
+                End Session
+              </button>
+            </>
+          ) : null}
           <span className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white">
             <Users className="size-4" />
             {participants} participants
@@ -1103,6 +1115,44 @@ function LivePage() {
         <div className="rounded-xl border border-blue-200 bg-white p-4">
           <h3 className="text-lg font-bold text-navy-900">{activeQuestion?.text || 'No question selected'}</h3>
           <p className="mt-1 text-sm text-slate-600">Type: {activeQuestion?.type || '—'}</p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={endSessionConfirmOpen}
+        title="End session?"
+        onClose={() => {
+          if (!transitionMutation.isPending) setEndSessionConfirmOpen(false)
+        }}
+      >
+        <p className="text-sm leading-relaxed text-slate-600">
+          Are you sure you want to end this session? Participants will be notified and will no longer
+          be able to submit new responses.
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            disabled={transitionMutation.isPending}
+            onClick={() => setEndSessionConfirmOpen(false)}
+            className="h-11 rounded-2xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={transitionMutation.isPending}
+            onClick={() =>
+              transitionMutation.mutate(
+                { action: 'end' },
+                {
+                  onSuccess: () => setEndSessionConfirmOpen(false),
+                },
+              )
+            }
+            className="h-11 rounded-2xl border border-red-200 bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+          >
+            {transitionMutation.isPending ? 'Ending…' : 'End session'}
+          </button>
         </div>
       </Modal>
 

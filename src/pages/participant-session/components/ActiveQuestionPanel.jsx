@@ -23,6 +23,7 @@ export function ActiveQuestionPanel({
   hasAttemptedQuestion,
   canSeeAnswerReveal,
   participantAnswerIsCorrect,
+  sessionEnded = false,
   tagsInput,
   submitted,
   isLastDisplayedQuestion,
@@ -164,17 +165,20 @@ export function ActiveQuestionPanel({
             type="button"
             aria-label={isLastDisplayedQuestion ? 'Submit all answers and finish' : 'Next question'}
             disabled={
+              sessionEnded ||
               isSubmitting ||
               (isLastDisplayedQuestion
                 ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
                 : hasCountdown && !canGoToNextQuestion)
             }
             title={
-              hasCountdown && !canGoToNextQuestion
-                ? 'Answer this question or wait for the timer'
-                : isLastDisplayedQuestion && !hasFinalizePayload
-                  ? 'Answer the open question(s) before submitting'
-                  : undefined
+              sessionEnded
+                ? 'Session has ended'
+                : hasCountdown && !canGoToNextQuestion
+                  ? 'Answer this question or wait for the timer'
+                  : isLastDisplayedQuestion && !hasFinalizePayload
+                    ? 'Answer the open question(s) before submitting'
+                    : undefined
             }
             onClick={onNextOrSubmit}
             className={`h-11 rounded-xl px-4 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -194,7 +198,7 @@ export function ActiveQuestionPanel({
         </div>
       </div>
 
-      {submitted && !hasCountdown && (
+      {submitted && !hasCountdown && !sessionEnded && (
         <div className="flex gap-3 rounded-2xl border border-sky-200 bg-sky-50/90 p-4">
           <Pencil className="mt-0.5 size-5 shrink-0 text-sky-700" aria-hidden />
           <div>
@@ -204,6 +208,15 @@ export function ActiveQuestionPanel({
               are on the last question to update your submission.
             </p>
           </div>
+        </div>
+      )}
+
+      {sessionEnded && (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-slate-800">Session ended</p>
+          <p className="mt-1 text-xs text-slate-600">
+            This session has ended. You can review your answers but cannot submit new responses.
+          </p>
         </div>
       )}
 

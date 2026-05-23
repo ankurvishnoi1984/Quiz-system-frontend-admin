@@ -61,6 +61,7 @@ function ParticipantSessionPage() {
     setQuizCountdown,
     resetQuizProgress,
     freezeCountdownAfterSubmit,
+    freezeAllCountdowns,
     markQuestionsSubmitted,
     unlockQuestionForReattempt,
     markQuestionOpened,
@@ -80,6 +81,7 @@ function ParticipantSessionPage() {
       setQuizCountdown: s.setQuizCountdown,
       resetQuizProgress: s.resetQuizProgress,
       freezeCountdownAfterSubmit: s.freezeCountdownAfterSubmit,
+      freezeAllCountdowns: s.freezeAllCountdowns,
       markQuestionsSubmitted: s.markQuestionsSubmitted,
       unlockQuestionForReattempt: s.unlockQuestionForReattempt,
       markQuestionOpened: s.markQuestionOpened,
@@ -103,6 +105,8 @@ function ParticipantSessionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitModal, setSubmitModal] = useState(null)
   const [reattemptModal, setReattemptModal] = useState(null)
+  const [sessionEndedModal, setSessionEndedModal] = useState(false)
+  const sessionEndedNotifiedRef = useRef(false)
   const [leaderboard, setLeaderboard] = useState([])
   const [questionLeaderboardByQuestion, setQuestionLeaderboardByQuestion] = useState({})
   const [questionLbVisibleByQuestion, setQuestionLbVisibleByQuestion] = useState({})
@@ -117,6 +121,7 @@ function ParticipantSessionPage() {
     refetchInterval: (query) => {
       const status = query.state.data?.status
       if (step === 'waiting' || status === 'draft') return 3000
+      if (participantToken && (status === 'live' || status === 'paused')) return 5000
       return false
     },
   })
@@ -186,6 +191,8 @@ function ParticipantSessionPage() {
   )
 
   const session = sessionQuery.data
+  const isSessionEnded =
+    session?.status === 'completed' || session?.status === 'archived'
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
 
   const question = useMemo(() => {
@@ -211,12 +218,24 @@ function ParticipantSessionPage() {
   const countdownFrozen = questionCountdown?.frozen ?? null
 
   const timer = useMemo(() => {
+    if (isSessionEnded && hasCountdown) {
+      if (countdownFrozen != null) return countdownFrozen
+      return 0
+    }
     if (hasCountdown && questionLockedBySubmission && countdownFrozen != null) return countdownFrozen
     if (!hasCountdown || !countdownEndsAt) return 0
     return Math.max(0, Math.ceil((countdownEndsAt - Date.now()) / 1000))
-  }, [hasCountdown, questionLockedBySubmission, countdownFrozen, countdownEndsAt, countdownTick])
+  }, [
+    isSessionEnded,
+    hasCountdown,
+    questionLockedBySubmission,
+    countdownFrozen,
+    countdownEndsAt,
+    countdownTick,
+  ])
 
-  const inputsLocked = hasCountdown && (questionLockedBySubmission || timer === 0)
+  const inputsLocked =
+    isSessionEnded || (hasCountdown && (questionLockedBySubmission || timer === 0))
 
   const activeQuestionsRef = useRef(activeQuestions)
   activeQuestionsRef.current = activeQuestions
@@ -319,6 +338,25 @@ function ParticipantSessionPage() {
   }, [participantHydrated, session, effectiveSessionCode])
 
   useEffect(() => {
+    sessionEndedNotifiedRef.current = false
+    setSessionEndedModal(false)
+  }, [effectiveSessionCode])
+
+  useEffect(() => {
+    if (!participantToken || !session) return
+    if (session.status !== 'completed' && session.status !== 'archived') return
+    freezeAllCountdowns()
+    if (sessionEndedNotifiedRef.current) return
+    sessionEndedNotifiedRef.current = true
+    setSessionEndedModal(true)
+  }, [participantToken, session?.status, freezeAllCountdowns])
+
+  useEffect(() => {
+    if (!isSessionEnded) return
+    freezeAllCountdowns()
+  }, [isSessionEnded, freezeAllCountdowns])
+
+  useEffect(() => {
     if (!client || !effectiveSessionCode || !participantToken || !dbSessionId) return
 
     const offConnected = client.on(RealtimeEvent.CONNECTED, () => {
@@ -327,10 +365,22 @@ function ParticipantSessionPage() {
     })
 
     const offSession = client.on('session_updated', (data) => {
+      if (data?.status) {
+        queryClient.setQueryData(['participant-session', effectiveSessionCode], (old) =>
+          old ? { ...old, status: data.status } : old,
+        )
+      }
       queryClient.invalidateQueries({ queryKey: ['participant-session', effectiveSessionCode] })
       queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
       if (data.status === 'completed' || data.status === 'live') {
         queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
+      }
+      if (data.status === 'completed' || data.status === 'archived') {
+        freezeAllCountdowns()
+        if (!sessionEndedNotifiedRef.current) {
+          sessionEndedNotifiedRef.current = true
+          setSessionEndedModal(true)
+        }
       }
       if (Array.isArray(data.leaderboard)) {
         setLeaderboard(data.leaderboard)
@@ -459,6 +509,7 @@ function ParticipantSessionPage() {
     unlockQuestionForReattempt,
     setLiveQuestionId,
     handleHostQuestionActivated,
+    freezeAllCountdowns,
   ])
 
   useEffect(() => {
@@ -536,12 +587,14 @@ function ParticipantSessionPage() {
   )
 
   useEffect(() => {
+    if (isSessionEnded) return
     if (step !== 'active' || !hasCountdown || questionLockedBySubmission) return
     const id = setInterval(() => setCountdownTick((t) => t + 1), 1000)
     return () => clearInterval(id)
-  }, [step, hasCountdown, question?.id, questionLockedBySubmission])
+  }, [isSessionEnded, step, hasCountdown, question?.id, questionLockedBySubmission])
 
   useEffect(() => {
+    if (isSessionEnded) return
     if (step !== 'active' || !question?.id) return
     if (!hasCountdown) {
       setQuizCountdown({ questionId: null, endsAt: null })
@@ -561,7 +614,15 @@ function ParticipantSessionPage() {
     }
     if (byQuestion[qidStr]?.endsAt != null) return
     setQuizCountdown({ questionId: qid, endsAt: Date.now() + timeLimit * 1000 })
-  }, [step, question?.id, hasCountdown, timeLimit, setQuizCountdown, quizSubmittedQuestionIds])
+  }, [
+    isSessionEnded,
+    step,
+    question?.id,
+    hasCountdown,
+    timeLimit,
+    setQuizCountdown,
+    quizSubmittedQuestionIds,
+  ])
 
   useEffect(() => {
     if (step !== 'active' || !question?.id || hasCountdown) return
@@ -654,6 +715,7 @@ function ParticipantSessionPage() {
 
   const submitQuestionById = useCallback(
     async (questionId) => {
+      if (isSessionEnded) return false
       if (!participantToken || !questionId) return false
       const q = activeQuestions.find((item) => item.id === questionId)
       if (!q) return false
@@ -683,6 +745,7 @@ function ParticipantSessionPage() {
       }
     },
     [
+      isSessionEnded,
       participantToken,
       activeQuestions,
       responses,
@@ -693,6 +756,7 @@ function ParticipantSessionPage() {
   )
 
   const handleSubmitResponse = async () => {
+    if (isSessionEnded) return false
     const payloads = buildFinalPayload()
     if (!payloads.length || !participantToken) return false
 
@@ -715,6 +779,7 @@ function ParticipantSessionPage() {
   }
 
   const handleNext = async () => {
+    if (isSessionEnded) return
     if (!question?.id || isLastDisplayedQuestion) return
     if (participantQuestionHasAnswer(question, responses[question.id])) {
       await submitQuestionById(question.id)
@@ -733,6 +798,7 @@ function ParticipantSessionPage() {
   }
 
   const handleSubmit = async () => {
+    if (isSessionEnded) return
     if (!isLastDisplayedQuestion) return
     const ok = await handleSubmitResponse()
     if (ok) {
@@ -754,6 +820,7 @@ function ParticipantSessionPage() {
   }
 
   const handleNextOrSubmit = async () => {
+    if (isSessionEnded) return
     if (isLastDisplayedQuestion) {
       await handleSubmit()
       return
@@ -772,6 +839,7 @@ function ParticipantSessionPage() {
   }
 
   useEffect(() => {
+    if (isSessionEnded) return
     if (step !== 'active') return
     if (!hasCountdown) return
     if (timer > 0) return
@@ -801,6 +869,7 @@ function ParticipantSessionPage() {
       return () => clearTimeout(timeout)
     }
   }, [
+    isSessionEnded,
     timer,
     step,
     displayQuestionIndex,
@@ -927,16 +996,18 @@ function ParticipantSessionPage() {
 
   const updateResponse = useCallback(
     (questionId, patch) => {
+      if (isSessionEnded) return
       setResponses((prev) => ({
         ...prev,
         [questionId]: { ...prev[questionId], ...patch },
       }))
     },
-    [setResponses],
+    [isSessionEnded, setResponses],
   )
 
   const handleAddWordCloudTag = useCallback(
     (questionId) => {
+      if (isSessionEnded) return
       const t = tagsInput.trim()
       if (!t) return
       setResponses((prev) => ({
@@ -948,7 +1019,7 @@ function ParticipantSessionPage() {
       }))
       setTagsInput('')
     },
-    [tagsInput, setResponses],
+    [isSessionEnded, tagsInput, setResponses],
   )
 
   if (!participantHydrated) {
@@ -1047,6 +1118,7 @@ function ParticipantSessionPage() {
             hasAttemptedQuestion={hasAttemptedQuestion}
             canSeeAnswerReveal={canSeeAnswerReveal}
             participantAnswerIsCorrect={participantAnswerIsCorrect}
+            sessionEnded={isSessionEnded}
             tagsInput={tagsInput}
             submitted={submitted}
             isLastDisplayedQuestion={isLastDisplayedQuestion}
@@ -1104,6 +1176,15 @@ function ParticipantSessionPage() {
         message={reattemptModal?.message ?? ''}
         confirmLabel={reattemptModal?.confirmLabel ?? 'Go to question'}
         onClose={() => setReattemptModal(null)}
+      />
+
+      <ParticipantAlertModal
+        open={sessionEndedModal}
+        variant="info"
+        title="Session ended"
+        message="This session was ended by the host. Thank you for participating."
+        confirmLabel="OK"
+        onClose={() => setSessionEndedModal(false)}
       />
 
       <LeaderboardModal
