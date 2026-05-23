@@ -32,3 +32,19 @@ export function isOptionCorrectForReveal(option, revealMeta) {
   if (!revealMeta?.correctOptionIds?.length) return false
   return revealMeta.correctOptionIds.includes(Number(option.option_id))
 }
+
+/** After reveal: whether the participant's MCQ / True-False choice matches the key. */
+export function isParticipantChoiceCorrect(question, currentResponse, revealMeta) {
+  if (!revealMeta?.correctOptionIds?.length) return null
+  if (question?.type !== 'MCQ' && question?.type !== 'True/False') return null
+
+  const selected = String(currentResponse?.selectedOption || '').trim()
+  if (!selected) return false
+
+  const selectedOption = (question?.options || []).find(
+    (o) => String(o.option_text).trim().toLowerCase() === selected.toLowerCase(),
+  )
+  if (!selectedOption?.option_id) return false
+
+  return revealMeta.correctOptionIds.includes(Number(selectedOption.option_id))
+}

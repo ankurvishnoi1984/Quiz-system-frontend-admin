@@ -25,6 +25,7 @@ import { QaPanel } from './components/QaPanel'
 import { SessionHeader } from './components/SessionHeader'
 import { WaitingForQuestion } from './components/WaitingForQuestion'
 import { WaitingView } from './components/WaitingView'
+import { isParticipantChoiceCorrect } from '../../utils/answerReveal'
 import {
   buildResponsePayloadForQuestion,
   canAutoNavigateToActivatedQuestion,
@@ -619,6 +620,10 @@ function ParticipantSessionPage() {
   const isAnswerRevealed = Boolean(answerRevealMeta?.revealed)
   const hasAttemptedQuestion = Boolean(questionLockedBySubmission || (hasCountdown && timer === 0))
   const canSeeAnswerReveal = isAnswerRevealed && hasAttemptedQuestion
+  const participantAnswerIsCorrect = useMemo(() => {
+    if (!canSeeAnswerReveal || !question) return null
+    return isParticipantChoiceCorrect(question, currentResponse, answerRevealMeta)
+  }, [canSeeAnswerReveal, question, currentResponse, answerRevealMeta])
   const currentQuestionLeaderboard = question?.id
     ? questionLeaderboardByQuestion[String(question.id)] || []
     : []
@@ -1041,6 +1046,7 @@ function ParticipantSessionPage() {
             isAnswerRevealed={isAnswerRevealed}
             hasAttemptedQuestion={hasAttemptedQuestion}
             canSeeAnswerReveal={canSeeAnswerReveal}
+            participantAnswerIsCorrect={participantAnswerIsCorrect}
             tagsInput={tagsInput}
             submitted={submitted}
             isLastDisplayedQuestion={isLastDisplayedQuestion}

@@ -22,6 +22,7 @@ export function ActiveQuestionPanel({
   isAnswerRevealed,
   hasAttemptedQuestion,
   canSeeAnswerReveal,
+  participantAnswerIsCorrect,
   tagsInput,
   submitted,
   isLastDisplayedQuestion,
@@ -206,11 +207,25 @@ export function ActiveQuestionPanel({
         </div>
       )}
 
-      {submitted && hasCountdown && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-sm font-semibold text-emerald-800">Response received!</p>
-        </div>
-      )}
+      {canSeeAnswerReveal &&
+        (question.type === 'MCQ' || question.type === 'True/False') &&
+        participantAnswerIsCorrect !== null && (
+          <div
+            className={`rounded-2xl border p-4 ${
+              participantAnswerIsCorrect
+                ? 'border-emerald-200 bg-emerald-50'
+                : 'border-red-200 bg-red-50'
+            }`}
+          >
+            <p
+              className={`text-sm font-semibold ${
+                participantAnswerIsCorrect ? 'text-emerald-800' : 'text-red-800'
+              }`}
+            >
+              {participantAnswerIsCorrect ? 'Correct Answer' : 'Incorrect Answer'}
+            </p>
+          </div>
+        )}
 
       {showCurrentQuestionLeaderboard && (
         <QuestionLeaderboard entries={currentQuestionLeaderboard} />
