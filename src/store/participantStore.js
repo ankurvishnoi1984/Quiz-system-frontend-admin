@@ -10,6 +10,8 @@ const initialQuiz = {
   quizSubmittedQuestionIds: {},
   /** Per-question countdown: { [questionId]: { endsAt, frozen } } */
   quizCountdownByQuestion: {},
+  /** Untimed: when the participant first saw each question (epoch ms) */
+  quizQuestionOpenedAt: {},
 }
 
 export const useParticipantStore = create(
@@ -69,10 +71,26 @@ export const useParticipantStore = create(
           delete locks[qid]
           const countdowns = { ...(s.quizCountdownByQuestion || {}) }
           delete countdowns[qid]
+          const openedAt = { ...(s.quizQuestionOpenedAt || {}) }
+          delete openedAt[qid]
           return {
             quizSubmittedQuestionIds: locks,
             quizCountdownByQuestion: countdowns,
+            quizQuestionOpenedAt: openedAt,
             quizSubmitted: false,
+          }
+        })
+      },
+
+      markQuestionOpened: (questionId) => {
+        const qid = String(questionId)
+        set((s) => {
+          if (s.quizQuestionOpenedAt?.[qid]) return {}
+          return {
+            quizQuestionOpenedAt: {
+              ...(s.quizQuestionOpenedAt || {}),
+              [qid]: Date.now(),
+            },
           }
         })
       },
@@ -138,6 +156,7 @@ export const useParticipantStore = create(
         quizSubmitted: state.quizSubmitted,
         quizSubmittedQuestionIds: state.quizSubmittedQuestionIds,
         quizCountdownByQuestion: state.quizCountdownByQuestion,
+        quizQuestionOpenedAt: state.quizQuestionOpenedAt,
       }),
       migrate: (persistedState, version) => {
         const s = persistedState || {}

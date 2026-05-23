@@ -43,6 +43,7 @@ import {
   transitionSessionApi,
 } from '../services/liveApi'
 import { questionSupportsAnswerReveal } from '../utils/answerReveal'
+import { formatQuizSubmitTime } from '../utils/quizResponseTime'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 
 
@@ -237,6 +238,7 @@ function LivePage() {
         isQuizMode: Boolean(q.is_quiz_mode),
         answerRevealed: Boolean(q.answer_revealed),
         showLeaderboard: Boolean(q.show_leaderboard),
+        timeLimit: Number(q.time_limit_seconds) || 0,
         options: q.question_options || [],
       })),
     [questionsQuery.data],
@@ -469,19 +471,35 @@ function LivePage() {
   const wordCloudTotal = wordCloudWords.reduce((sum, row) => sum + row.count, 0)
 
 
-  const attemptsRows = useMemo(
-    () =>
-      currentResponses.slice(0, 100).map((row) => ({
+  const questionTimeLimitSec = activeQuestion?.timeLimit ?? 0
+
+  const attemptsRows = useMemo(() => {
+    const rows = currentResponses.map((row) => {
+      const responseTimeMs =
+        row.response_time_ms != null ? Number(row.response_time_ms) : null
+      return {
         id: row.response_id,
         participant: row.participant?.nickname || `Participant ${row.participant_id}`,
         response:
           row.question_option?.option_text ||
           row.text_response ||
-          (row.rating_value !== null && row.rating_value !== undefined ? String(row.rating_value) : '—'),
-        submittedAt: row.submitted_at ? new Date(row.submitted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—',
-      })),
-    [currentResponses],
-  )
+          (row.rating_value !== null && row.rating_value !== undefined
+            ? String(row.rating_value)
+            : '—'),
+        responseTimeMs,
+        quizTimeLabel: formatQuizSubmitTime(responseTimeMs, questionTimeLimitSec),
+      }
+    })
+
+    rows.sort((a, b) => {
+      if (a.responseTimeMs == null && b.responseTimeMs == null) return 0
+      if (a.responseTimeMs == null) return 1
+      if (b.responseTimeMs == null) return -1
+      return a.responseTimeMs - b.responseTimeMs
+    })
+
+    return rows.slice(0, 100)
+  }, [currentResponses, questionTimeLimitSec])
 
 
   const leaderboard = useMemo(() => {
@@ -729,7 +747,7 @@ function LivePage() {
                   <tr className="border-b border-blue-100">
                     <th className="px-3 py-2 font-semibold text-slate-700">Participant</th>
                     <th className="px-3 py-2 font-semibold text-slate-700">Response</th>
-                    <th className="px-3 py-2 font-semibold text-slate-700">Time</th>
+                    <th className="px-3 py-2 font-semibold text-slate-700">Quiz time</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -737,7 +755,9 @@ function LivePage() {
                     <tr key={row.id} className="border-b border-blue-50 last:border-b-0">
                       <td className="px-3 py-2 text-slate-700">{row.participant}</td>
                       <td className="px-3 py-2 text-slate-700">{row.response}</td>
-                      <td className="px-3 py-2 text-slate-600">{row.submittedAt}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-slate-600 tabular-nums">
+                        {row.quizTimeLabel}
+                      </td>
                     </tr>
                   ))}
                   {!attemptsRows.length ? (

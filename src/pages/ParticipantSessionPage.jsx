@@ -18,6 +18,7 @@ import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 import { useParticipantStore } from '../store/participantStore'
 import { getChoiceRevealClasses, isOptionCorrectForReveal } from '../utils/answerReveal'
 import { hasSessionCodeInJoinPath, normalizeSessionCode } from '../utils/joinUrl'
+import { computeResponseTimeMs } from '../utils/quizResponseTime'
 
 
 function clamp(n, min, max) {
@@ -207,6 +208,7 @@ function ParticipantSessionPage() {
     liveQuestionId,
     submitted,
     quizCountdownByQuestion,
+    quizQuestionOpenedAt,
     quizSubmittedQuestionIds,
     setResponses,
     setQuestionIndex,
@@ -217,6 +219,7 @@ function ParticipantSessionPage() {
     freezeCountdownAfterSubmit,
     markQuestionsSubmitted,
     unlockQuestionForReattempt,
+    markQuestionOpened,
   } = useParticipantStore(
     useShallow((s) => ({
       responses: s.quizResponses,
@@ -224,6 +227,7 @@ function ParticipantSessionPage() {
       liveQuestionId: s.quizLiveQuestionId,
       submitted: s.quizSubmitted,
       quizCountdownByQuestion: s.quizCountdownByQuestion,
+      quizQuestionOpenedAt: s.quizQuestionOpenedAt,
       quizSubmittedQuestionIds: s.quizSubmittedQuestionIds,
       setResponses: s.setQuizResponses,
       setQuestionIndex: s.setQuizQuestionIndex,
@@ -234,6 +238,7 @@ function ParticipantSessionPage() {
       freezeCountdownAfterSubmit: s.freezeCountdownAfterSubmit,
       markQuestionsSubmitted: s.markQuestionsSubmitted,
       unlockQuestionForReattempt: s.unlockQuestionForReattempt,
+      markQuestionOpened: s.markQuestionOpened,
     })),
   )
 
@@ -699,6 +704,11 @@ function ParticipantSessionPage() {
     setQuizCountdown({ questionId: qid, endsAt: Date.now() + timeLimit * 1000 })
   }, [step, question?.id, hasCountdown, timeLimit, setQuizCountdown, quizSubmittedQuestionIds])
 
+  useEffect(() => {
+    if (step !== 'active' || !question?.id || hasCountdown) return
+    markQuestionOpened(question.id)
+  }, [step, question?.id, hasCountdown, markQuestionOpened])
+
 
   useEffect(() => {
     if (!session) return
@@ -771,11 +781,22 @@ function ParticipantSessionPage() {
 
 
   const buildFinalPayload = useCallback(
-    () =>
-      activeQuestions
+    () => {
+      const { quizCountdownByQuestion: countdowns, quizQuestionOpenedAt: openedAt } =
+        useParticipantStore.getState()
+      return activeQuestions
         .filter((q) => !(quizSubmittedQuestionIds || {})[String(q.id)])
-        .map((q) => buildResponsePayloadForQuestion(q, responses[q.id]))
-        .filter(Boolean),
+        .map((q) => {
+          const payload = buildResponsePayloadForQuestion(q, responses[q.id])
+          if (!payload) return null
+          const responseTimeMs = computeResponseTimeMs(q, countdowns, openedAt)
+          if (responseTimeMs != null) {
+            payload.response_time_ms = responseTimeMs
+          }
+          return payload
+        })
+        .filter(Boolean)
+    },
     [activeQuestions, responses, quizSubmittedQuestionIds],
   )
 
@@ -787,6 +808,15 @@ function ParticipantSessionPage() {
       const payload = buildResponsePayloadForQuestion(q, responses[questionId])
       if (!payload) return false
       if ((quizSubmittedQuestionIds || {})[String(questionId)]) return true
+
+      const responseTimeMs = computeResponseTimeMs(
+        q,
+        useParticipantStore.getState().quizCountdownByQuestion,
+        useParticipantStore.getState().quizQuestionOpenedAt,
+      )
+      if (responseTimeMs != null) {
+        payload.response_time_ms = responseTimeMs
+      }
 
       try {
         await submitResponseApi(participantToken, payload)
