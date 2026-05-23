@@ -1,5 +1,5 @@
-import { Link2, QrCode, Hash } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Download, Link2, QrCode, Hash } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { getSessionQrApi } from '../../services/dashboardApi'
 import {
@@ -15,7 +15,92 @@ const SHARE_TABS = [
   { id: 'code', label: 'Session code', icon: Hash },
 ]
 
-function CopyButton({ value, disabled, className = '' }) {
+function dataUrlToBlob(dataUrl) {
+  const [header, base64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)?.[1] || 'image/png'
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return new Blob([bytes], { type: mime })
+}
+
+function downloadDataUrl(filename, dataUrl) {
+  const a = document.createElement('a')
+  a.href = dataUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
+function qrDownloadFilename(sessionCode, sessionId) {
+  const slug = (sessionCode || `session-${sessionId || 'qr'}`).toLowerCase()
+  return `quiz-qr-${slug}.png`
+}
+
+function buildShareLinkText({ title, sessionCode, description, joinUrl }) {
+  const lines = ["You're invited to join a quiz session!", '', `Session: ${title}`]
+  if (sessionCode) lines.push(`Session code: ${sessionCode}`)
+  if (description?.trim()) lines.push(`Description: ${description.trim()}`)
+  lines.push('', `Join link: ${joinUrl}`, '', 'Open the link to join directly — no code entry needed.')
+  return lines.join('\n')
+}
+
+function QrImageActions({ dataUrl, filename }) {
+  const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState(false)
+
+  const actionClass =
+    'inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50'
+
+  return (
+    <div className="mt-3 flex gap-2">
+      <button
+        type="button"
+        disabled={!dataUrl}
+        onClick={async () => {
+          if (!dataUrl) return
+          setCopyError(false)
+          try {
+            if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+              throw new Error('Clipboard API unavailable')
+            }
+            const blob = await dataUrlToBlob(dataUrl)
+            await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+          } catch {
+            setCopyError(true)
+            setTimeout(() => setCopyError(false), 2000)
+          }
+        }}
+        className={`${actionClass} ${
+          copied
+            ? 'border-green-300 bg-green-100 text-green-700'
+            : copyError
+              ? 'border-red-300 bg-red-50 text-red-700'
+              : ''
+        }`}
+      >
+        {copied ? 'Copied ✓' : copyError ? 'Copy failed' : 'Copy QR'}
+      </button>
+      <button
+        type="button"
+        disabled={!dataUrl}
+        onClick={() => {
+          if (!dataUrl) return
+          downloadDataUrl(filename, dataUrl)
+        }}
+        className={actionClass}
+      >
+        <Download className="size-4" />
+        Download
+      </button>
+    </div>
+  )
+}
+
+function CopyButton({ value, disabled, className = '', label = 'Copy', copiedLabel = 'Copied ✓' }) {
   const [copied, setCopied] = useState(false)
 
   return (
@@ -34,7 +119,7 @@ function CopyButton({ value, disabled, className = '' }) {
           : 'border-blue-200 bg-white text-slate-700 hover:bg-blue-50'
       } ${className}`}
     >
-      {copied ? 'Copied ✓' : 'Copy'}
+      {copied ? copiedLabel : label}
     </button>
   )
 }
@@ -46,6 +131,18 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
 
   const sessionCode = normalizeSessionCode(session?.session_code)
   const genericJoinUrl = buildGenericJoinUrl()
+  const sessionDescription = session?.description || ''
+
+  const shareLinkText = useMemo(
+    () =>
+      buildShareLinkText({
+        title: session?.title || 'Quiz session',
+        sessionCode,
+        description: sessionDescription,
+        joinUrl: shareJoinUrl,
+      }),
+    [session?.title, sessionCode, sessionDescription, shareJoinUrl],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -84,18 +181,20 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session</p>
-        <p className="mt-1 text-lg font-bold text-navy-900">{session.title}</p>
-        {sessionCode ? (
-          <p className="mt-1 text-sm text-slate-600">
-            Session code:{' '}
-            <span className="font-mono font-semibold tracking-widest text-navy-800">{sessionCode}</span>
-          </p>
-        ) : (
-          <p className="mt-1 text-sm text-slate-600">Share link for participants to join this session.</p>
-        )}
-      </div>
+      {shareTab !== 'link' && (
+        <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session</p>
+          <p className="mt-1 text-lg font-bold text-navy-900">{session.title}</p>
+          {sessionCode ? (
+            <p className="mt-1 text-sm text-slate-600">
+              Session code:{' '}
+              <span className="font-mono font-semibold tracking-widest text-navy-800">{sessionCode}</span>
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-slate-600">Share link for participants to join this session.</p>
+          )}
+        </div>
+      )}
 
       <div className="inline-flex rounded-xl border border-blue-200/70 bg-white p-0.5 shadow-sm">
         {SHARE_TABS.map(({ id, label, icon: Icon }) => (
@@ -116,38 +215,55 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
       </div>
 
       {shareTab === 'link' && (
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700">Direct join link</label>
-          <div className="flex gap-2">
-            <input
-              readOnly
-              value={shareJoinUrl}
-              className="h-11 flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none"
-            />
-            <CopyButton value={shareJoinUrl} />
+        <div className="space-y-3">
+          <label className="text-sm font-semibold text-slate-700">Share with participants</label>
+          <div className="space-y-3 rounded-2xl border border-blue-200/70 bg-white p-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session</p>
+              <p className="mt-1 text-base font-bold text-navy-900">{session.title}</p>
+            </div>
+            {sessionCode ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session code</p>
+                <p className="mt-1 font-mono text-sm font-semibold tracking-widest text-navy-800">{sessionCode}</p>
+              </div>
+            ) : null}
+            {sessionDescription.trim() ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Description</p>
+                <p className="mt-1 text-sm leading-relaxed text-slate-700">{sessionDescription.trim()}</p>
+              </div>
+            ) : null}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Join link</p>
+              <p className="mt-1 break-all text-sm text-slate-700">{shareJoinUrl || 'Generating link…'}</p>
+            </div>
           </div>
-          <p className="text-xs text-slate-500">Opens this session directly — no code entry needed.</p>
+          <CopyButton
+            value={shareLinkText}
+            disabled={!shareJoinUrl}
+            label="Copy all"
+            className="w-full"
+          />
+          <p className="text-xs text-slate-500">
+            Copies session details and the join link — paste into email, chat, or any messaging app.
+          </p>
         </div>
       )}
 
       {shareTab === 'qr' && (
-        <div className="grid gap-4 md:grid-cols-[1fr_280px]">
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-700">QR encodes the direct join link</label>
-            <input
-              readOnly
-              value={shareJoinUrl}
-              className="h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none"
-            />
-            <CopyButton value={shareJoinUrl} className="w-full" />
-          </div>
-          <div className="rounded-2xl border border-blue-200/70 bg-white p-3">
-            {qrDataUrl ? (
+        <div className="mx-auto max-w-[304px] rounded-2xl border border-blue-200/70 bg-white p-3">
+          {qrDataUrl ? (
+            <>
               <img src={qrDataUrl} alt="Session QR" className="mx-auto h-[240px] w-[240px]" />
-            ) : (
-              <div className="grid h-[240px] place-items-center text-sm text-slate-500">Generating QR...</div>
-            )}
-          </div>
+              <QrImageActions
+                dataUrl={qrDataUrl}
+                filename={qrDownloadFilename(sessionCode, session.id)}
+              />
+            </>
+          ) : (
+            <div className="grid h-[240px] place-items-center text-sm text-slate-500">Generating QR...</div>
+          )}
         </div>
       )}
 
