@@ -319,7 +319,7 @@ function LivePage() {
         answerRevealed: Boolean(q.answer_revealed),
         showLeaderboard: Boolean(q.show_leaderboard),
         timeLimit: Number(q.time_limit_seconds) || 0,
-        options: q.question_options || [],
+        options: q.question_options || q.QuestionOptions || [],
       })),
     [questionsQuery.data],
   )

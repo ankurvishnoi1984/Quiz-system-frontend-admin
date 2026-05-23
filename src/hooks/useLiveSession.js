@@ -30,6 +30,7 @@ export function useLiveSession(accessToken, sessionId) {
     queryKey: ['live-questions', sessionId],
     queryFn: () => listSessionQuestionsApi(accessToken, sessionId),
     enabled: Boolean(accessToken && sessionId),
+    refetchInterval: 4000,
   })
 
   const responsesQuery = useQuery({

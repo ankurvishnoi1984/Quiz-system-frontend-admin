@@ -1,83 +1,27 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { getQuestionResultsApi } from '../../services/liveApi'
 import WordCloudChart from '../../components/charts/WordCloudChart'
-import { CHART_TOOLTIP_STYLE } from '../../utils/chartColors'
 import { formatQuizSubmitTime } from '../../utils/quizResponseTime'
+import { PresentBarChart } from './PresentBarChart'
 import {
   buildOptionChartData,
   buildRatingChartData,
   buildResponseRows,
   buildWordCloudData,
   enrichOptionChartDataWithReveal,
+  enrichRatingChartDataWithColors,
   filterResponsesForQuestion,
+  getCorrectOptionsForQuestion,
   questionUsesOptionChart,
 } from '../../utils/livePresentation'
-import { getCorrectOptionsForQuestion } from '../../utils/livePresentation'
 import {
-  getPresentBarFill,
   PresentAnswerRevealBadge,
-  PresentCorrectOptionStrip,
+  PresentOptionsKey,
   shouldShowAnswerRevealUi,
 } from './PresentAnswerReveal'
 import { PresentSlideHeader } from './PresentShell'
-
-/** Recharts needs a parent with explicit pixel height — not unbounded flex-only sizing. */
-function PresentBarChart({ data, rawType, answerRevealed }) {
-  const total = data.reduce((s, r) => s + r.value, 0)
-  return (
-    <div className="h-[clamp(280px,45vh,480px)] w-full min-w-0">
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-        <BarChart data={data} margin={{ top: 16, right: 24, left: 8, bottom: 24 }}>
-        <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" vertical={false} />
-        <XAxis
-          dataKey="name"
-          tick={{ fontSize: 18, fill: answerRevealed ? '#64748b' : '#475569', fontWeight: 600 }}
-          axisLine={false}
-          tickLine={false}
-          interval={0}
-        />
-        <YAxis
-          allowDecimals={false}
-          tick={{ fontSize: 16, fill: '#64748b' }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <Tooltip
-          cursor={{ fill: 'rgba(27, 75, 107, 0.06)' }}
-          contentStyle={{ ...CHART_TOOLTIP_STYLE, fontSize: 16 }}
-          formatter={(value, name, props) => {
-            const pct = total ? Math.round((Number(value) / total) * 100) : 0
-            const label = props?.payload?.isCorrect ? `${name} ✓` : name
-            return [`${value} (${pct}%)`, label]
-          }}
-        />
-        <Bar dataKey="value" radius={[12, 12, 0, 0]} maxBarSize={120}>
-          {data.map((entry) => (
-            <Cell
-              key={entry.name}
-              fill={getPresentBarFill(entry, rawType, answerRevealed)}
-              stroke={entry.isCorrect ? '#047857' : undefined}
-              strokeWidth={entry.isCorrect ? 2 : 0}
-            />
-          ))}
-        </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
 
 function TextResponsesList({ rows }) {
   if (!rows.length) {
@@ -129,7 +73,7 @@ export function QuestionSlide({
     currentResponses,
   )
   const optionData = enrichOptionChartDataWithReveal(optionDataRaw, question)
-  const ratingData = buildRatingChartData(currentResponses)
+  const ratingData = enrichRatingChartDataWithColors(buildRatingChartData(currentResponses))
   const showRevealUi = shouldShowAnswerRevealUi(question)
   const wordCloudWords = buildWordCloudData(question, questionResultsQuery.data, currentResponses)
   const responseRows = buildResponseRows(currentResponses)
@@ -269,18 +213,16 @@ export function QuestionSlide({
           </div>
         ) : hasChart ? (
           <div
-            className={`flex min-h-0 w-full min-w-0 flex-1 flex-col rounded-3xl border bg-white/90 p-4 shadow-xl transition-colors ${
-              showRevealUi
-                ? 'border-emerald-300/80 shadow-emerald-900/10 ring-1 ring-emerald-100'
-                : 'border-blue-200/70 shadow-navy-900/10'
-            }`}
+            className="flex min-h-0 w-full min-w-0 flex-1 flex-col rounded-3xl border border-blue-200/70 bg-white/90 p-4 shadow-xl shadow-navy-900/10"
           >
             <PresentBarChart
               data={usesOptionChart ? optionData : chartData}
               rawType={question.rawType}
               answerRevealed={showRevealUi}
             />
-            {showRevealUi ? <PresentCorrectOptionStrip question={question} /> : null}
+            {showRevealUi ? (
+              <PresentOptionsKey question={question} chartData={optionData} />
+            ) : null}
             {!hasChartResponses ? (
               <p className="mt-3 text-center text-[clamp(0.95rem,1.8vw,1.15rem)] text-slate-500">
                 Waiting for participants to answer…

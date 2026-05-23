@@ -1,4 +1,26 @@
+import { getChartColor } from './chartColors'
 import { wordCountsFromApiResults, wordCountsFromResponses } from './wordCloud'
+
+/** High-contrast palette for fullscreen present mode (MCQ / rating). */
+export const PRESENT_OPTION_COLORS = [
+  '#4F46E5',
+  '#E11D48',
+  '#D97706',
+  '#0891B2',
+  '#7C3AED',
+  '#EA580C',
+  '#059669',
+  '#DB2777',
+]
+
+export function getPresentOptionColor(name, index, rawType) {
+  if (rawType === 'true_false') {
+    const key = String(name).trim().toLowerCase()
+    if (key === 'true') return '#16A34A'
+    if (key === 'false') return '#DC2626'
+  }
+  return PRESENT_OPTION_COLORS[index % PRESENT_OPTION_COLORS.length]
+}
 
 export function mapLiveQuestionType(type) {
   const map = {
@@ -23,18 +45,43 @@ export function sortTrueFalseOptionData(data) {
   })
 }
 
-export function mapLiveQuestions(questions) {
-  return (questions || []).map((q) => ({
-    id: q.question_id,
-    text: q.question_text,
-    type: mapLiveQuestionType(q.question_type),
-    rawType: q.question_type,
-    isLive: Boolean(q.is_live),
-    isQuizMode: Boolean(q.is_quiz_mode),
-    answerRevealed: Boolean(q.answer_revealed),
-    correctOptionIds: (q.correct_option_ids || []).map(Number),
-    options: q.question_options || [],
+export function normalizeQuestionOptions(question) {
+  const raw = question?.question_options || question?.QuestionOptions || []
+  return raw.map((option) => ({
+    option_id: option.option_id,
+    option_text: option.option_text,
+    is_correct: Boolean(option.is_correct),
+    display_order: option.display_order,
   }))
+}
+
+/** Host API returns options with is_correct; participant API may send correct_option_ids. */
+export function resolveCorrectOptionIds(question, options) {
+  const fromApi = (question?.correct_option_ids || []).map(Number).filter(Boolean)
+  if (fromApi.length) return fromApi
+
+  const revealed = Boolean(question?.answer_revealed ?? question?.answerRevealed)
+  if (!revealed) return []
+
+  return options.filter((option) => option.is_correct).map((option) => Number(option.option_id))
+}
+
+export function mapLiveQuestions(questions) {
+  return (questions || []).map((q) => {
+    const options = normalizeQuestionOptions(q)
+    const answerRevealed = Boolean(q.answer_revealed)
+    return {
+      id: q.question_id,
+      text: q.question_text,
+      type: mapLiveQuestionType(q.question_type),
+      rawType: q.question_type,
+      isLive: Boolean(q.is_live),
+      isQuizMode: Boolean(q.is_quiz_mode),
+      answerRevealed,
+      correctOptionIds: resolveCorrectOptionIds({ ...q, answerRevealed }, options),
+      options,
+    }
+  })
 }
 
 export function getCorrectOptionsForQuestion(question) {
@@ -46,14 +93,28 @@ export function getCorrectOptionsForQuestion(question) {
 export function enrichOptionChartDataWithReveal(optionData, question) {
   const correctIds = new Set((question?.correctOptionIds || []).map(Number))
   const revealed = Boolean(question?.answerRevealed)
+  const rawType = question?.rawType
 
   return optionData.map((row, idx) => {
     const matched = (question?.options || []).find(
       (o) => String(o.option_text).trim() === String(row.name).trim(),
     )
     const isCorrect = matched ? correctIds.has(Number(matched.option_id)) : false
-    return { ...row, isCorrect: revealed && isCorrect, optionIndex: idx }
+    return {
+      ...row,
+      isCorrect: revealed && isCorrect,
+      optionIndex: idx,
+      color: getPresentOptionColor(row.name, idx, rawType),
+    }
   })
+}
+
+export function enrichRatingChartDataWithColors(ratingData) {
+  return ratingData.map((row, idx) => ({
+    ...row,
+    optionIndex: idx,
+    color: getPresentOptionColor(row.name, idx, 'rating'),
+  }))
 }
 
 export function buildParticipantList(responses) {

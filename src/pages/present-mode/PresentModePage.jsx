@@ -156,6 +156,7 @@ function PresentModePage() {
 
       {currentSlide?.type === 'question' ? (
         <QuestionSlide
+          key={currentSlide.question.id}
           accessToken={accessToken}
           sessionTitle={sessionTitle}
           question={currentSlide.question}

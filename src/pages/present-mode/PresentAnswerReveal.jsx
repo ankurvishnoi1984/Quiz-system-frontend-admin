@@ -1,55 +1,95 @@
-import { CheckCircle2, Sparkles } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { questionSupportsAnswerReveal } from '../../utils/answerReveal'
-import { getChartColor } from '../../utils/chartColors'
-import { getCorrectOptionsForQuestion } from '../../utils/livePresentation'
+import { getCorrectOptionsForQuestion, getPresentOptionColor } from '../../utils/livePresentation'
 
-const CORRECT_BAR_FILL = '#059669'
-const MUTED_BAR_FILL = '#cbd5e1'
+export const CORRECT_STROKE = '#047857'
 
 export function PresentAnswerRevealBadge() {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/80 bg-linear-to-r from-emerald-50 to-teal-50 px-4 py-2 shadow-sm shadow-emerald-900/10">
-      <span className="grid size-8 place-items-center rounded-full bg-emerald-500 text-white">
-        <Sparkles className="size-4" strokeWidth={2.25} aria-hidden />
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[clamp(0.7rem,1.2vw,0.8rem)] font-semibold text-emerald-800">
+      <span className="grid size-5 place-items-center rounded-full bg-emerald-500 text-white">
+        <Check className="size-3" strokeWidth={3} aria-hidden />
       </span>
-      <span className="text-[clamp(0.8rem,1.4vw,0.95rem)] font-bold uppercase tracking-wider text-emerald-800">
-        Answer revealed
-      </span>
-    </div>
+      Key shown
+    </span>
   )
 }
 
-export function PresentCorrectOptionStrip({ question }) {
-  const correctOptions = getCorrectOptionsForQuestion(question)
-  if (!question?.answerRevealed || !correctOptions.length) return null
+/** All options in a scannable list — correct ones get a green tick badge. */
+export function PresentOptionsKey({ question, chartData = [] }) {
+  if (!question?.answerRevealed) return null
+
+  const correctIds = new Set((question.correctOptionIds || []).map(Number))
+  const options =
+    question.options?.length > 0
+      ? question.options
+      : chartData.map((row, idx) => ({ option_id: idx, option_text: row.name }))
+  if (!options.length) return null
 
   return (
-    <div className="mt-4 flex flex-wrap justify-center gap-[clamp(0.5rem,1.5vw,1rem)]">
-      {correctOptions.map((option, idx) => (
-        <div
-          key={option.option_id ?? idx}
-          className="relative flex max-w-full items-center gap-3 rounded-2xl border-2 border-emerald-400 bg-linear-to-br from-emerald-50 via-white to-emerald-50/80 px-[clamp(1rem,2.5vw,1.75rem)] py-[clamp(0.75rem,1.5vh,1.25rem)] shadow-lg shadow-emerald-900/15 ring-4 ring-emerald-100"
-        >
-          <span className="grid size-[clamp(2.25rem,5vw,3rem)] shrink-0 place-items-center rounded-xl bg-emerald-500 text-white shadow-md">
-            <CheckCircle2 className="size-[clamp(1.1rem,2.5vw,1.5rem)]" strokeWidth={2.5} />
-          </span>
-          <p className="text-[clamp(1.15rem,2.8vw,2rem)] font-bold leading-snug text-emerald-950">
-            {option.option_text}
-          </p>
-        </div>
-      ))}
+    <div className="mt-4 border-t border-slate-200/80 pt-4">
+      <p className="mb-3 text-center text-[clamp(0.7rem,1.2vw,0.8rem)] font-semibold uppercase tracking-wider text-slate-500">
+        Answer key
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((opt, idx) => {
+          const isCorrect = correctIds.has(Number(opt.option_id))
+          const chartRow = chartData.find(
+            (d) => String(d.name).trim() === String(opt.option_text).trim(),
+          )
+          const count = chartRow?.value ?? 0
+          const optionColor =
+            chartRow?.color ?? getPresentOptionColor(opt.option_text, idx, question.rawType)
+
+          return (
+            <div
+              key={opt.option_id ?? idx}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${
+                isCorrect
+                  ? 'border-emerald-400/90 bg-emerald-50/90'
+                  : 'border-slate-200/90 bg-white/80'
+              }`}
+            >
+              <span
+                className="grid size-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white shadow-sm"
+                style={{ backgroundColor: isCorrect ? '#059669' : optionColor }}
+                aria-hidden
+              >
+                {isCorrect ? (
+                  <Check className="size-5" strokeWidth={3} />
+                ) : (
+                  String.fromCharCode(65 + idx)
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p
+                  className={`truncate text-[clamp(0.95rem,1.6vw,1.15rem)] font-semibold ${
+                    isCorrect ? 'text-emerald-900' : 'text-slate-700'
+                  }`}
+                >
+                  {opt.option_text}
+                </p>
+                {count > 0 ? (
+                  <p className="text-[clamp(0.75rem,1.2vw,0.85rem)] text-slate-500">
+                    {count} response{count === 1 ? '' : 's'}
+                  </p>
+                ) : null}
+              </div>
+              {isCorrect ? (
+                <span className="shrink-0 text-[clamp(0.65rem,1vw,0.75rem)] font-bold uppercase tracking-wide text-emerald-600">
+                  Correct
+                </span>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-export function getPresentBarFill(entry, rawType, answerRevealed) {
-  if (!answerRevealed) {
-    return getChartColor(entry.name, entry.optionIndex ?? 0, rawType)
-  }
-  if (entry.isCorrect) {
-    return CORRECT_BAR_FILL
-  }
-  return MUTED_BAR_FILL
+export function getPresentBarFill(entry) {
+  return entry.color ?? getPresentOptionColor(entry.name, entry.optionIndex ?? 0)
 }
 
 export function shouldShowAnswerRevealUi(question) {
@@ -57,5 +97,55 @@ export function shouldShowAnswerRevealUi(question) {
     Boolean(question?.answerRevealed) &&
     questionSupportsAnswerReveal(question.type, question.isQuizMode) &&
     getCorrectOptionsForQuestion(question).length > 0
+  )
+}
+
+/** Green tick badge above the correct bar(s). */
+export function PresentCorrectBarLabel(props) {
+  const { x, y, width, index, data, answerRevealed } = props
+  const entry = data?.[index]
+  if (!answerRevealed || !entry?.isCorrect || width == null) return null
+
+  const cx = Number(x) + Number(width) / 2
+  const cy = Number(y) - 14
+  const r = 11
+
+  return (
+    <g aria-hidden>
+      <circle cx={cx} cy={cy} r={r} fill="#059669" stroke="#fff" strokeWidth={2} />
+      <path
+        d={`M ${cx - 4} ${cy} L ${cx - 1} ${cy + 4} L ${cx + 5} ${cy - 4}`}
+        fill="none"
+        stroke="#fff"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  )
+}
+
+/** Option label only on axis — correct mark stays on the bar top to avoid overlap. */
+export function PresentXAxisTick({ x, y, payload, chartData }) {
+  const entry = chartData?.find((d) => d.name === payload?.value)
+  const fill = entry?.color ?? '#475569'
+  const label = String(payload?.value ?? '')
+  const maxLen = 14
+  const display =
+    label.length > maxLen ? `${label.slice(0, maxLen - 1)}…` : label
+
+  return (
+    <text
+      x={x}
+      y={y}
+      dy={20}
+      textAnchor="middle"
+      fill={fill}
+      fontSize={15}
+      fontWeight={entry?.isCorrect ? 700 : 600}
+    >
+      {display}
+      {entry?.isCorrect ? ' ✓' : ''}
+    </text>
   )
 }
