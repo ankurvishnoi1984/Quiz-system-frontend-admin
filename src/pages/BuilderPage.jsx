@@ -12,6 +12,7 @@ import {
   GripVertical,
   ListChecks,
   MessageSquareText,
+  Pencil,
   Plus,
   Star,
   Trophy,
@@ -38,6 +39,76 @@ import {
 import { setQuestionAnswerRevealedApi, setQuestionLeaderboardVisibleApi } from '../services/liveApi'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 import { questionSupportsAnswerReveal } from '../utils/answerReveal'
+
+function InlineEditableSessionTitle({ title, onSave, isSaving }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(title)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (!editing) setDraft(title)
+  }, [title, editing])
+
+  useEffect(() => {
+    if (!editing || !inputRef.current) return
+    inputRef.current.focus()
+    inputRef.current.select()
+  }, [editing])
+
+  const cancel = () => {
+    setDraft(title)
+    setEditing(false)
+  }
+
+  const commit = () => {
+    const trimmed = draft.trim()
+    setEditing(false)
+    if (!trimmed || trimmed === title) return
+    onSave(trimmed)
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={draft}
+        disabled={isSaving}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            commit()
+          }
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            cancel()
+          }
+        }}
+        className="mt-1 w-full min-w-[12rem] max-w-2xl border-0 border-b border-blue-300/70 bg-transparent px-0 py-0.5 text-2xl font-bold text-navy-900 outline-none ring-0 placeholder:text-slate-400 focus:border-blue-500 disabled:opacity-60"
+        aria-label="Session name"
+        maxLength={255}
+      />
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      disabled={isSaving}
+      className="group mt-1 flex max-w-full cursor-text items-center gap-2 rounded-lg text-left transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      aria-label="Edit session name"
+    >
+      <span className="text-2xl font-bold text-navy-900">{title || 'Untitled session'}</span>
+      <Pencil
+        className="size-4 shrink-0 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100"
+        aria-hidden
+      />
+    </button>
+  )
+}
 
 const QUESTION_TYPES = [
   { type: 'MCQ', icon: ListChecks, description: 'Multiple choice with options' },
@@ -739,6 +810,23 @@ function BuilderPage() {
     },
   })
 
+  const sessionTitleMutation = useMutation({
+    mutationFn: (title) => updateSessionApi(accessToken, sessionId, { title: title.trim() }),
+    onSuccess: (updated) => {
+      if (updated?.title) {
+        queryClient.setQueryData(['builder-session', sessionId], (old) =>
+          old ? { ...old, title: updated.title } : old,
+        )
+      }
+      queryClient.invalidateQueries({ queryKey: ['builder-dept-sessions'] })
+      queryClient.invalidateQueries({ queryKey: ['builder-session', sessionId] })
+      setSaveError('')
+    },
+    onError: (error) => {
+      setSaveError(error.message || 'Unable to update session name')
+    },
+  })
+
   const patchSessionSettings = (partial) => {
     const next = {
       leaderboard: partial.leaderboard ?? settings.leaderboard,
@@ -1059,7 +1147,11 @@ function BuilderPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Question Builder</p>
-          <h2 className="mt-1 text-2xl font-bold text-navy-900">{session.title}</h2>
+          <InlineEditableSessionTitle
+            title={session.title}
+            isSaving={sessionTitleMutation.isPending}
+            onSave={(nextTitle) => sessionTitleMutation.mutate(nextTitle)}
+          />
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">Session {session.id}</span>
             <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-navy-700">{session.status}</span>
