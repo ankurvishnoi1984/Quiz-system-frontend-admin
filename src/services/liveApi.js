@@ -65,6 +65,13 @@ export async function setQuestionLeaderboardVisibleApi(accessToken, questionId, 
   return data?.question || null
 }
 
+export async function openQuestionForReattemptApi(accessToken, questionId) {
+  const data = await authRequest(`/questions/${questionId}/open-reattempt`, accessToken, {
+    method: 'POST',
+  })
+  return data?.question || null
+}
+
 export async function qaModerateApi(accessToken, qaId, action, body = null) {
   const data = await authRequest(`/qa/${qaId}/${action}`, accessToken, {
     method: 'PUT',

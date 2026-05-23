@@ -1,5 +1,25 @@
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { BarChart3, ChevronLeft, ChevronRight, Crown, Eye, EyeOff, PieChart as PieChartIcon, Play, Share2, Square, ThumbsDown, ThumbsUp, Trophy, Users, X } from 'lucide-react'
+import {
+  BarChart3,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Crown,
+  Eye,
+  EyeOff,
+  Info,
+  PieChart as PieChartIcon,
+  Play,
+  RotateCcw,
+  Share2,
+  Square,
+  ThumbsDown,
+  ThumbsUp,
+  Trophy,
+  Users,
+  X,
+  XCircle,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -16,6 +36,7 @@ import {
   listQaQuestionsApi,
   listSessionQuestionsApi,
   qaModerateApi,
+  openQuestionForReattemptApi,
   setQuestionAnswerRevealedApi,
   setQuestionLeaderboardVisibleApi,
   setQuestionLiveStateApi,
@@ -27,6 +48,100 @@ import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 
 const COLORS = ['#1d4ed8', '#2563eb', '#4f46e5', '#0891b2', '#0ea5e9', '#6366f1']
 
+/** Same pattern as Activate / Deactivate: emerald = off action, slate = on / hide */
+function hostQuestionActionBtnClass(isActive) {
+  return `inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${
+    isActive
+      ? 'bg-linear-to-r from-slate-600 to-slate-700'
+      : 'bg-linear-to-r from-emerald-600 to-teal-600'
+  }`
+}
+
+function HostAlertModal({ open, variant = 'success', title, message, confirmLabel, onClose }) {
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, onClose])
+
+  if (!open) return null
+
+  const styles = {
+    success: {
+      panel: 'border-emerald-200/80 bg-linear-to-b from-emerald-50 to-white shadow-emerald-900/15',
+      bar: 'bg-linear-to-r from-emerald-500 to-teal-500',
+      iconWrap: 'bg-emerald-100 text-emerald-600 ring-emerald-50',
+      title: 'text-emerald-900',
+      message: 'text-emerald-800/90',
+      button: 'bg-linear-to-r from-emerald-600 to-teal-600 focus:ring-emerald-500',
+      Icon: CheckCircle2,
+    },
+    error: {
+      panel: 'border-red-200/80 bg-linear-to-b from-red-50 to-white shadow-red-900/15',
+      bar: 'bg-linear-to-r from-red-500 to-rose-500',
+      iconWrap: 'bg-red-100 text-red-600 ring-red-50',
+      title: 'text-red-900',
+      message: 'text-red-800/90',
+      button: 'bg-linear-to-r from-red-600 to-rose-600 focus:ring-red-500',
+      Icon: XCircle,
+    },
+    info: {
+      panel: 'border-emerald-200/80 bg-linear-to-b from-emerald-50 to-white shadow-emerald-900/15',
+      bar: 'bg-linear-to-r from-emerald-400 to-teal-500',
+      iconWrap: 'bg-emerald-100 text-emerald-600 ring-emerald-50',
+      title: 'text-emerald-900',
+      message: 'text-emerald-800/90',
+      button: 'bg-linear-to-r from-emerald-600 to-teal-600 focus:ring-emerald-500',
+      Icon: Info,
+    },
+  }
+
+  const theme = styles[variant] || styles.success
+  const Icon = theme.Icon
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-navy-950/30 backdrop-blur-sm"
+        aria-label="Close"
+        onClick={onClose}
+      />
+      <div
+        role="alertdialog"
+        aria-labelledby="host-alert-title"
+        aria-describedby="host-alert-message"
+        className={`relative w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl ${theme.panel}`}
+      >
+        <div className={`h-1.5 w-full ${theme.bar}`} aria-hidden />
+        <div className="p-6 text-center">
+          <div className={`mx-auto grid size-16 place-items-center rounded-full ring-4 ${theme.iconWrap}`}>
+            <Icon className="size-9" strokeWidth={2.25} aria-hidden />
+          </div>
+          <p id="host-alert-title" className={`mt-5 text-xl font-bold ${theme.title}`}>
+            {title}
+          </p>
+          <p
+            id="host-alert-message"
+            className={`mt-2 whitespace-pre-line text-sm leading-relaxed ${theme.message}`}
+          >
+            {message}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`mt-6 h-11 w-full rounded-xl text-sm font-semibold text-white shadow-md transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 ${theme.button}`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function mapQuestionType(type) {
   const map = {
@@ -67,6 +182,7 @@ function LivePage() {
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [chartView, setChartView] = useState('bar')
+  const [hostAlert, setHostAlert] = useState(null)
 
 
   const sessionQuery = useQuery({
@@ -250,6 +366,40 @@ function LivePage() {
     },
     onError: (error) => setErrorMessage(error.message || 'Unable to update answer visibility'),
   })
+
+  const reattemptMutation = useMutation({
+    mutationFn: ({ questionId }) => openQuestionForReattemptApi(accessToken, questionId),
+    onSuccess: (_data, { questionText }) => {
+      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
+      setErrorMessage('')
+      const preview = String(questionText || '').trim()
+      setHostAlert({
+        variant: 'success',
+        title: 'Opened for reattempt',
+        message: preview
+          ? `Participants are being notified and can answer again:\n\n“${preview.slice(0, 120)}${preview.length > 120 ? '…' : ''}”`
+          : 'Participants are being notified and can answer this question again.',
+        confirmLabel: 'OK',
+      })
+    },
+    onError: (error) => {
+      setHostAlert({
+        variant: 'error',
+        title: 'Could not open for reattempt',
+        message: error.message || 'Something went wrong. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
+  })
+
+  const handleOpenForReattempt = () => {
+    if (!activeQuestion?.id || !canEditLive) return
+    reattemptMutation.mutate({
+      questionId: activeQuestion.id,
+      questionText: activeQuestion.text,
+    })
+  }
 
 
   const qaMutation = useMutation({
@@ -473,72 +623,85 @@ function LivePage() {
 
 
           {activeQuestion ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={!canEditLive}
-                onClick={() =>
-                  questionLiveMutation.mutate({
-                    questionId: activeQuestion.id,
-                    isLive: !activeQuestion.isLive,
-                  })
-                }
-                className={`rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${activeQuestion.isLive
-                    ? 'bg-linear-to-r from-slate-600 to-slate-700'
-                    : 'bg-linear-to-r from-emerald-600 to-teal-600'
-                  }`}
-              >
-                {activeQuestion.isLive ? 'Deactivate Question' : 'Activate Question'}
-              </button>
-              {questionSupportsAnswerReveal(activeQuestion.type, activeQuestion.isQuizMode) ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
                   type="button"
-                  disabled={!canEditLive || answerRevealMutation.isPending}
+                  disabled={!canEditLive || questionLiveMutation.isPending}
                   onClick={() =>
-                    answerRevealMutation.mutate({
+                    questionLiveMutation.mutate({
                       questionId: activeQuestion.id,
-                      revealed: !activeQuestion.answerRevealed,
+                      isLive: !activeQuestion.isLive,
                     })
                   }
-                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${activeQuestion.answerRevealed
-                      ? 'bg-linear-to-r from-slate-600 to-slate-700'
-                      : 'bg-linear-to-r from-emerald-500 to-green-600'
-                    }`}
+                  className={hostQuestionActionBtnClass(activeQuestion.isLive)}
                 >
-                  {activeQuestion.answerRevealed ? (
-                    <>
-                      <EyeOff className="size-4" />
-                      Hide Answer
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="size-4" />
-                      Reveal Answer
-                    </>
-                  )}
+                  {activeQuestion.isLive ? 'Deactivate Question' : 'Activate Question'}
                 </button>
-              ) : null}
-              {canEditLive && activeQuestion.isQuizMode ? (
+                {questionSupportsAnswerReveal(activeQuestion.type, activeQuestion.isQuizMode) ? (
+                  <button
+                    type="button"
+                    disabled={!canEditLive || answerRevealMutation.isPending}
+                    onClick={() =>
+                      answerRevealMutation.mutate({
+                        questionId: activeQuestion.id,
+                        revealed: !activeQuestion.answerRevealed,
+                      })
+                    }
+                    className={hostQuestionActionBtnClass(activeQuestion.answerRevealed)}
+                  >
+                    {activeQuestion.answerRevealed ? (
+                      <>
+                        <EyeOff className="size-4 shrink-0" />
+                        Hide Answer
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="size-4 shrink-0" />
+                        Reveal Answer
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <div className="hidden sm:block" aria-hidden />
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {canEditLive && activeQuestion.isQuizMode ? (
+                  <button
+                    type="button"
+                    disabled={questionLeaderboardMutation.isPending}
+                    onClick={() =>
+                      questionLeaderboardMutation.mutate({
+                        questionId: activeQuestion.id,
+                        visible: !activeQuestion.showLeaderboard,
+                      })
+                    }
+                    className={hostQuestionActionBtnClass(activeQuestion.showLeaderboard)}
+                  >
+                    <Trophy className="size-4 shrink-0" />
+                    {activeQuestion.showLeaderboard
+                      ? 'Hide leaderboard for this question'
+                      : 'Show leaderboard for this question'}
+                  </button>
+                ) : (
+                  <div className="hidden sm:block" aria-hidden />
+                )}
                 <button
                   type="button"
-                  disabled={questionLeaderboardMutation.isPending}
-                  onClick={() =>
-                    questionLeaderboardMutation.mutate({
-                      questionId: activeQuestion.id,
-                      visible: !activeQuestion.showLeaderboard,
-                    })
+                  disabled={!canEditLive || reattemptMutation.isPending}
+                  onClick={handleOpenForReattempt}
+                  title={
+                    !activeQuestion.isLive
+                      ? 'Question will be activated and opened for another attempt'
+                      : undefined
                   }
-                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${activeQuestion.showLeaderboard
-                      ? 'bg-linear-to-r from-emerald-600 to-green-600'
-                      : 'bg-linear-to-r from-slate-500 to-slate-600'
-                    }`}
+                  className={hostQuestionActionBtnClass(false)}
                 >
-                  <Trophy className="size-4" />
-                  {activeQuestion.showLeaderboard
-                    ? 'Hide leaderboard for this question'
-                    : 'Show leaderboard for this question'}
+                  <RotateCcw className="size-4 shrink-0" />
+                  {reattemptMutation.isPending ? 'Opening…' : 'Open for reattempt'}
                 </button>
-              ) : null}
+              </div>
             </div>
           ) : null}
 
@@ -796,6 +959,15 @@ function LivePage() {
           </div>
         </div>
       )}
+
+      <HostAlertModal
+        open={Boolean(hostAlert)}
+        variant={hostAlert?.variant ?? 'success'}
+        title={hostAlert?.title ?? ''}
+        message={hostAlert?.message ?? ''}
+        confirmLabel={hostAlert?.confirmLabel ?? 'OK'}
+        onClose={() => setHostAlert(null)}
+      />
     </section>
   )
 }

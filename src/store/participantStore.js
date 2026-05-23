@@ -61,6 +61,22 @@ export const useParticipantStore = create(
 
       clearQuizSubmissionLocks: () => set({ quizSubmittedQuestionIds: {} }),
 
+      /** Host opened question for reattempt — allow editing and resubmit */
+      unlockQuestionForReattempt: (questionId) => {
+        const qid = String(questionId)
+        set((s) => {
+          const locks = { ...(s.quizSubmittedQuestionIds || {}) }
+          delete locks[qid]
+          const countdowns = { ...(s.quizCountdownByQuestion || {}) }
+          delete countdowns[qid]
+          return {
+            quizSubmittedQuestionIds: locks,
+            quizCountdownByQuestion: countdowns,
+            quizSubmitted: false,
+          }
+        })
+      },
+
       setQuizSubmitted: (value) =>
         set((s) => ({
           quizSubmitted: value,

@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, Crown, Pencil, Send, Star, Trophy, Users, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock3, Crown, Info, Pencil, Send, Star, Trophy, Users, XCircle } from 'lucide-react'
 // ChevronLeft, ChevronRight — kept for optional future arrow navigation
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
@@ -24,7 +24,9 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n))
 }
 
-function SubmitFeedbackModal({ open, type, message, onClose }) {
+/** @typedef {'success' | 'error' | 'info'} ParticipantAlertVariant */
+
+function ParticipantAlertModal({ open, variant = 'success', title, message, confirmLabel, onClose }) {
   useEffect(() => {
     if (!open) return
     const onKeyDown = (event) => {
@@ -34,9 +36,40 @@ function SubmitFeedbackModal({ open, type, message, onClose }) {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
-  if (!open || !type) return null
+  if (!open) return null
 
-  const isSuccess = type === 'success'
+  const styles = {
+    success: {
+      panel: 'border-emerald-200/80 bg-linear-to-b from-emerald-50 to-white shadow-emerald-900/15',
+      bar: 'bg-linear-to-r from-emerald-500 to-teal-500',
+      iconWrap: 'bg-emerald-100 text-emerald-600 ring-emerald-50',
+      title: 'text-emerald-900',
+      message: 'text-emerald-800/90',
+      button: 'bg-linear-to-r from-emerald-600 to-teal-600 focus:ring-emerald-500',
+      Icon: CheckCircle2,
+    },
+    error: {
+      panel: 'border-red-200/80 bg-linear-to-b from-red-50 to-white shadow-red-900/15',
+      bar: 'bg-linear-to-r from-red-500 to-rose-500',
+      iconWrap: 'bg-red-100 text-red-600 ring-red-50',
+      title: 'text-red-900',
+      message: 'text-red-800/90',
+      button: 'bg-linear-to-r from-red-600 to-rose-600 focus:ring-red-500',
+      Icon: XCircle,
+    },
+    info: {
+      panel: 'border-emerald-200/80 bg-linear-to-b from-[#ECFDF5] to-white shadow-emerald-900/15',
+      bar: 'bg-linear-to-r from-emerald-400 to-teal-500',
+      iconWrap: 'bg-emerald-100 text-emerald-600 ring-emerald-50',
+      title: 'text-emerald-900',
+      message: 'text-emerald-800/90',
+      button: 'bg-linear-to-r from-emerald-600 to-teal-600 focus:ring-emerald-500',
+      Icon: Info,
+    },
+  }
+
+  const theme = styles[variant] || styles.success
+  const Icon = theme.Icon
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -48,54 +81,30 @@ function SubmitFeedbackModal({ open, type, message, onClose }) {
       />
       <div
         role="alertdialog"
-        aria-labelledby="submit-feedback-title"
-        aria-describedby="submit-feedback-message"
-        className={`relative w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl ${
-          isSuccess
-            ? 'border-emerald-200/80 bg-linear-to-b from-emerald-50 to-white shadow-emerald-900/15'
-            : 'border-red-200/80 bg-linear-to-b from-red-50 to-white shadow-red-900/15'
-        }`}
+        aria-labelledby="participant-alert-title"
+        aria-describedby="participant-alert-message"
+        className={`relative w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl ${theme.panel}`}
       >
-        <div
-          className={`h-1.5 w-full ${isSuccess ? 'bg-linear-to-r from-emerald-500 to-teal-500' : 'bg-linear-to-r from-red-500 to-rose-500'}`}
-          aria-hidden
-        />
+        <div className={`h-1.5 w-full ${theme.bar}`} aria-hidden />
         <div className="p-6 text-center">
-          <div
-            className={`mx-auto grid size-16 place-items-center rounded-full ${
-              isSuccess
-                ? 'bg-emerald-100 text-emerald-600 ring-4 ring-emerald-50'
-                : 'bg-red-100 text-red-600 ring-4 ring-red-50'
-            }`}
-          >
-            {isSuccess ? (
-              <CheckCircle2 className="size-9" strokeWidth={2.25} aria-hidden />
-            ) : (
-              <XCircle className="size-9" strokeWidth={2.25} aria-hidden />
-            )}
+          <div className={`mx-auto grid size-16 place-items-center rounded-full ring-4 ${theme.iconWrap}`}>
+            <Icon className="size-9" strokeWidth={2.25} aria-hidden />
           </div>
-          <p
-            id="submit-feedback-title"
-            className={`mt-5 text-xl font-bold ${isSuccess ? 'text-emerald-900' : 'text-red-900'}`}
-          >
-            {isSuccess ? 'Submission successful' : 'Submission failed'}
+          <p id="participant-alert-title" className={`mt-5 text-xl font-bold ${theme.title}`}>
+            {title}
           </p>
           <p
-            id="submit-feedback-message"
-            className={`mt-2 text-sm leading-relaxed ${isSuccess ? 'text-emerald-800/90' : 'text-red-800/90'}`}
+            id="participant-alert-message"
+            className={`mt-2 whitespace-pre-line text-sm leading-relaxed ${theme.message}`}
           >
             {message}
           </p>
           <button
             type="button"
             onClick={onClose}
-            className={`mt-6 h-11 w-full rounded-xl text-sm font-semibold text-white shadow-md transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-              isSuccess
-                ? 'bg-linear-to-r from-emerald-600 to-teal-600 focus:ring-emerald-500'
-                : 'bg-linear-to-r from-red-600 to-rose-600 focus:ring-red-500'
-            }`}
+            className={`mt-6 h-11 w-full rounded-xl text-sm font-semibold text-white shadow-md transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 ${theme.button}`}
           >
-            {isSuccess ? 'Continue' : 'Try again'}
+            {confirmLabel}
           </button>
         </div>
       </div>
@@ -207,6 +216,7 @@ function ParticipantSessionPage() {
     resetQuizProgress,
     freezeCountdownAfterSubmit,
     markQuestionsSubmitted,
+    unlockQuestionForReattempt,
   } = useParticipantStore(
     useShallow((s) => ({
       responses: s.quizResponses,
@@ -223,6 +233,7 @@ function ParticipantSessionPage() {
       resetQuizProgress: s.resetQuizProgress,
       freezeCountdownAfterSubmit: s.freezeCountdownAfterSubmit,
       markQuestionsSubmitted: s.markQuestionsSubmitted,
+      unlockQuestionForReattempt: s.unlockQuestionForReattempt,
     })),
   )
 
@@ -248,6 +259,7 @@ function ParticipantSessionPage() {
   const [ownQuestions, setOwnQuestions] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitModal, setSubmitModal] = useState(null)
+  const [reattemptModal, setReattemptModal] = useState(null)
   const [leaderboard, setLeaderboard] = useState([])
   const [questionLeaderboardByQuestion, setQuestionLeaderboardByQuestion] = useState({})
   const [questionLbVisibleByQuestion, setQuestionLbVisibleByQuestion] = useState({})
@@ -452,6 +464,28 @@ function ParticipantSessionPage() {
     })
 
 
+    const handleReattemptOpened = (data) => {
+      const qid = Number(data?.question_id)
+      if (!qid) return
+
+      unlockQuestionForReattempt(qid)
+      setStep('active')
+      setLiveQuestionId(qid)
+      const preview = String(data?.question_text || '').trim()
+      setReattemptModal({
+        variant: 'info',
+        title: 'Question reopened',
+        message: preview
+          ? `The host has reopened this question for another attempt:\n\n“${preview.slice(0, 120)}${preview.length > 120 ? '…' : ''}”\n\nYou can change your answer and submit again.`
+          : 'The host has reopened a question for another attempt. You can change your answer and submit again.',
+        confirmLabel: 'Go to question',
+      })
+      queryClient.invalidateQueries({ queryKey: ['participant-session', effectiveSessionCode] })
+      if (dbSessionId) {
+        queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
+      }
+    }
+
     const offQuestion = client.on('question_changed', (data) => {
       queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
 
@@ -465,6 +499,8 @@ function ParticipantSessionPage() {
         )
       }
     })
+
+    const offReattempt = client.on(RealtimeEvent.QUESTION_REATTEMPT_OPENED, handleReattemptOpened)
 
     const offAnswerReveal = client.on(RealtimeEvent.ANSWER_REVEALED, (data) => {
       const qid = String(data?.question_id ?? '')
@@ -536,6 +572,7 @@ function ParticipantSessionPage() {
       offConnected()
       offSession()
       offQuestion()
+      offReattempt()
       offAnswerReveal()
       offResp()
       offLeaderboard()
@@ -543,7 +580,16 @@ function ParticipantSessionPage() {
       offQuestionLbVisibility()
       client.disconnect()
     }
-  }, [client, effectiveSessionCode, participantToken, queryClient, dbSessionId])
+  }, [
+    client,
+    effectiveSessionCode,
+    participantToken,
+    queryClient,
+    dbSessionId,
+    unlockQuestionForReattempt,
+    setLiveQuestionId,
+    setStep,
+  ])
 
   useEffect(() => {
     if (step === 'qa' && showOverallLeaderboard && dbSessionId) {
@@ -807,13 +853,18 @@ function ParticipantSessionPage() {
     const ok = await handleSubmitResponse()
     if (ok) {
       setSubmitModal({
-        type: 'success',
-        message: 'Your answers were submitted successfully. You can keep browsing questions or open Q&A when ready.',
+        variant: 'success',
+        title: 'Submission successful',
+        message:
+          'Your answers were submitted successfully. You can keep browsing questions or open Q&A when ready.',
+        confirmLabel: 'Continue',
       })
     } else {
       setSubmitModal({
-        type: 'error',
+        variant: 'error',
+        title: 'Submission failed',
         message: 'We could not submit your answers. Check your connection and try again.',
+        confirmLabel: 'Try again',
       })
     }
   }
@@ -1683,11 +1734,22 @@ function ParticipantSessionPage() {
       </div>
 
 
-      <SubmitFeedbackModal
+      <ParticipantAlertModal
         open={Boolean(submitModal)}
-        type={submitModal?.type}
+        variant={submitModal?.variant ?? 'success'}
+        title={submitModal?.title ?? ''}
         message={submitModal?.message ?? ''}
+        confirmLabel={submitModal?.confirmLabel ?? 'Continue'}
         onClose={() => setSubmitModal(null)}
+      />
+
+      <ParticipantAlertModal
+        open={Boolean(reattemptModal)}
+        variant={reattemptModal?.variant ?? 'info'}
+        title={reattemptModal?.title ?? 'Question reopened'}
+        message={reattemptModal?.message ?? ''}
+        confirmLabel={reattemptModal?.confirmLabel ?? 'Go to question'}
+        onClose={() => setReattemptModal(null)}
       />
 
       {showLeaderboard && (
