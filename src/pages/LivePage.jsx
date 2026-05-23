@@ -59,13 +59,82 @@ import { formatQuizSubmitTime } from '../utils/quizResponseTime'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 
 
-/** Same pattern as Activate / Deactivate: emerald = off action, slate = on / hide */
-function hostQuestionActionBtnClass(isActive) {
-  return `inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${
-    isActive
-      ? 'bg-linear-to-r from-slate-600 to-slate-700'
-      : 'bg-linear-to-r from-emerald-600 to-teal-600'
-  }`
+const HOST_ACTION_TONES = {
+  emerald: {
+    active:
+      'border-emerald-500 bg-emerald-100 text-emerald-950 shadow-sm shadow-emerald-200/60 ring-1 ring-emerald-300/70',
+    activeIcon: 'bg-emerald-600 text-white',
+    idle: 'border-emerald-200/90 bg-emerald-50/90 text-emerald-800 hover:border-emerald-400 hover:bg-emerald-100',
+    idleIcon: 'bg-emerald-200/80 text-emerald-700',
+    dot: 'bg-emerald-600',
+  },
+  rose: {
+    active: 'border-rose-500 bg-rose-100 text-rose-950 shadow-sm shadow-rose-200/60 ring-1 ring-rose-300/70',
+    activeIcon: 'bg-rose-600 text-white',
+    idle: 'border-rose-200/90 bg-rose-50/90 text-rose-800 hover:border-rose-400 hover:bg-rose-100',
+    idleIcon: 'bg-rose-200/80 text-rose-700',
+    dot: 'bg-rose-600',
+  },
+  violet: {
+    active:
+      'border-violet-500 bg-violet-100 text-violet-950 shadow-sm shadow-violet-200/60 ring-1 ring-violet-300/70',
+    activeIcon: 'bg-violet-600 text-white',
+    idle: 'border-violet-200/90 bg-violet-50/90 text-violet-800 hover:border-violet-400 hover:bg-violet-100',
+    idleIcon: 'bg-violet-200/80 text-violet-700',
+    dot: 'bg-violet-600',
+  },
+  amber: {
+    active: 'border-amber-500 bg-amber-100 text-amber-950 shadow-sm shadow-amber-200/60 ring-1 ring-amber-300/70',
+    activeIcon: 'bg-amber-600 text-white',
+    idle: 'border-amber-200/90 bg-amber-50/90 text-amber-900 hover:border-amber-400 hover:bg-amber-100',
+    idleIcon: 'bg-amber-200/80 text-amber-800',
+    dot: 'bg-amber-600',
+  },
+  sky: {
+    active: 'border-sky-500 bg-sky-100 text-sky-950 shadow-sm shadow-sky-200/60 ring-1 ring-sky-300/70',
+    activeIcon: 'bg-sky-600 text-white',
+    idle: 'border-sky-200/90 bg-sky-50/90 text-sky-800 hover:border-sky-400 hover:bg-sky-100',
+    idleIcon: 'bg-sky-200/80 text-sky-700',
+    dot: 'bg-sky-600',
+  },
+}
+
+function HostQuestionActionButton({
+  disabled,
+  onClick,
+  icon: Icon,
+  label,
+  active = false,
+  tone = 'emerald',
+  title,
+}) {
+  const styles = HOST_ACTION_TONES[tone] || HOST_ACTION_TONES.emerald
+  const tooltip = title || label
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      title={tooltip}
+      aria-pressed={active}
+      className={`group inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
+        active ? styles.active : styles.idle
+      }`}
+    >
+      <span
+        className={`grid size-7 shrink-0 place-items-center rounded-md transition-colors ${
+          active ? styles.activeIcon : styles.idleIcon
+        }`}
+      >
+        <Icon className="size-3.5" strokeWidth={2.25} aria-hidden />
+      </span>
+      <span className="whitespace-nowrap">{label}</span>
+      {active ? (
+        <span className={`size-1.5 shrink-0 rounded-full ${styles.dot}`} aria-hidden />
+      ) : null}
+    </button>
+  )
 }
 
 function HostAlertModal({ open, variant = 'success', title, message, confirmLabel, onClose }) {
@@ -718,19 +787,19 @@ function LivePage() {
               type="button"
               onClick={() => setPreviewOpen(true)}
               disabled={!activeQuestion}
-              className="shrink-0 rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200/90 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-navy-200 hover:bg-slate-50 disabled:opacity-50"
             >
-              <Eye className="mr-2 inline size-4" />
+              <Eye className="size-3.5" />
               Preview
             </button>
           </div>
 
 
           {activeQuestion ? (
-            <div className="space-y-2">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
+            <div className="mt-3 border-t border-slate-200/80 pt-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Host controls</p>
+              <div className="flex flex-wrap gap-2">
+                <HostQuestionActionButton
                   disabled={!canEditLive || questionLiveMutation.isPending}
                   onClick={() =>
                     questionLiveMutation.mutate({
@@ -738,13 +807,18 @@ function LivePage() {
                       isLive: !activeQuestion.isLive,
                     })
                   }
-                  className={hostQuestionActionBtnClass(activeQuestion.isLive)}
-                >
-                  {activeQuestion.isLive ? 'Deactivate Question' : 'Activate Question'}
-                </button>
+                  icon={activeQuestion.isLive ? Square : Play}
+                  label={activeQuestion.isLive ? 'Deactivate' : 'Activate'}
+                  title={
+                    activeQuestion.isLive
+                      ? 'Stop accepting new responses'
+                      : 'Let participants answer this question'
+                  }
+                  active={activeQuestion.isLive}
+                  tone={activeQuestion.isLive ? 'rose' : 'emerald'}
+                />
                 {questionSupportsAnswerReveal(activeQuestion.type, activeQuestion.isQuizMode) ? (
-                  <button
-                    type="button"
+                  <HostQuestionActionButton
                     disabled={!canEditLive || answerRevealMutation.isPending}
                     onClick={() =>
                       answerRevealMutation.mutate({
@@ -752,28 +826,19 @@ function LivePage() {
                         revealed: !activeQuestion.answerRevealed,
                       })
                     }
-                    className={hostQuestionActionBtnClass(activeQuestion.answerRevealed)}
-                  >
-                    {activeQuestion.answerRevealed ? (
-                      <>
-                        <EyeOff className="size-4 shrink-0" />
-                        Hide Answer
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="size-4 shrink-0" />
-                        Reveal Answer
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <div className="hidden sm:block" aria-hidden />
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    icon={activeQuestion.answerRevealed ? EyeOff : Eye}
+                    label={activeQuestion.answerRevealed ? 'Hide answer' : 'Reveal answer'}
+                    title={
+                      activeQuestion.answerRevealed
+                        ? 'Correct answer is visible to participants'
+                        : 'Show the correct answer on participant screens'
+                    }
+                    active={activeQuestion.answerRevealed}
+                    tone="violet"
+                  />
+                ) : null}
                 {canEditLive && activeQuestion.isQuizMode ? (
-                  <button
-                    type="button"
+                  <HostQuestionActionButton
                     disabled={questionLeaderboardMutation.isPending}
                     onClick={() =>
                       questionLeaderboardMutation.mutate({
@@ -781,30 +846,29 @@ function LivePage() {
                         visible: !activeQuestion.showLeaderboard,
                       })
                     }
-                    className={hostQuestionActionBtnClass(activeQuestion.showLeaderboard)}
-                  >
-                    <Trophy className="size-4 shrink-0" />
-                    {activeQuestion.showLeaderboard
-                      ? 'Hide leaderboard for this question'
-                      : 'Show leaderboard for this question'}
-                  </button>
-                ) : (
-                  <div className="hidden sm:block" aria-hidden />
-                )}
-                <button
-                  type="button"
+                    icon={Trophy}
+                    label="Leaderboard"
+                    title={
+                      activeQuestion.showLeaderboard
+                        ? 'Hide ranking for this question'
+                        : 'Show ranking for this question only'
+                    }
+                    active={activeQuestion.showLeaderboard}
+                    tone="amber"
+                  />
+                ) : null}
+                <HostQuestionActionButton
                   disabled={!canEditLive || reattemptMutation.isPending}
                   onClick={handleOpenForReattempt}
+                  icon={RotateCcw}
+                  label={reattemptMutation.isPending ? 'Opening…' : 'Reattempt'}
                   title={
                     !activeQuestion.isLive
-                      ? 'Question will be activated and opened for another attempt'
-                      : undefined
+                      ? 'Activates the question and opens another attempt'
+                      : 'Allow another attempt on this question'
                   }
-                  className={hostQuestionActionBtnClass(false)}
-                >
-                  <RotateCcw className="size-4 shrink-0" />
-                  {reattemptMutation.isPending ? 'Opening…' : 'Open for reattempt'}
-                </button>
+                  tone="sky"
+                />
               </div>
             </div>
           ) : null}
