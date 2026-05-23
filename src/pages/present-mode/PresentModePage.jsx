@@ -1,0 +1,184 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { Maximize2, Minimize2 } from 'lucide-react'
+import { useAuthStore } from '../../store/authStore'
+import { useLiveSession } from '../../hooks/useLiveSession'
+import { LeaderboardSlide } from './LeaderboardSlide'
+import { ParticipantsSlide } from './ParticipantsSlide'
+import { PresentNavButton, PresentShell } from './PresentShell'
+import { QuestionSlide } from './QuestionSlide'
+
+function PresentModePage() {
+  const [searchParams] = useSearchParams()
+  const sessionId = searchParams.get('session') || ''
+  const accessToken = useAuthStore((state) => state.accessToken)
+
+  const { session, mappedQuestions, responses, participants, leaderboard, isLoading, isError } =
+    useLiveSession(accessToken, sessionId)
+
+  const [slideIndex, setSlideIndex] = useState(0)
+  const [detailIndexByQuestion, setDetailIndexByQuestion] = useState({})
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  const slides = useMemo(() => {
+    const list = [{ type: 'participants' }]
+    mappedQuestions.forEach((q, i) => list.push({ type: 'question', question: q, questionNumber: i + 1 }))
+    list.push({ type: 'leaderboard' })
+    return list
+  }, [mappedQuestions])
+
+  const slideTotal = slides.length
+  const currentSlide = slides[slideIndex]
+
+  const goPrev = useCallback(() => {
+    setSlideIndex((i) => Math.max(0, i - 1))
+  }, [])
+
+  const goNext = useCallback(() => {
+    setSlideIndex((i) => Math.min(slideTotal - 1, i + 1))
+  }, [slideTotal])
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        goPrev()
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        goNext()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [goPrev, goNext])
+
+  useEffect(() => {
+    const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      } else {
+        await document.documentElement.requestFullscreen()
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const setDetailForQuestion = (questionId, index) => {
+    setDetailIndexByQuestion((prev) => ({ ...prev, [String(questionId)]: index }))
+  }
+
+  if (!sessionId) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-linear-to-br from-slate-50 via-blue-50 to-indigo-100/70 p-8">
+        <p className="text-center text-lg text-slate-600">
+          Missing session. Open present mode from the Live page.
+        </p>
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-linear-to-br from-slate-50 via-blue-50 to-indigo-100/70">
+        <p className="text-lg font-medium text-slate-600">Loading presentation…</p>
+      </div>
+    )
+  }
+
+  if (isError || !session) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-linear-to-br from-slate-50 via-blue-50 to-indigo-100/70 p-8">
+        <p className="text-center text-lg text-red-700">Session not found.</p>
+      </div>
+    )
+  }
+
+  const sessionTitle = session.title || 'Live session'
+
+  return (
+    <PresentShell
+      footer={
+        <footer className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-4 border-t border-blue-200/50 bg-white/60 px-[clamp(1.5rem,4vw,4rem)] py-4 backdrop-blur-sm">
+          <PresentNavButton
+            direction="prev"
+            label="Previous"
+            onClick={goPrev}
+            disabled={slideIndex <= 0}
+          />
+          <div className="flex flex-col items-center gap-2 sm:flex-row">
+            <p className="hidden text-xs font-medium text-slate-500 sm:block">
+              ← → arrow keys to change slides
+            </p>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="inline-flex items-center gap-2 rounded-xl border border-blue-200/80 bg-white/90 px-4 py-3 text-sm font-semibold text-navy-800 shadow-sm transition hover:bg-white"
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="size-4" />
+                  Exit fullscreen
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="size-4" />
+                  Fullscreen
+                </>
+              )}
+            </button>
+          </div>
+          <PresentNavButton
+            direction="next"
+            label="Next"
+            onClick={goNext}
+            disabled={slideIndex >= slideTotal - 1}
+          />
+        </footer>
+      }
+    >
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      {currentSlide?.type === 'participants' ? (
+        <ParticipantsSlide
+          sessionTitle={sessionTitle}
+          participants={participants}
+          slideIndex={slideIndex + 1}
+          slideTotal={slideTotal}
+        />
+      ) : null}
+
+      {currentSlide?.type === 'question' ? (
+        <QuestionSlide
+          accessToken={accessToken}
+          sessionTitle={sessionTitle}
+          question={currentSlide.question}
+          questionNumber={currentSlide.questionNumber}
+          allResponses={responses}
+          slideIndex={slideIndex + 1}
+          slideTotal={slideTotal}
+          detailIndex={detailIndexByQuestion[String(currentSlide.question.id)] ?? -1}
+          onDetailIndexChange={(index) => setDetailForQuestion(currentSlide.question.id, index)}
+        />
+      ) : null}
+
+      {currentSlide?.type === 'leaderboard' ? (
+        <LeaderboardSlide
+          sessionTitle={sessionTitle}
+          leaderboard={leaderboard}
+          slideIndex={slideIndex + 1}
+          slideTotal={slideTotal}
+        />
+      ) : null}
+      </div>
+    </PresentShell>
+  )
+}
+
+export default PresentModePage

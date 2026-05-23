@@ -8,6 +8,7 @@ import LivePage from './pages/LivePage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import ReportsPage from './pages/ReportsPage'
 import ParticipantSessionPage from './pages/participant-session'
+import PresentModePage from './pages/present-mode'
 import { SessionsProvider } from './context/SessionsContext'
 import { useAuthStore } from './store/authStore'
 
@@ -46,6 +47,10 @@ function App() {
         <Routes>
           <Route path="/join/:sessionId" element={<ParticipantSessionPage />} />
           <Route path="/join" element={<ParticipantSessionPage />} />
+          <Route
+            path="/present"
+            element={user ? <PresentModePage /> : <Navigate to="/login" replace />}
+          />
           <Route
             path="/login"
             element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />}

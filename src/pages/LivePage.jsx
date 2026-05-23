@@ -20,6 +20,7 @@ import {
   Info,
   PieChart as PieChartIcon,
   Play,
+  Presentation,
   RotateCcw,
   Share2,
   Square,
@@ -636,7 +637,7 @@ function LivePage() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Live Present Mode</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Live session</p>
           <p className="mt-1 text-lg font-bold text-navy-900">{session.title}</p>
           <p className="mt-1 text-xs text-slate-600">
             Session {session.session_id} • {statusLabel} • Socket: {socketStatus}
@@ -682,6 +683,17 @@ function LivePage() {
           >
             <Trophy className="size-4" />
             Leaderboard
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const url = `${window.location.origin}/present?session=${encodeURIComponent(sessionId)}`
+              window.open(url, '_blank', 'noopener,noreferrer')
+            }}
+            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-navy-900/20 transition hover:brightness-110"
+          >
+            <Presentation className="size-4" />
+            Present
           </button>
           <button
             type="button"
