@@ -7,7 +7,7 @@ import BuilderPage from './pages/BuilderPage'
 import LivePage from './pages/LivePage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import ReportsPage from './pages/ReportsPage'
-import ParticipantSessionPage from './pages/ParticipantSessionPage'
+import ParticipantSessionPage from './pages/participant-session'
 import { SessionsProvider } from './context/SessionsContext'
 import { useAuthStore } from './store/authStore'
 
