@@ -45,11 +45,13 @@ export function ActiveQuestionPanel({
   return (
     <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-navy-700">
-            Question {displayQuestionIndex + 1} / {activeQuestions.length}
-          </p>
-        </div>
+        {navigationEnabled ? (
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-navy-700">
+              Question {displayQuestionIndex + 1} / {activeQuestions.length}
+            </p>
+          </div>
+        ) : null}
         {navigationEnabled && hasCountdown && !canGoToNextQuestion && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             Answer this question or wait for the timer to use Next.
@@ -151,7 +153,7 @@ export function ActiveQuestionPanel({
       )}
 
       <div
-        className={`flex items-center gap-2 ${navigationEnabled ? 'justify-between' : 'justify-end'}`}
+        className={`flex items-center gap-2 ${navigationEnabled ? 'justify-between' : 'justify-center'}`}
       >
         {navigationEnabled ? (
           <button
@@ -164,7 +166,9 @@ export function ActiveQuestionPanel({
             Previous
           </button>
         ) : null}
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div
+          className={`flex flex-wrap items-center gap-2 ${navigationEnabled ? 'justify-end' : 'justify-center'}`}
+        >
           {navigationEnabled && isLastDisplayedQuestion && submitted && !hasCountdown && (
             <button
               type="button"
