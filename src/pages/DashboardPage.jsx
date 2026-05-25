@@ -177,12 +177,13 @@ function DashboardPage() {
       live: 'Live',
       paused: 'Live',
       completed: 'Completed',
-      archived: 'Completed',
     }
 
     const departmentsById = new Map(departments.map((d) => [String(d.dept_id), d.name]))
 
-    return (sessionsQuery.data || []).map((session) => ({
+    return (sessionsQuery.data || [])
+      .filter((session) => session.status !== 'archived')
+      .map((session) => ({
       ...session,
       id: session.session_id,
       date: (session.created_at || '').slice(0, 10),
