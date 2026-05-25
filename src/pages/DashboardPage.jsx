@@ -46,7 +46,7 @@ function DashboardPage() {
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
   const [join_type, setJoinType] = useState('name')
   const [overallLeaderboard, setOverallLeaderboard] = useState(true)
-  const [enableNavigation, setEnableNavigation] = useState(true)
+  const [enableNavigation, setEnableNavigation] = useState(false)
 
   const { departmentId, departments } = useShell()
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
@@ -307,7 +307,7 @@ function DashboardPage() {
       },
     })
     setCreateOpen(false)
-    setEnableNavigation(true)
+    setEnableNavigation(false)
   }
 
   return (
@@ -459,20 +459,25 @@ function DashboardPage() {
             </select>
           </div>
           <div className="md:col-span-2">
-            <label className="text-sm font-semibold text-slate-700" htmlFor="enable-navigation">
-              Enable navigation
+            <label className="text-sm font-semibold text-slate-700" htmlFor="question-availability">
+              Question availability
             </label>
             <select
-              id="enable-navigation"
+              id="question-availability"
               value={enableNavigation ? 'enabled' : 'disabled'}
               onChange={(e) => setEnableNavigation(e.target.value === 'enabled')}
               className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
             >
-              <option value="enabled">Enabled — participants can move between questions</option>
-              <option value="disabled">Disabled — one question at a time, host advances</option>
+              <option value="disabled">
+                Single active question — one live question at a time, host-led pacing
+              </option>
+              <option value="enabled">
+                Multiple active questions — participants can access all live questions
+              </option>
             </select>
             <p className="mt-1 text-xs text-slate-500">
-              When disabled, participants only see the active question and cannot use Previous or Next.
+              Multiple mode lets you activate several questions at once; participants browse between them.
+              Single mode shows only the current live question until the host advances.
             </p>
           </div>
           <div className="md:col-span-2">
