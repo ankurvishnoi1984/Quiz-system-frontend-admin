@@ -202,11 +202,7 @@ export function ActiveQuestionPanel({
                     : undefined
             }
             onClick={onNextOrSubmit}
-            className={`h-11 rounded-xl px-4 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-              navigationEnabled && !isLastDisplayedQuestion
-                ? 'border border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                : 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow-lg shadow-blue-900/20 hover:brightness-110'
-            }`}
+            className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting
               ? 'Submitting...'
