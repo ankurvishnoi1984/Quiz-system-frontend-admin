@@ -1,4 +1,4 @@
-import { Download, Link2, QrCode, Hash } from 'lucide-react'
+import { Check, Copy, Download, Hash, Link2, QrCode } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { getSessionQrApi } from '../../services/dashboardApi'
@@ -100,19 +100,27 @@ function QrImageActions({ dataUrl, filename }) {
   )
 }
 
-function CopyButton({ value, disabled, className = '', label = 'Copy', copiedLabel = 'Copied ✓' }) {
+function useCopyToClipboard() {
   const [copied, setCopied] = useState(false)
+
+  const copy = (value) => {
+    if (!value) return
+    navigator.clipboard.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return { copied, copy }
+}
+
+function CopyButton({ value, disabled, className = '', label = 'Copy', copiedLabel = 'Copied ✓' }) {
+  const { copied, copy } = useCopyToClipboard()
 
   return (
     <button
       type="button"
       disabled={disabled || !value}
-      onClick={() => {
-        if (!value) return
-        navigator.clipboard.writeText(value)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1500)
-      }}
+      onClick={() => copy(value)}
       className={`h-11 shrink-0 rounded-xl border px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
         copied
           ? 'scale-95 border-green-300 bg-green-100 text-green-700'
@@ -120,6 +128,42 @@ function CopyButton({ value, disabled, className = '', label = 'Copy', copiedLab
       } ${className}`}
     >
       {copied ? copiedLabel : label}
+    </button>
+  )
+}
+
+function CopyIconButton({
+  value,
+  disabled,
+  ariaLabel = 'Copy link',
+  showLabel = false,
+  attached = false,
+}) {
+  const { copied, copy } = useCopyToClipboard()
+
+  return (
+    <button
+      type="button"
+      disabled={disabled || !value}
+      aria-label={copied ? 'Copied' : ariaLabel}
+      title={copied ? 'Copied' : ariaLabel}
+      onClick={() => copy(value)}
+      className={`inline-flex shrink-0 items-center justify-center gap-1 transition disabled:cursor-not-allowed disabled:opacity-50 ${
+        attached
+          ? `h-11 border-l border-blue-200/70 px-3 text-xs font-semibold ${
+              copied
+                ? 'bg-green-50 text-green-700'
+                : 'bg-blue-50/50 text-navy-700 hover:bg-blue-50'
+            }`
+          : `h-9 w-9 rounded-lg border ${
+              copied
+                ? 'border-green-300 bg-green-100 text-green-700'
+                : 'border-blue-200 bg-white text-slate-600 hover:bg-blue-50'
+            }`
+      }`}
+    >
+      {copied ? <Check className="size-4 shrink-0" /> : <Copy className="size-4 shrink-0" />}
+      {showLabel ? <span>{copied ? 'Copied' : 'Copy link'}</span> : null}
     </button>
   )
 }
@@ -236,7 +280,20 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
             ) : null}
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Join link</p>
-              <p className="mt-1 break-all text-sm text-slate-700">{shareJoinUrl || 'Generating link…'}</p>
+              <div className="mt-1 flex overflow-hidden rounded-xl border border-blue-200/70 bg-white">
+                <input
+                  readOnly
+                  value={shareJoinUrl || 'Generating link…'}
+                  className="h-11 min-w-0 flex-1 border-0 bg-transparent px-3 text-sm text-slate-700 outline-none"
+                  aria-label="Join link"
+                />
+                <CopyIconButton
+                  value={shareJoinUrl}
+                  disabled={!shareJoinUrl}
+                  attached
+                  showLabel
+                />
+              </div>
             </div>
           </div>
           <CopyButton
@@ -246,7 +303,7 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
             className="w-full"
           />
           <p className="text-xs text-slate-500">
-            Copies session details and the join link — paste into email, chat, or any messaging app.
+            Use Copy link on the field for the URL only, or Copy all for session details plus the join link.
           </p>
         </div>
       )}
