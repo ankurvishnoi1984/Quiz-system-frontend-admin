@@ -30,6 +30,9 @@ import {
   buildResponsePayloadForQuestion,
   canAutoNavigateToActivatedQuestion,
   clamp,
+  findNextUnsubmittedActiveQuestion,
+  getLockedNavigationQuestion,
+  isParticipantAttemptingQuestion,
   mapQuestionType,
   participantQuestionHasAnswer,
 } from './utils/questionUtils'
@@ -194,16 +197,30 @@ function ParticipantSessionPage() {
   const isSessionEnded =
     session?.status === 'completed' || session?.status === 'archived'
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
+  const navigationEnabled = session?.participant_navigation_enabled !== false
 
   const question = useMemo(() => {
     if (!activeQuestions.length) return null
+    if (!navigationEnabled) {
+      return getLockedNavigationQuestion(
+        activeQuestions,
+        liveQuestionId,
+        quizSubmittedQuestionIds,
+      )
+    }
     if (liveQuestionId) {
       const live = activeQuestions.find((q) => q.id === liveQuestionId)
       if (live) return live
     }
     const idx = clamp(questionIndex, 0, activeQuestions.length - 1)
     return activeQuestions[idx] ?? null
-  }, [activeQuestions, liveQuestionId, questionIndex])
+  }, [
+    activeQuestions,
+    liveQuestionId,
+    questionIndex,
+    navigationEnabled,
+    quizSubmittedQuestionIds,
+  ])
 
   const joinRequirement = session?.join_type || 'name'
   const timeLimit = question?.timeLimit ?? 0
@@ -252,19 +269,42 @@ function ParticipantSessionPage() {
       return false
     }
 
-    const canNavigate = canAutoNavigateToActivatedQuestion({
-      activeQuestions: visibleActiveQuestions,
-      liveQuestionId: store.quizLiveQuestionId,
-      questionIndex: store.quizQuestionIndex,
-      quizSubmittedQuestionIds: store.quizSubmittedQuestionIds,
-    })
+    const canNavigate = navigationEnabled
+      ? canAutoNavigateToActivatedQuestion({
+          activeQuestions: visibleActiveQuestions,
+          liveQuestionId: store.quizLiveQuestionId,
+          questionIndex: store.quizQuestionIndex,
+          quizSubmittedQuestionIds: store.quizSubmittedQuestionIds,
+        })
+      : !isParticipantAttemptingQuestion(
+          getLockedNavigationQuestion(
+            visibleActiveQuestions,
+            store.quizLiveQuestionId,
+            store.quizSubmittedQuestionIds,
+          ),
+          store.quizSubmittedQuestionIds,
+        )
     if (!canNavigate) return false
 
     pendingActivatedQuestionIdRef.current = null
     setStep('active')
     setLiveQuestionId(pendingId)
+    setSubmitted(false)
     return true
-  }, [setLiveQuestionId])
+  }, [navigationEnabled, setLiveQuestionId, setSubmitted])
+
+  const advanceToNextUnsubmittedActiveQuestion = useCallback(() => {
+    if (navigationEnabled) return false
+    const store = useParticipantStore.getState()
+    const submittedIds = store.quizSubmittedQuestionIds || {}
+    const visible = activeQuestionsRef.current
+    const currentId = store.quizLiveQuestionId ?? question?.id ?? null
+    const next = findNextUnsubmittedActiveQuestion(visible, submittedIds, currentId)
+    if (!next) return false
+    setLiveQuestionId(next.id)
+    setSubmitted(false)
+    return true
+  }, [navigationEnabled, question?.id, setLiveQuestionId, setSubmitted])
 
   const handleHostQuestionActivated = useCallback(
     (questionId) => {
@@ -456,6 +496,8 @@ function ParticipantSessionPage() {
           ? {
               ...old,
               leaderboard_enabled: data.leaderboard_enabled ?? old.leaderboard_enabled,
+              participant_navigation_enabled:
+                data.participant_navigation_enabled ?? old.participant_navigation_enabled,
             }
           : old,
       )
@@ -520,6 +562,22 @@ function ParticipantSessionPage() {
       return
     }
 
+    if (!navigationEnabled) {
+      const locked = getLockedNavigationQuestion(
+        activeQuestions,
+        liveQuestionId,
+        quizSubmittedQuestionIds,
+      )
+      if (locked) {
+        const idx = activeQuestions.findIndex((q) => q.id === locked.id)
+        if (idx !== -1) setQuestionIndex(idx)
+        if (liveQuestionId !== locked.id) {
+          setLiveQuestionId(locked.id)
+        }
+      }
+      return
+    }
+
     if (liveQuestionId) {
       const idx = activeQuestions.findIndex((q) => q.id === liveQuestionId)
       if (idx !== -1) {
@@ -530,7 +588,31 @@ function ParticipantSessionPage() {
     }
 
     setQuestionIndex((prev) => clamp(prev, 0, activeQuestions.length - 1))
-  }, [activeQuestions, liveQuestionId, setLiveQuestionId, setQuestionIndex])
+  }, [
+    activeQuestions,
+    liveQuestionId,
+    navigationEnabled,
+    quizSubmittedQuestionIds,
+    setLiveQuestionId,
+    setQuestionIndex,
+  ])
+
+  useEffect(() => {
+    if (navigationEnabled || step !== 'active' || !activeQuestions.length) return
+    const submittedIds = quizSubmittedQuestionIds || {}
+    const currentId = question?.id
+    if (!currentId || !submittedIds[String(currentId)]) return
+    if (tryApplyPendingActivatedQuestion()) return
+    advanceToNextUnsubmittedActiveQuestion()
+  }, [
+    navigationEnabled,
+    step,
+    activeQuestions,
+    question?.id,
+    quizSubmittedQuestionIds,
+    tryApplyPendingActivatedQuestion,
+    advanceToNextUnsubmittedActiveQuestion,
+  ])
 
   const displayQuestionIndex = useMemo(() => {
     if (!question?.id || !activeQuestions.length) return 0
@@ -538,8 +620,15 @@ function ParticipantSessionPage() {
     return idx !== -1 ? idx : clamp(questionIndex, 0, activeQuestions.length - 1)
   }, [question?.id, activeQuestions, questionIndex])
 
-  const isLastDisplayedQuestion =
-    activeQuestions.length > 0 && displayQuestionIndex === activeQuestions.length - 1
+  const isLastDisplayedQuestion = navigationEnabled
+    ? activeQuestions.length > 0 && displayQuestionIndex === activeQuestions.length - 1
+    : true
+
+  const canSubmitCurrentQuestion = useMemo(() => {
+    if (!question?.id) return false
+    if ((quizSubmittedQuestionIds || {})[String(question.id)]) return false
+    return participantQuestionHasAnswer(question, responses[question.id])
+  }, [question, responses, quizSubmittedQuestionIds])
 
   const hasFinalizePayload = useMemo(
     () =>
@@ -565,7 +654,7 @@ function ParticipantSessionPage() {
 
   const goToQuestionIndex = useCallback(
     (nextIndex) => {
-      if (!activeQuestions.length) return
+      if (!navigationEnabled || !activeQuestions.length) return
       const n = clamp(nextIndex, 0, activeQuestions.length - 1)
       if (hasCountdown && n > displayQuestionIndex && !canGoToNextQuestion) return
       setLiveQuestionId(null)
@@ -576,6 +665,7 @@ function ParticipantSessionPage() {
       hasCountdown,
       displayQuestionIndex,
       canGoToNextQuestion,
+      navigationEnabled,
       setLiveQuestionId,
       setQuestionIndex,
     ],
@@ -773,8 +863,53 @@ function ParticipantSessionPage() {
     }
   }
 
+  const handleSubmitCurrentQuestion = async () => {
+    if (isSessionEnded || !question?.id) return
+    if ((quizSubmittedQuestionIds || {})[String(question.id)]) {
+      const moved = tryApplyPendingActivatedQuestion() || advanceToNextUnsubmittedActiveQuestion()
+      if (!moved) {
+        setSubmitModal({
+          variant: 'success',
+          title: 'Already submitted',
+          message: 'Please wait for the host to open the next question.',
+          confirmLabel: 'OK',
+        })
+      }
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      const ok = await submitQuestionById(question.id)
+      if (ok) {
+        setSubmitted(true)
+        const moved =
+          tryApplyPendingActivatedQuestion() || advanceToNextUnsubmittedActiveQuestion()
+        if (moved) {
+          setSubmitted(false)
+        }
+        setSubmitModal({
+          variant: 'success',
+          title: 'Submission successful',
+          message: moved
+            ? 'Your answer was submitted. Continue with the next question when you are ready.'
+            : 'Your answer was submitted. Please wait for the host to open the next question.',
+          confirmLabel: 'Continue',
+        })
+      } else {
+        setSubmitModal({
+          variant: 'error',
+          title: 'Submission failed',
+          message: 'We could not submit your answer. Check your connection and try again.',
+          confirmLabel: 'Try again',
+        })
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const handleNext = async () => {
-    if (isSessionEnded) return
+    if (isSessionEnded || !navigationEnabled) return
     if (!question?.id || isLastDisplayedQuestion) return
     if (participantQuestionHasAnswer(question, responses[question.id])) {
       await submitQuestionById(question.id)
@@ -788,7 +923,7 @@ function ParticipantSessionPage() {
   }
 
   const handlePrevious = () => {
-    if (displayQuestionIndex <= 0) return
+    if (!navigationEnabled || displayQuestionIndex <= 0) return
     goToQuestionIndex(displayQuestionIndex - 1)
   }
 
@@ -816,6 +951,10 @@ function ParticipantSessionPage() {
 
   const handleNextOrSubmit = async () => {
     if (isSessionEnded) return
+    if (!navigationEnabled) {
+      await handleSubmitCurrentQuestion()
+      return
+    }
     if (isLastDisplayedQuestion) {
       await handleSubmit()
       return
@@ -840,10 +979,26 @@ function ParticipantSessionPage() {
     if (timer > 0) return
     if (questionLockedBySubmission) return
 
+    const qid = question?.id
+
+    if (!navigationEnabled) {
+      const timeout = setTimeout(async () => {
+        if (qid != null) {
+          await submitQuestionById(qid)
+        }
+        setSubmitted(true)
+        const moved =
+          tryApplyPendingActivatedQuestion() || advanceToNextUnsubmittedActiveQuestion()
+        if (moved) {
+          setSubmitted(false)
+        }
+      }, 800)
+      return () => clearTimeout(timeout)
+    }
+
     const isLast = isLastDisplayedQuestion
 
     if (!isLast) {
-      const qid = question?.id
       const nextIdx = displayQuestionIndex + 1
       const timeout = setTimeout(async () => {
         if (qid != null) {
@@ -865,6 +1020,7 @@ function ParticipantSessionPage() {
     }
   }, [
     isSessionEnded,
+    navigationEnabled,
     timer,
     step,
     displayQuestionIndex,
@@ -875,6 +1031,7 @@ function ParticipantSessionPage() {
     isLastDisplayedQuestion,
     submitQuestionById,
     tryApplyPendingActivatedQuestion,
+    advanceToNextUnsubmittedActiveQuestion,
     setLiveQuestionId,
     setQuestionIndex,
   ])
@@ -1117,9 +1274,10 @@ function ParticipantSessionPage() {
             sessionEnded={isSessionEnded}
             tagsInput={tagsInput}
             submitted={submitted}
+            navigationEnabled={navigationEnabled}
             isLastDisplayedQuestion={isLastDisplayedQuestion}
             isSubmitting={isSubmitting}
-            hasFinalizePayload={hasFinalizePayload}
+            hasFinalizePayload={navigationEnabled ? hasFinalizePayload : canSubmitCurrentQuestion}
             showCurrentQuestionLeaderboard={showCurrentQuestionLeaderboard}
             currentQuestionLeaderboard={currentQuestionLeaderboard}
             onTagsInputChange={setTagsInput}

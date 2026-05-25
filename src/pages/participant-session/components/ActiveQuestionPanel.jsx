@@ -25,6 +25,7 @@ export function ActiveQuestionPanel({
   canSeeAnswerReveal,
   participantAnswerIsCorrect,
   sessionEnded = false,
+  navigationEnabled = true,
   tagsInput,
   submitted,
   isLastDisplayedQuestion,
@@ -49,20 +50,25 @@ export function ActiveQuestionPanel({
             Question {displayQuestionIndex + 1} / {activeQuestions.length}
           </p>
         </div>
-        {hasCountdown && !canGoToNextQuestion && (
+        {navigationEnabled && hasCountdown && !canGoToNextQuestion && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             Answer this question or wait for the timer to use Next.
           </p>
         )}
-        {hasCountdown && canGoToNextQuestion && inputsLocked && (
+        {navigationEnabled && hasCountdown && canGoToNextQuestion && inputsLocked && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             Timed: use Previous and Next to browse; answers cannot be changed after submit or when
             time runs out.
           </p>
         )}
-        {!hasCountdown && hasAnyQuestionSaved && (
+        {navigationEnabled && !hasCountdown && hasAnyQuestionSaved && (
           <p className="max-w-[min(100%,18rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             No timer: revisit questions with Previous; use Submit on the last question to update.
+          </p>
+        )}
+        {!navigationEnabled && (
+          <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
+            Answer and submit; the host will show the next question when ready.
           </p>
         )}
       </div>
@@ -144,18 +150,22 @@ export function ActiveQuestionPanel({
         />
       )}
 
-      <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          aria-label="Previous question"
-          disabled={displayQuestionIndex <= 0}
-          onClick={onPrevious}
-          className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Previous
-        </button>
+      <div
+        className={`flex items-center gap-2 ${navigationEnabled ? 'justify-between' : 'justify-end'}`}
+      >
+        {navigationEnabled ? (
+          <button
+            type="button"
+            aria-label="Previous question"
+            disabled={displayQuestionIndex <= 0}
+            onClick={onPrevious}
+            className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Previous
+          </button>
+        ) : null}
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {isLastDisplayedQuestion && submitted && !hasCountdown && (
+          {navigationEnabled && isLastDisplayedQuestion && submitted && !hasCountdown && (
             <button
               type="button"
               onClick={onGoToQa}
@@ -166,42 +176,44 @@ export function ActiveQuestionPanel({
           )}
           <button
             type="button"
-            aria-label={isLastDisplayedQuestion ? 'Submit all answers and finish' : 'Next question'}
+            aria-label={
+              navigationEnabled && !isLastDisplayedQuestion ? 'Next question' : 'Submit answer'
+            }
             disabled={
               sessionEnded ||
               isSubmitting ||
-              (isLastDisplayedQuestion
-                ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
-                : hasCountdown && !canGoToNextQuestion)
+              (navigationEnabled
+                ? isLastDisplayedQuestion
+                  ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
+                  : hasCountdown && !canGoToNextQuestion
+                : !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion))
             }
             title={
               sessionEnded
                 ? 'Session has ended'
                 : hasCountdown && !canGoToNextQuestion
                   ? 'Answer this question or wait for the timer'
-                  : isLastDisplayedQuestion && !hasFinalizePayload
-                    ? 'Answer the open question(s) before submitting'
+                  : !hasFinalizePayload
+                    ? 'Answer this question before submitting'
                     : undefined
             }
             onClick={onNextOrSubmit}
             className={`h-11 rounded-xl px-4 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-              isLastDisplayedQuestion
-                ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow-lg shadow-blue-900/20 hover:brightness-110'
-                : 'border border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+              navigationEnabled && !isLastDisplayedQuestion
+                ? 'border border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                : 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow-lg shadow-blue-900/20 hover:brightness-110'
             }`}
           >
             {isSubmitting
-              ? isLastDisplayedQuestion
-                ? 'Submitting...'
-                : 'Saving...'
-              : isLastDisplayedQuestion
-                ? 'Submit'
-                : 'Next'}
+              ? 'Submitting...'
+              : navigationEnabled && !isLastDisplayedQuestion
+                ? 'Next'
+                : 'Submit'}
           </button>
         </div>
       </div>
 
-      {submitted && !hasCountdown && !sessionEnded && (
+      {navigationEnabled && submitted && !hasCountdown && !sessionEnded && (
         <div className="flex gap-3 rounded-2xl border border-sky-200 bg-sky-50/90 p-4">
           <Pencil className="mt-0.5 size-5 shrink-0 text-sky-700" aria-hidden />
           <div>

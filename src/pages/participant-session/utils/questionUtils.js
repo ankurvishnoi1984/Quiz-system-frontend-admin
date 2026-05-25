@@ -92,6 +92,44 @@ export function canAutoNavigateToActivatedQuestion({
   return !isParticipantAttemptingQuestion(currentQuestion, quizSubmittedQuestionIds)
 }
 
+/**
+ * When navigation is disabled, pick the question the participant should see.
+ * Prefer host-targeted liveQuestionId, then first live question not yet submitted.
+ */
+export function getLockedNavigationQuestion(
+  activeQuestions,
+  liveQuestionId,
+  submittedIds = {},
+) {
+  if (!activeQuestions?.length) return null
+
+  if (liveQuestionId != null) {
+    const byId = activeQuestions.find((q) => q.id === liveQuestionId)
+    if (byId) return byId
+  }
+
+  const unsubmittedLive = activeQuestions.find(
+    (q) => q.isLive && !submittedIds?.[String(q.id)],
+  )
+  if (unsubmittedLive) return unsubmittedLive
+
+  const live = activeQuestions.find((q) => q.isLive)
+  if (live) return live
+
+  return activeQuestions[0] ?? null
+}
+
+/** Next active question the participant has not submitted yet (for locked navigation). */
+export function findNextUnsubmittedActiveQuestion(activeQuestions, submittedIds, currentQuestionId) {
+  if (!activeQuestions?.length) return null
+  return (
+    activeQuestions.find(
+      (q) =>
+        q.id !== currentQuestionId && !submittedIds?.[String(q.id)],
+    ) ?? null
+  )
+}
+
 export function participantQuestionHasAnswer(question, response = {}) {
   if (!question) return false
   if (question.type === 'MCQ' || question.type === 'True/False') {

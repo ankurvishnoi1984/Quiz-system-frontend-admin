@@ -46,6 +46,7 @@ function DashboardPage() {
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
   const [join_type, setJoinType] = useState('name')
   const [overallLeaderboard, setOverallLeaderboard] = useState(true)
+  const [enableNavigation, setEnableNavigation] = useState(true)
 
   const { departmentId, departments } = useShell()
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
@@ -300,10 +301,12 @@ function DashboardPage() {
         show_results_to_participants: true,
         allow_late_join: true,
         leaderboard_enabled: overallLeaderboard,
+        participant_navigation_enabled: enableNavigation,
         join_type: join_type || 'name',
       },
     })
     setCreateOpen(false)
+    setEnableNavigation(true)
   }
 
   return (
@@ -453,6 +456,23 @@ function DashboardPage() {
               <option value="name">Name only</option>
               <option value="name_email">Name + Email</option>
             </select>
+          </div>
+          <div className="md:col-span-2">
+            <label className="text-sm font-semibold text-slate-700" htmlFor="enable-navigation">
+              Enable navigation
+            </label>
+            <select
+              id="enable-navigation"
+              value={enableNavigation ? 'enabled' : 'disabled'}
+              onChange={(e) => setEnableNavigation(e.target.value === 'enabled')}
+              className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+            >
+              <option value="enabled">Enabled — participants can move between questions</option>
+              <option value="disabled">Disabled — one question at a time, host advances</option>
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              When disabled, participants only see the active question and cannot use Previous or Next.
+            </p>
           </div>
           <div className="md:col-span-2">
             <label className="flex items-center justify-between gap-3 rounded-xl border border-blue-200/70 bg-white px-3 py-3">
