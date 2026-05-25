@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Maximize2, Minimize2 } from 'lucide-react'
+import { HostAlertModal } from '../../components/live/HostAlertModal'
+import { HostQuestionControls } from '../../components/live/HostQuestionControls'
 import { useAuthStore } from '../../store/authStore'
+import { useHostQuestionMutations } from '../../hooks/useHostQuestionMutations'
 import { useLiveSession } from '../../hooks/useLiveSession'
 import { LeaderboardSlide } from './LeaderboardSlide'
 import { ParticipantsSlide } from './ParticipantsSlide'
@@ -19,6 +22,37 @@ function PresentModePage() {
   const [slideIndex, setSlideIndex] = useState(0)
   const [detailIndexByQuestion, setDetailIndexByQuestion] = useState({})
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [hostAlert, setHostAlert] = useState(null)
+
+  const canEditLive = session?.status === 'live'
+
+  const {
+    questionLiveMutation,
+    questionLeaderboardMutation,
+    answerRevealMutation,
+    reattemptMutation,
+    openForReattempt,
+  } = useHostQuestionMutations(accessToken, sessionId, {
+    onReattemptSuccess: (questionText) => {
+      const preview = String(questionText || '').trim()
+      setHostAlert({
+        variant: 'success',
+        title: 'Opened for reattempt',
+        message: preview
+          ? `Participants are being notified and can answer again:\n\n“${preview.slice(0, 120)}${preview.length > 120 ? '…' : ''}”`
+          : 'Participants are being notified and can answer this question again.',
+        confirmLabel: 'OK',
+      })
+    },
+    onReattemptError: (error) => {
+      setHostAlert({
+        variant: 'error',
+        title: 'Could not open for reattempt',
+        message: error.message || 'Something went wrong. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
+  })
 
   const slides = useMemo(() => {
     const list = [{ type: 'participants' }]
@@ -29,6 +63,7 @@ function PresentModePage() {
 
   const slideTotal = slides.length
   const currentSlide = slides[slideIndex]
+  const currentQuestion = currentSlide?.type === 'question' ? currentSlide.question : null
 
   const goPrev = useCallback(() => {
     setSlideIndex((i) => Math.max(0, i - 1))
@@ -106,78 +141,105 @@ function PresentModePage() {
   return (
     <PresentShell
       footer={
-        <footer className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-4 border-t border-blue-200/50 bg-white/60 px-[clamp(1.5rem,4vw,4rem)] py-4 backdrop-blur-sm">
-          <PresentNavButton
-            direction="prev"
-            label="Previous"
-            onClick={goPrev}
-            disabled={slideIndex <= 0}
-          />
-          <div className="flex flex-col items-center gap-2 sm:flex-row">
-            <p className="hidden text-xs font-medium text-slate-500 sm:block">
-              ← → arrow keys to change slides
-            </p>
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="inline-flex items-center gap-2 rounded-xl border border-blue-200/80 bg-white/90 px-4 py-3 text-sm font-semibold text-navy-800 shadow-sm transition hover:bg-white"
-            >
-              {isFullscreen ? (
-                <>
-                  <Minimize2 className="size-4" />
-                  Exit fullscreen
-                </>
-              ) : (
-                <>
-                  <Maximize2 className="size-4" />
-                  Fullscreen
-                </>
-              )}
-            </button>
+        <footer className="relative z-20 flex shrink-0 flex-col gap-3 border-t border-blue-200/50 bg-white/60 px-[clamp(1rem,3vw,3rem)] py-4 backdrop-blur-sm">
+          {currentQuestion ? (
+            <div className="w-full rounded-xl border border-blue-200/70 bg-white/90 px-4 py-3 shadow-sm">
+              <HostQuestionControls
+                question={currentQuestion}
+                canEditLive={canEditLive}
+                size="compact"
+                showLabel
+                questionLiveMutation={questionLiveMutation}
+                answerRevealMutation={answerRevealMutation}
+                questionLeaderboardMutation={questionLeaderboardMutation}
+                reattemptMutation={reattemptMutation}
+                onOpenForReattempt={() => openForReattempt(currentQuestion)}
+              />
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <PresentNavButton
+              direction="prev"
+              label="Previous"
+              onClick={goPrev}
+              disabled={slideIndex <= 0}
+            />
+            <div className="flex flex-col items-center gap-2 sm:flex-row">
+              <p className="hidden text-xs font-medium text-slate-500 sm:block">
+                ← → arrow keys to change slides
+              </p>
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className="inline-flex items-center gap-2 rounded-xl border border-blue-200/80 bg-white/90 px-4 py-3 text-sm font-semibold text-navy-800 shadow-sm transition hover:bg-white"
+              >
+                {isFullscreen ? (
+                  <>
+                    <Minimize2 className="size-4" />
+                    Exit fullscreen
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="size-4" />
+                    Fullscreen
+                  </>
+                )}
+              </button>
+            </div>
+            <PresentNavButton
+              direction="next"
+              label="Next"
+              onClick={goNext}
+              disabled={slideIndex >= slideTotal - 1}
+            />
           </div>
-          <PresentNavButton
-            direction="next"
-            label="Next"
-            onClick={goNext}
-            disabled={slideIndex >= slideTotal - 1}
-          />
         </footer>
       }
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      {currentSlide?.type === 'participants' ? (
-        <ParticipantsSlide
-          sessionTitle={sessionTitle}
-          participants={participants}
-          slideIndex={slideIndex + 1}
-          slideTotal={slideTotal}
-        />
-      ) : null}
+        {currentSlide?.type === 'participants' ? (
+          <ParticipantsSlide
+            sessionTitle={sessionTitle}
+            participants={participants}
+            slideIndex={slideIndex + 1}
+            slideTotal={slideTotal}
+          />
+        ) : null}
 
-      {currentSlide?.type === 'question' ? (
-        <QuestionSlide
-          key={currentSlide.question.id}
-          accessToken={accessToken}
-          sessionTitle={sessionTitle}
-          question={currentSlide.question}
-          questionNumber={currentSlide.questionNumber}
-          allResponses={responses}
-          slideIndex={slideIndex + 1}
-          slideTotal={slideTotal}
-          detailIndex={detailIndexByQuestion[String(currentSlide.question.id)] ?? -1}
-          onDetailIndexChange={(index) => setDetailForQuestion(currentSlide.question.id, index)}
-        />
-      ) : null}
+        {currentSlide?.type === 'question' ? (
+          <QuestionSlide
+            key={currentSlide.question.id}
+            accessToken={accessToken}
+            sessionTitle={sessionTitle}
+            question={currentSlide.question}
+            questionNumber={currentSlide.questionNumber}
+            allResponses={responses}
+            slideIndex={slideIndex + 1}
+            slideTotal={slideTotal}
+            detailIndex={detailIndexByQuestion[String(currentSlide.question.id)] ?? -1}
+            onDetailIndexChange={(index) => setDetailForQuestion(currentSlide.question.id, index)}
+          />
+        ) : null}
 
-      {currentSlide?.type === 'leaderboard' ? (
-        <LeaderboardSlide
-          sessionTitle={sessionTitle}
-          leaderboard={leaderboard}
-          slideIndex={slideIndex + 1}
-          slideTotal={slideTotal}
-        />
-      ) : null}
+        {currentSlide?.type === 'leaderboard' ? (
+          <LeaderboardSlide
+            sessionTitle={sessionTitle}
+            leaderboard={leaderboard}
+            slideIndex={slideIndex + 1}
+            slideTotal={slideTotal}
+          />
+        ) : null}
       </div>
+
+      <HostAlertModal
+        open={Boolean(hostAlert)}
+        variant={hostAlert?.variant ?? 'success'}
+        title={hostAlert?.title ?? ''}
+        message={hostAlert?.message ?? ''}
+        confirmLabel={hostAlert?.confirmLabel ?? 'OK'}
+        onClose={() => setHostAlert(null)}
+      />
     </PresentShell>
   )
 }

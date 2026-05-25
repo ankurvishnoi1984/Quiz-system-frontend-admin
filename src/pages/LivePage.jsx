@@ -13,19 +13,14 @@ import {
 } from 'recharts'
 import {
   BarChart3,
-  CheckCircle2,
   Eye,
-  EyeOff,
-  Info,
   PieChart as PieChartIcon,
   Play,
   Presentation,
-  RotateCcw,
   Share2,
   Square,
   Trophy,
   Users,
-  XCircle,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -35,6 +30,9 @@ import { renderPieLabel } from '../components/charts/renderPieLabel'
 import { CHART_COLORS, CHART_TOOLTIP_STYLE, getChartColor } from '../utils/chartColors'
 import ShareSessionPanel from '../components/dashboard/ShareSessionPanel'
 import Modal from '../components/ui/Modal'
+import { HostAlertModal } from '../components/live/HostAlertModal'
+import { HostQuestionControls } from '../components/live/HostQuestionControls'
+import { useHostQuestionMutations } from '../hooks/useHostQuestionMutations'
 import { LiveQaPanel } from '../components/leaderboard/LiveQaPanel'
 import { QuestionLeaderboardModal } from '../components/leaderboard/QuestionLeaderboardModal'
 import { QuestionLeaderboardPanel } from '../components/leaderboard/QuestionLeaderboardPanel'
@@ -53,180 +51,11 @@ import {
   listQaQuestionsApi,
   listSessionQuestionsApi,
   qaModerateApi,
-  openQuestionForReattemptApi,
-  setQuestionAnswerRevealedApi,
-  setQuestionLeaderboardVisibleApi,
-  setQuestionLiveStateApi,
   transitionSessionApi,
 } from '../services/liveApi'
-import { questionSupportsAnswerReveal } from '../utils/answerReveal'
 import { formatQuizSubmitTime } from '../utils/quizResponseTime'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 
-
-const HOST_ACTION_TONES = {
-  emerald: {
-    active:
-      'border-emerald-500 bg-emerald-100 text-emerald-950 shadow-sm shadow-emerald-200/60 ring-1 ring-emerald-300/70',
-    activeIcon: 'bg-emerald-600 text-white',
-    idle: 'border-emerald-200/90 bg-emerald-50/90 text-emerald-800 hover:border-emerald-400 hover:bg-emerald-100',
-    idleIcon: 'bg-emerald-200/80 text-emerald-700',
-    dot: 'bg-emerald-600',
-  },
-  rose: {
-    active: 'border-rose-500 bg-rose-100 text-rose-950 shadow-sm shadow-rose-200/60 ring-1 ring-rose-300/70',
-    activeIcon: 'bg-rose-600 text-white',
-    idle: 'border-rose-200/90 bg-rose-50/90 text-rose-800 hover:border-rose-400 hover:bg-rose-100',
-    idleIcon: 'bg-rose-200/80 text-rose-700',
-    dot: 'bg-rose-600',
-  },
-  violet: {
-    active:
-      'border-violet-500 bg-violet-100 text-violet-950 shadow-sm shadow-violet-200/60 ring-1 ring-violet-300/70',
-    activeIcon: 'bg-violet-600 text-white',
-    idle: 'border-violet-200/90 bg-violet-50/90 text-violet-800 hover:border-violet-400 hover:bg-violet-100',
-    idleIcon: 'bg-violet-200/80 text-violet-700',
-    dot: 'bg-violet-600',
-  },
-  amber: {
-    active: 'border-amber-500 bg-amber-100 text-amber-950 shadow-sm shadow-amber-200/60 ring-1 ring-amber-300/70',
-    activeIcon: 'bg-amber-600 text-white',
-    idle: 'border-amber-200/90 bg-amber-50/90 text-amber-900 hover:border-amber-400 hover:bg-amber-100',
-    idleIcon: 'bg-amber-200/80 text-amber-800',
-    dot: 'bg-amber-600',
-  },
-  sky: {
-    active: 'border-sky-500 bg-sky-100 text-sky-950 shadow-sm shadow-sky-200/60 ring-1 ring-sky-300/70',
-    activeIcon: 'bg-sky-600 text-white',
-    idle: 'border-sky-200/90 bg-sky-50/90 text-sky-800 hover:border-sky-400 hover:bg-sky-100',
-    idleIcon: 'bg-sky-200/80 text-sky-700',
-    dot: 'bg-sky-600',
-  },
-}
-
-function HostQuestionActionButton({
-  disabled,
-  onClick,
-  icon: Icon,
-  label,
-  active = false,
-  tone = 'emerald',
-  title,
-}) {
-  const styles = HOST_ACTION_TONES[tone] || HOST_ACTION_TONES.emerald
-  const tooltip = title || label
-
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      title={tooltip}
-      aria-pressed={active}
-      className={`group inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
-        active ? styles.active : styles.idle
-      }`}
-    >
-      <span
-        className={`grid size-7 shrink-0 place-items-center rounded-md transition-colors ${
-          active ? styles.activeIcon : styles.idleIcon
-        }`}
-      >
-        <Icon className="size-3.5" strokeWidth={2.25} aria-hidden />
-      </span>
-      <span className="whitespace-nowrap">{label}</span>
-      {active ? (
-        <span className={`size-1.5 shrink-0 rounded-full ${styles.dot}`} aria-hidden />
-      ) : null}
-    </button>
-  )
-}
-
-function HostAlertModal({ open, variant = 'success', title, message, confirmLabel, onClose }) {
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
-
-  if (!open) return null
-
-  const styles = {
-    success: {
-      panel: 'border-emerald-200/80 bg-linear-to-b from-emerald-50 to-white shadow-emerald-900/15',
-      bar: 'bg-linear-to-r from-emerald-500 to-teal-500',
-      iconWrap: 'bg-emerald-100 text-emerald-600 ring-emerald-50',
-      title: 'text-emerald-900',
-      message: 'text-emerald-800/90',
-      button: 'bg-linear-to-r from-emerald-600 to-teal-600 focus:ring-emerald-500',
-      Icon: CheckCircle2,
-    },
-    error: {
-      panel: 'border-red-200/80 bg-linear-to-b from-red-50 to-white shadow-red-900/15',
-      bar: 'bg-linear-to-r from-red-500 to-rose-500',
-      iconWrap: 'bg-red-100 text-red-600 ring-red-50',
-      title: 'text-red-900',
-      message: 'text-red-800/90',
-      button: 'bg-linear-to-r from-red-600 to-rose-600 focus:ring-red-500',
-      Icon: XCircle,
-    },
-    info: {
-      panel: 'border-emerald-200/80 bg-linear-to-b from-emerald-50 to-white shadow-emerald-900/15',
-      bar: 'bg-linear-to-r from-emerald-400 to-teal-500',
-      iconWrap: 'bg-emerald-100 text-emerald-600 ring-emerald-50',
-      title: 'text-emerald-900',
-      message: 'text-emerald-800/90',
-      button: 'bg-linear-to-r from-emerald-600 to-teal-600 focus:ring-emerald-500',
-      Icon: Info,
-    },
-  }
-
-  const theme = styles[variant] || styles.success
-  const Icon = theme.Icon
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-navy-950/30 backdrop-blur-sm"
-        aria-label="Close"
-        onClick={onClose}
-      />
-      <div
-        role="alertdialog"
-        aria-labelledby="host-alert-title"
-        aria-describedby="host-alert-message"
-        className={`relative w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl ${theme.panel}`}
-      >
-        <div className={`h-1.5 w-full ${theme.bar}`} aria-hidden />
-        <div className="p-6 text-center">
-          <div className={`mx-auto grid size-16 place-items-center rounded-full ring-4 ${theme.iconWrap}`}>
-            <Icon className="size-9" strokeWidth={2.25} aria-hidden />
-          </div>
-          <p id="host-alert-title" className={`mt-5 text-xl font-bold ${theme.title}`}>
-            {title}
-          </p>
-          <p
-            id="host-alert-message"
-            className={`mt-2 whitespace-pre-line text-sm leading-relaxed ${theme.message}`}
-          >
-            {message}
-          </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className={`mt-6 h-11 w-full rounded-xl text-sm font-semibold text-white shadow-md transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 ${theme.button}`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function mapQuestionType(type) {
   const map = {
@@ -428,38 +257,15 @@ function LivePage() {
   })
 
 
-  const questionLiveMutation = useMutation({
-    mutationFn: ({ questionId, isLive }) => setQuestionLiveStateApi(accessToken, questionId, isLive),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
-      queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
-    },
-    onError: (error) => setErrorMessage(error.message || 'Unable to update question live state'),
-  })
-
-  const questionLeaderboardMutation = useMutation({
-    mutationFn: ({ questionId, visible }) =>
-      setQuestionLeaderboardVisibleApi(accessToken, questionId, visible),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
-    },
-    onError: (error) => setErrorMessage(error.message || 'Unable to update question leaderboard'),
-  })
-
-  const answerRevealMutation = useMutation({
-    mutationFn: ({ questionId, revealed }) =>
-      setQuestionAnswerRevealedApi(accessToken, questionId, revealed),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
-    },
-    onError: (error) => setErrorMessage(error.message || 'Unable to update answer visibility'),
-  })
-
-  const reattemptMutation = useMutation({
-    mutationFn: ({ questionId }) => openQuestionForReattemptApi(accessToken, questionId),
-    onSuccess: (_data, { questionText }) => {
-      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
-      queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
+  const {
+    questionLiveMutation,
+    questionLeaderboardMutation,
+    answerRevealMutation,
+    reattemptMutation,
+    openForReattempt,
+  } = useHostQuestionMutations(accessToken, sessionId, {
+    onMutationError: (message) => setErrorMessage(message),
+    onReattemptSuccess: (questionText) => {
       setErrorMessage('')
       const preview = String(questionText || '').trim()
       setHostAlert({
@@ -471,7 +277,7 @@ function LivePage() {
         confirmLabel: 'OK',
       })
     },
-    onError: (error) => {
+    onReattemptError: (error) => {
       setHostAlert({
         variant: 'error',
         title: 'Could not open for reattempt',
@@ -480,15 +286,6 @@ function LivePage() {
       })
     },
   })
-
-  const handleOpenForReattempt = () => {
-    if (!activeQuestion?.id || !canEditLive) return
-    reattemptMutation.mutate({
-      questionId: activeQuestion.id,
-      questionText: activeQuestion.text,
-    })
-  }
-
 
   const qaMutation = useMutation({
     mutationFn: ({ qaId, action, body }) => qaModerateApi(accessToken, qaId, action, body),
@@ -823,79 +620,18 @@ function LivePage() {
 
           {activeQuestion ? (
             <div className="mt-3 border-t border-slate-200/80 pt-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Host controls</p>
-              <div className="flex flex-wrap gap-2">
-                <HostQuestionActionButton
-                  disabled={!canEditLive || questionLiveMutation.isPending}
-                  onClick={() =>
-                    questionLiveMutation.mutate({
-                      questionId: activeQuestion.id,
-                      isLive: !activeQuestion.isLive,
-                    })
-                  }
-                  icon={activeQuestion.isLive ? Square : Play}
-                  label={activeQuestion.isLive ? 'Deactivate' : 'Activate'}
-                  title={
-                    activeQuestion.isLive
-                      ? 'Stop accepting new responses'
-                      : 'Let participants answer this question'
-                  }
-                  active={activeQuestion.isLive}
-                  tone={activeQuestion.isLive ? 'rose' : 'emerald'}
-                />
-                {questionSupportsAnswerReveal(activeQuestion.type, activeQuestion.isQuizMode) ? (
-                  <HostQuestionActionButton
-                    disabled={!canEditLive || answerRevealMutation.isPending}
-                    onClick={() =>
-                      answerRevealMutation.mutate({
-                        questionId: activeQuestion.id,
-                        revealed: !activeQuestion.answerRevealed,
-                      })
-                    }
-                    icon={activeQuestion.answerRevealed ? EyeOff : Eye}
-                    label={activeQuestion.answerRevealed ? 'Hide answer' : 'Reveal answer'}
-                    title={
-                      activeQuestion.answerRevealed
-                        ? 'Correct answer is visible to participants'
-                        : 'Show the correct answer on participant screens'
-                    }
-                    active={activeQuestion.answerRevealed}
-                    tone="violet"
-                  />
-                ) : null}
-                {canEditLive && activeQuestion.isQuizMode ? (
-                  <HostQuestionActionButton
-                    disabled={questionLeaderboardMutation.isPending}
-                    onClick={() =>
-                      questionLeaderboardMutation.mutate({
-                        questionId: activeQuestion.id,
-                        visible: !activeQuestion.showLeaderboard,
-                      })
-                    }
-                    icon={Trophy}
-                    label="Leaderboard"
-                    title={
-                      activeQuestion.showLeaderboard
-                        ? 'Hide ranking for this question'
-                        : 'Show ranking for this question only'
-                    }
-                    active={activeQuestion.showLeaderboard}
-                    tone="amber"
-                  />
-                ) : null}
-                <HostQuestionActionButton
-                  disabled={!canEditLive || reattemptMutation.isPending}
-                  onClick={handleOpenForReattempt}
-                  icon={RotateCcw}
-                  label={reattemptMutation.isPending ? 'Opening…' : 'Reattempt'}
-                  title={
-                    !activeQuestion.isLive
-                      ? 'Activates the question and opens another attempt'
-                      : 'Allow another attempt on this question'
-                  }
-                  tone="sky"
-                />
-              </div>
+              <HostQuestionControls
+                question={activeQuestion}
+                canEditLive={canEditLive}
+                questionLiveMutation={questionLiveMutation}
+                answerRevealMutation={answerRevealMutation}
+                questionLeaderboardMutation={questionLeaderboardMutation}
+                reattemptMutation={reattemptMutation}
+                onOpenForReattempt={() => {
+                  if (!canEditLive) return
+                  openForReattempt(activeQuestion)
+                }}
+              />
             </div>
           ) : null}
 

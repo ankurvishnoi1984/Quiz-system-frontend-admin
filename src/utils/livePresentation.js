@@ -78,6 +78,7 @@ export function mapLiveQuestions(questions) {
       isLive: Boolean(q.is_live),
       isQuizMode: Boolean(q.is_quiz_mode),
       answerRevealed,
+      showLeaderboard: Boolean(q.show_leaderboard),
       correctOptionIds: resolveCorrectOptionIds({ ...q, answerRevealed }, options),
       options,
     }
