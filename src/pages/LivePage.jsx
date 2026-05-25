@@ -14,7 +14,6 @@ import {
 import {
   BarChart3,
   CheckCircle2,
-  Crown,
   Eye,
   EyeOff,
   Info,
@@ -24,11 +23,8 @@ import {
   RotateCcw,
   Share2,
   Square,
-  ThumbsDown,
-  ThumbsUp,
   Trophy,
   Users,
-  X,
   XCircle,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -39,6 +35,14 @@ import { renderPieLabel } from '../components/charts/renderPieLabel'
 import { CHART_COLORS, CHART_TOOLTIP_STYLE, getChartColor } from '../utils/chartColors'
 import ShareSessionPanel from '../components/dashboard/ShareSessionPanel'
 import Modal from '../components/ui/Modal'
+import { LiveQaPanel } from '../components/leaderboard/LiveQaPanel'
+import { QuestionLeaderboardModal } from '../components/leaderboard/QuestionLeaderboardModal'
+import { QuestionLeaderboardPanel } from '../components/leaderboard/QuestionLeaderboardPanel'
+import { SessionLeaderboardModal } from '../components/leaderboard/SessionLeaderboardModal'
+import {
+  buildQuestionLeaderboardForQuestion,
+  buildSessionLeaderboardFromResponses,
+} from '../utils/leaderboard'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
 import { useAuthStore } from '../store/authStore'
 import {
@@ -256,11 +260,12 @@ function LivePage() {
 
 
   const [questionIndex, setQuestionIndex] = useState(0)
-  const [qaOpen, setQaOpen] = useState(true)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [socketStatus, setSocketStatus] = useState('disconnected')
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
+  const [questionLeaderboardOpen, setQuestionLeaderboardOpen] = useState(false)
+  const [leaderboardLimit, setLeaderboardLimit] = useState(10)
   const [shareOpen, setShareOpen] = useState(false)
   const [chartView, setChartView] = useState('bar')
   const [hostAlert, setHostAlert] = useState(null)
@@ -591,24 +596,21 @@ function LivePage() {
   }, [currentResponses])
 
 
-  const leaderboard = useMemo(() => {
-    const scoreByParticipant = new Map()
-    ;(responsesQuery.data || []).forEach((row) => {
-      const key = row.participant_id
-      const existing = scoreByParticipant.get(key) || {
-        participant_id: row.participant_id,
-        name: row.participant?.nickname || `Participant ${row.participant_id}`,
-        score: 0,
-        attempts: 0,
-      }
-      existing.score += Number(row.points_earned || 0)
-      existing.attempts += 1
-      scoreByParticipant.set(key, existing)
-    })
-    return Array.from(scoreByParticipant.values())
-      .sort((a, b) => b.score - a.score || b.attempts - a.attempts)
-      .slice(0, 10)
-  }, [responsesQuery.data])
+  const sessionResponses = responsesQuery.data || []
+
+  const leaderboard = useMemo(
+    () => buildSessionLeaderboardFromResponses(sessionResponses, leaderboardLimit),
+    [sessionResponses, leaderboardLimit],
+  )
+
+  const activeQuestionLeaderboard = useMemo(() => {
+    if (!activeQuestion?.id || !activeQuestion.isQuizMode) return []
+    return buildQuestionLeaderboardForQuestion(
+      sessionResponses,
+      activeQuestion.id,
+      leaderboardLimit,
+    )
+  }, [activeQuestion?.id, activeQuestion?.isQuizMode, sessionResponses, leaderboardLimit])
 
 
   const session = sessionQuery.data
@@ -1079,32 +1081,17 @@ function LivePage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-navy-900">Q&A panel</p>
-              <button type="button" onClick={() => setQaOpen((p) => !p)} className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm">
-                {qaOpen ? 'Collapse' : 'Expand'}
-              </button>
-            </div>
-            {qaOpen ? (
-              <div className="mt-3 space-y-2">
-                {(qaQuery.data || []).map((q) => (
-                  <div key={q.qa_id} className="rounded-xl border border-blue-200 bg-white p-3">
-                    <p className="text-sm font-semibold text-navy-900">{q.question_text}</p>
-                    <p className="mt-1 text-xs text-slate-600">Status: {q.status}</p>
-                    <div className="mt-2 flex gap-2">
-                      <button type="button" onClick={() => qaMutation.mutate({ qaId: q.qa_id, action: 'approve' })} className="rounded-lg border border-emerald-200 px-2 py-1 text-emerald-700">
-                        <ThumbsUp className="size-4" />
-                      </button>
-                      <button type="button" onClick={() => qaMutation.mutate({ qaId: q.qa_id, action: 'reject' })} className="rounded-lg border border-red-200 px-2 py-1 text-red-700">
-                        <ThumbsDown className="size-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
+          <LiveQaPanel
+            questions={qaQuery.data}
+            onModerate={(qaId, action) => qaMutation.mutate({ qaId, action })}
+          />
+
+          <QuestionLeaderboardPanel
+            activeQuestion={activeQuestion}
+            questionNumber={activeQuestion ? questionIndex + 1 : null}
+            canShowLeaderboard={Boolean(activeQuestion?.isQuizMode)}
+            onShowLeaderboard={() => setQuestionLeaderboardOpen(true)}
+          />
             </div>
           </div>
         )}
@@ -1170,49 +1157,24 @@ function LivePage() {
         ) : null}
       </Modal>
 
-      {leaderboardOpen && (
-        <div className="fixed inset-0 z-40">
-          <button
-            type="button"
-            className="absolute inset-0 bg-navy-950/20 backdrop-blur-sm"
-            onClick={() => setLeaderboardOpen(false)}
-            aria-label="Close leaderboard"
-          />
-          <div className="relative mx-auto mt-20 w-[min(92vw,520px)] rounded-2xl border border-amber-200/70 bg-white p-5 shadow-2xl shadow-blue-900/20">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Leaderboard</p>
-                <h3 className="mt-1 text-xl font-bold text-navy-900">Top 10</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setLeaderboardOpen(false)}
-                className="rounded-xl border border-amber-200/70 p-2 text-slate-600 transition hover:bg-amber-50"
-                aria-label="Close"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
+      <SessionLeaderboardModal
+        open={leaderboardOpen}
+        onClose={() => setLeaderboardOpen(false)}
+        entries={leaderboard}
+        limit={leaderboardLimit}
+        onLimitChange={setLeaderboardLimit}
+      />
 
-            <div className="mt-4 space-y-2">
-              {leaderboard.map((row, idx) => (
-                <div key={row.participant_id} className="flex items-center justify-between rounded-2xl border border-amber-200/60 bg-amber-50/40 px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="grid size-9 place-items-center rounded-2xl bg-linear-to-br from-amber-400 to-amber-600 text-white">
-                      {idx === 0 ? <Crown className="size-4" /> : idx + 1}
-                    </div>
-                    <p className="font-semibold text-navy-900">{row.name}</p>
-                  </div>
-                  <p className="text-sm font-bold text-navy-900">{row.score}</p>
-                </div>
-              ))}
-              {!leaderboard.length ? (
-                <p className="text-sm text-slate-500 text-center py-4">Leaderboard will appear once responses start coming in.</p>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      )}
+      <QuestionLeaderboardModal
+        open={questionLeaderboardOpen}
+        onClose={() => setQuestionLeaderboardOpen(false)}
+        questionLabel={activeQuestion ? `Q${questionIndex + 1}` : ''}
+        questionText={activeQuestion?.text || ''}
+        entries={activeQuestionLeaderboard}
+        isQuizQuestion={Boolean(activeQuestion?.isQuizMode)}
+        limit={leaderboardLimit}
+        onLimitChange={setLeaderboardLimit}
+      />
 
       <HostAlertModal
         open={Boolean(hostAlert)}
