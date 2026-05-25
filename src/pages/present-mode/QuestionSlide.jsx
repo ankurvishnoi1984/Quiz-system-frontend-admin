@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CheckCircle2, XCircle } from 'lucide-react'
+import { BarChart3, List, Trophy } from 'lucide-react'
 import { getQuestionResultsApi } from '../../services/liveApi'
 import WordCloudChart from '../../components/charts/WordCloudChart'
-import { formatQuizSubmitTime } from '../../utils/quizResponseTime'
+import { buildQuestionLeaderboardForQuestion } from '../../utils/leaderboard'
 import { PresentBarChart } from './PresentBarChart'
 import {
   buildOptionChartData,
@@ -21,9 +21,12 @@ import {
   PresentOptionsKey,
   shouldShowAnswerRevealUi,
 } from './PresentAnswerReveal'
+import { PresentLeaderboardList } from './PresentLeaderboardList'
+import { PresentResponsesList } from './PresentResponsesList'
 import { PresentSlideHeader } from './PresentShell'
+import { PresentViewSwitcher } from './PresentViewSwitcher'
 
-function TextResponsesList({ rows }) {
+function TextResponsesPanel({ rows }) {
   if (!rows.length) {
     return (
       <p className="flex h-full items-center justify-center text-center text-[clamp(1.1rem,2.5vw,1.75rem)] text-slate-500">
@@ -32,18 +35,20 @@ function TextResponsesList({ rows }) {
     )
   }
   return (
-    <div className="grid h-full auto-rows-fr gap-3 overflow-y-auto pr-2">
-      {rows.slice(0, 12).map((row) => (
-        <div
+    <ul className="present-lb-list grid h-full auto-rows-min gap-3 overflow-y-auto pr-2">
+      {rows.slice(0, 24).map((row, idx) => (
+        <li
           key={row.id}
-          className="rounded-2xl border border-blue-200/70 bg-white/95 px-6 py-4 shadow-sm"
+          className="present-lb-row rounded-2xl border border-blue-200/70 bg-white/95 px-6 py-4 shadow-sm"
+          style={{ animationDelay: `${idx * 40}ms` }}
         >
-          <p className="text-[clamp(1.25rem,3vw,2rem)] font-medium leading-snug text-navy-900">
+          <p className="text-[clamp(0.9rem,1.6vw,1rem)] font-semibold text-navy-600">{row.participant}</p>
+          <p className="mt-1 text-[clamp(1.25rem,3vw,2rem)] font-medium leading-snug text-navy-900">
             {row.response}
           </p>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   )
 }
 
@@ -55,9 +60,9 @@ export function QuestionSlide({
   allResponses,
   slideIndex,
   slideTotal,
-  detailIndex,
-  onDetailIndexChange,
 }) {
+  const [viewMode, setViewMode] = useState('results')
+
   const currentResponses = filterResponsesForQuestion(allResponses, question.id)
 
   const questionResultsQuery = useQuery({
@@ -77,19 +82,22 @@ export function QuestionSlide({
   const showRevealUi = shouldShowAnswerRevealUi(question)
   const wordCloudWords = buildWordCloudData(question, questionResultsQuery.data, currentResponses)
   const responseRows = buildResponseRows(currentResponses)
+  const questionLeaderboard = useMemo(
+    () => buildQuestionLeaderboardForQuestion(allResponses, question.id, 30),
+    [allResponses, question.id],
+  )
 
   const usesOptionChart = questionUsesOptionChart(question.rawType)
   const showWordCloud = question.rawType === 'word_cloud'
   const showRating = question.rawType === 'rating'
   const showTextList = question.rawType === 'open_text' || question.rawType === 'ranking'
+  const showQuestionLeaderboard = Boolean(question.isQuizMode && question.showLeaderboard)
 
   const chartData = showRating ? ratingData : optionData
   const hasChart = (usesOptionChart || showRating) && chartData.length > 0
   const hasChartResponses = chartData.some((d) => d.value > 0)
   const hasResponses = responseRows.length > 0
 
-  const showDetail = detailIndex >= 0 && hasResponses
-  const activeResponse = showDetail ? responseRows[detailIndex] : null
   const correctLabels = useMemo(
     () =>
       new Set(
@@ -99,20 +107,71 @@ export function QuestionSlide({
       ),
     [question],
   )
-  const activeResponseIsCorrect =
-    showRevealUi &&
-    activeResponse &&
-    correctLabels.has(String(activeResponse.response).trim().toLowerCase())
 
-  const goPrevDetail = () => {
-    if (!hasResponses) return
-    onDetailIndexChange(detailIndex <= 0 ? -1 : detailIndex - 1)
-  }
+  const views = useMemo(() => {
+    const list = [{ id: 'results', label: 'Results', icon: BarChart3 }]
+    if (showQuestionLeaderboard) {
+      list.push({ id: 'leaderboard', label: 'Leaderboard', icon: Trophy })
+    }
+    if (hasResponses && !showWordCloud && !showTextList) {
+      list.push({ id: 'responses', label: 'All responses', icon: List })
+    }
+    return list
+  }, [showQuestionLeaderboard, hasResponses, showWordCloud, showTextList])
 
-  const goNextDetail = () => {
-    if (!hasResponses) return
-    if (detailIndex < 0) onDetailIndexChange(0)
-    else if (detailIndex < responseRows.length - 1) onDetailIndexChange(detailIndex + 1)
+  useEffect(() => {
+    setViewMode('results')
+  }, [question.id])
+
+  useEffect(() => {
+    if (!views.some((v) => v.id === viewMode)) {
+      setViewMode(views[0]?.id ?? 'results')
+    }
+  }, [views, viewMode])
+
+  const renderResults = () => {
+    if (showWordCloud) {
+      return (
+        <div className="min-h-0 flex-1 rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10">
+          <WordCloudChart
+            words={wordCloudWords}
+            className="h-full min-h-[40vh]"
+            emptyLabel="Waiting for words…"
+          />
+        </div>
+      )
+    }
+    if (showTextList) {
+      return (
+        <div className="min-h-0 flex-1 rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10">
+          <TextResponsesPanel rows={responseRows} />
+        </div>
+      )
+    }
+    if (hasChart) {
+      return (
+        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col rounded-3xl border border-blue-200/70 bg-white/90 p-4 shadow-xl shadow-navy-900/10">
+          <PresentBarChart
+            data={usesOptionChart ? optionData : chartData}
+            rawType={question.rawType}
+            answerRevealed={showRevealUi}
+          />
+          {showRevealUi ? <PresentOptionsKey question={question} chartData={optionData} /> : null}
+          {!hasChartResponses ? (
+            <p className="mt-3 text-center text-[clamp(0.95rem,1.8vw,1.15rem)] text-slate-500">
+              Waiting for participants to answer…
+            </p>
+          ) : null}
+        </div>
+      )
+    }
+    return (
+      <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-blue-200 bg-white/60">
+        <p className="text-[clamp(1.25rem,3vw,2rem)] font-semibold text-slate-500">
+          Waiting for participants to answer…
+        </p>
+      </div>
+    )
   }
 
   return (
@@ -135,6 +194,11 @@ export function QuestionSlide({
             </span>
           ) : null}
           {showRevealUi ? <PresentAnswerRevealBadge /> : null}
+          {showQuestionLeaderboard ? (
+            <span className="rounded-full bg-amber-100 px-4 py-1.5 text-[clamp(0.75rem,1.4vw,0.9rem)] font-semibold text-amber-900">
+              Leaderboard on
+            </span>
+          ) : null}
           <span className="text-[clamp(0.9rem,1.6vw,1.1rem)] font-semibold text-slate-500">
             {currentResponses.length} response{currentResponses.length === 1 ? '' : 's'}
           </span>
@@ -144,131 +208,43 @@ export function QuestionSlide({
         </h2>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        {showDetail && activeResponse ? (
-          <div
-            className={`flex min-h-0 flex-1 flex-col items-center justify-center rounded-3xl border bg-white/90 p-[clamp(1.5rem,4vw,3rem)] shadow-xl ${
-              showRevealUi
-                ? activeResponseIsCorrect
-                  ? 'border-emerald-300/80 shadow-emerald-900/10 ring-2 ring-emerald-100'
-                  : 'border-slate-200/80 shadow-navy-900/10'
-                : 'border-blue-200/70 shadow-navy-900/10'
-            }`}
-          >
-            <p className="text-[clamp(0.85rem,1.5vw,1rem)] font-semibold uppercase tracking-wider text-slate-500">
-              Response {detailIndex + 1} of {responseRows.length}
-            </p>
-            {showRevealUi ? (
-              <div
-                className={`mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[clamp(0.85rem,1.4vw,1rem)] font-bold ${
-                  activeResponseIsCorrect
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                {activeResponseIsCorrect ? (
-                  <>
-                    <CheckCircle2 className="size-5" aria-hidden />
-                    Got it right
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="size-5" aria-hidden />
-                    Different choice
-                  </>
-                )}
-              </div>
-            ) : null}
-            <p className="mt-4 text-[clamp(1.25rem,3vw,2rem)] font-semibold text-navy-600">
-              {activeResponse.participant}
-            </p>
-            <p
-              className={`mt-6 max-w-4xl text-center text-[clamp(2rem,6vw,4.5rem)] font-bold leading-tight ${
-                showRevealUi
-                  ? activeResponseIsCorrect
-                    ? 'text-emerald-900'
-                    : 'text-navy-900'
-                  : 'text-navy-900'
-              }`}
-            >
-              {activeResponse.response}
-            </p>
-            {activeResponse.responseTimeMs != null ? (
-              <p className="mt-8 text-[clamp(1rem,2vw,1.35rem)] text-slate-500">
-                {formatQuizSubmitTime(activeResponse.responseTimeMs)}
-              </p>
-            ) : null}
-          </div>
-        ) : showWordCloud ? (
-          <div className="min-h-0 flex-1 rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10">
-            <WordCloudChart
-              words={wordCloudWords}
-              className="h-full min-h-[40vh]"
-              emptyLabel="Waiting for words…"
-            />
-          </div>
-        ) : showTextList ? (
-          <div className="min-h-0 flex-1 rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10">
-            <TextResponsesList rows={responseRows} />
-          </div>
-        ) : hasChart ? (
-          <div
-            className="flex min-h-0 w-full min-w-0 flex-1 flex-col rounded-3xl border border-blue-200/70 bg-white/90 p-4 shadow-xl shadow-navy-900/10"
-          >
-            <PresentBarChart
-              data={usesOptionChart ? optionData : chartData}
-              rawType={question.rawType}
-              answerRevealed={showRevealUi}
-            />
-            {showRevealUi ? (
-              <PresentOptionsKey question={question} chartData={optionData} />
-            ) : null}
-            {!hasChartResponses ? (
-              <p className="mt-3 text-center text-[clamp(0.95rem,1.8vw,1.15rem)] text-slate-500">
-                Waiting for participants to answer…
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-blue-200 bg-white/60">
-            <p className="text-[clamp(1.25rem,3vw,2rem)] font-semibold text-slate-500">
-              Waiting for participants to answer…
-            </p>
-          </div>
-        )}
-      </div>
-
-      {hasResponses ? (
-        <div className="mt-[clamp(0.75rem,2vh,1.25rem)] flex shrink-0 flex-wrap items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={goPrevDetail}
-            className="rounded-xl border border-blue-200/80 bg-white/90 px-5 py-3 text-[clamp(0.9rem,1.6vw,1.05rem)] font-semibold text-navy-800 shadow-sm transition hover:bg-white disabled:opacity-40"
-            disabled={detailIndex < 0}
-          >
-            ← {detailIndex < 0 ? 'Chart' : 'Previous'}
-          </button>
-          <button
-            type="button"
-            onClick={() => onDetailIndexChange(-1)}
-            className={`rounded-xl px-5 py-3 text-[clamp(0.9rem,1.6vw,1.05rem)] font-semibold transition ${
-              detailIndex < 0
-                ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow-md'
-                : 'border border-blue-200/80 bg-white/90 text-navy-800 hover:bg-white'
-            }`}
-          >
-            Results chart
-          </button>
-          <button
-            type="button"
-            onClick={goNextDetail}
-            className="rounded-xl border border-blue-200/80 bg-white/90 px-5 py-3 text-[clamp(0.9rem,1.6vw,1.05rem)] font-semibold text-navy-800 shadow-sm transition hover:bg-white disabled:opacity-40"
-            disabled={detailIndex >= responseRows.length - 1}
-          >
-            {detailIndex < 0 ? 'Responses' : 'Next'} →
-          </button>
+      {views.length > 1 ? (
+        <div className="mb-[clamp(0.75rem,2vh,1rem)] flex shrink-0 justify-center">
+          <PresentViewSwitcher views={views} activeId={viewMode} onChange={setViewMode} />
         </div>
       ) : null}
+
+      <div className="flex min-h-0 flex-1 flex-col">
+        {viewMode === 'leaderboard' ? (
+          <PresentLeaderboardList
+            entries={questionLeaderboard}
+            title="Question leaderboard"
+            emptyMessage="Rankings will appear as participants answer this question."
+          />
+        ) : null}
+
+        {viewMode === 'responses' ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-blue-200/70 bg-white/90 shadow-xl shadow-navy-900/10">
+            <div className="shrink-0 border-b border-blue-100/80 px-[clamp(1rem,3vw,1.75rem)] py-[clamp(0.75rem,2vh,1rem)]">
+              <p className="text-[clamp(0.7rem,1.3vw,0.8rem)] font-semibold uppercase tracking-wider text-slate-500">
+                All responses
+              </p>
+              <p className="text-[clamp(0.95rem,1.8vw,1.1rem)] font-semibold text-navy-800">
+                {responseRows.length} submission{responseRows.length === 1 ? '' : 's'}
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 p-[clamp(0.75rem,2vw,1.25rem)]">
+              <PresentResponsesList
+                rows={responseRows}
+                showRevealUi={showRevealUi}
+                correctLabels={correctLabels}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {viewMode === 'results' ? renderResults() : null}
+      </div>
     </div>
   )
 }

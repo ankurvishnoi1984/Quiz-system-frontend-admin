@@ -28,10 +28,11 @@ export function ParticipantsSlide({ sessionTitle, participants, slideIndex, slid
 
         {participants.length > 0 ? (
           <div className="grid w-full max-w-6xl grid-cols-[repeat(auto-fill,minmax(clamp(9rem,18vw,14rem),1fr))] gap-[clamp(0.75rem,2vw,1.25rem)] overflow-y-auto pb-4">
-            {participants.map((p) => (
+            {participants.map((p, idx) => (
               <div
                 key={p.id}
-                className="flex min-h-[clamp(3.5rem,8vh,5rem)] items-center justify-center rounded-2xl border border-blue-200/70 bg-white/95 px-4 py-3 text-center shadow-md shadow-navy-900/5"
+                className="present-lb-row flex min-h-[clamp(3.5rem,8vh,5rem)] items-center justify-center rounded-2xl border border-blue-200/70 bg-white/95 px-4 py-3 text-center shadow-md shadow-navy-900/5 transition hover:border-navy-300 hover:shadow-lg"
+                style={{ animationDelay: `${Math.min(idx, 20) * 35}ms` }}
               >
                 <span className="line-clamp-2 text-[clamp(1rem,2.2vw,1.5rem)] font-semibold text-navy-900">
                   {p.name}

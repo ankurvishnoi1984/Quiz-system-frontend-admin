@@ -33,4 +33,23 @@
   .btn-gradient {
     @apply inline-flex w-full items-center justify-center rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-navy-900/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60;
   }
+
+  .present-mode .present-lb-row {
+    animation: present-lb-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .present-mode .present-lb-list:hover .present-lb-row {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes present-lb-in {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }

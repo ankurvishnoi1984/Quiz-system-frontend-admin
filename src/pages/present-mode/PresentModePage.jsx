@@ -20,7 +20,6 @@ function PresentModePage() {
     useLiveSession(accessToken, sessionId)
 
   const [slideIndex, setSlideIndex] = useState(0)
-  const [detailIndexByQuestion, setDetailIndexByQuestion] = useState({})
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [hostAlert, setHostAlert] = useState(null)
 
@@ -104,10 +103,6 @@ function PresentModePage() {
     } catch {
       /* ignore */
     }
-  }
-
-  const setDetailForQuestion = (questionId, index) => {
-    setDetailIndexByQuestion((prev) => ({ ...prev, [String(questionId)]: index }))
   }
 
   if (!sessionId) {
@@ -217,8 +212,6 @@ function PresentModePage() {
             allResponses={responses}
             slideIndex={slideIndex + 1}
             slideTotal={slideTotal}
-            detailIndex={detailIndexByQuestion[String(currentSlide.question.id)] ?? -1}
-            onDetailIndexChange={(index) => setDetailForQuestion(currentSlide.question.id, index)}
           />
         ) : null}
 
