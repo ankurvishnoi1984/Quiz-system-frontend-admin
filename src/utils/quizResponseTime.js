@@ -56,3 +56,12 @@ export function formatQuizSubmitTime(responseTimeMs) {
   if (responseTimeMs == null || Number.isNaN(Number(responseTimeMs))) return '—'
   return formatDurationMs(responseTimeMs)
 }
+
+/** Compact table cells: "7.438" — seconds.milliseconds */
+export function formatQuizSubmitTimeCompact(responseTimeMs) {
+  if (responseTimeMs == null || Number.isNaN(Number(responseTimeMs))) return '—'
+  const total = Math.max(0, Math.round(Number(responseTimeMs)))
+  const seconds = Math.floor(total / 1000)
+  const millis = total % 1000
+  return `${seconds}.${String(millis).padStart(3, '0')}`
+}

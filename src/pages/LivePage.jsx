@@ -53,7 +53,7 @@ import {
   qaModerateApi,
   transitionSessionApi,
 } from '../services/liveApi'
-import { formatQuizSubmitTime } from '../utils/quizResponseTime'
+import { formatQuizSubmitTimeCompact } from '../utils/quizResponseTime'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 
 
@@ -378,7 +378,7 @@ function LivePage() {
             ? String(row.rating_value)
             : '—'),
         responseTimeMs,
-        quizTimeLabel: formatQuizSubmitTime(responseTimeMs),
+        quizTimeLabel: formatQuizSubmitTimeCompact(responseTimeMs),
       }
     })
 
@@ -659,7 +659,10 @@ function LivePage() {
                   <tr className="border-b border-blue-100">
                     <th className="px-3 py-2 font-semibold text-slate-700">Participant</th>
                     <th className="px-3 py-2 font-semibold text-slate-700">Response</th>
-                    <th className="px-3 py-2 font-semibold text-slate-700">Response time</th>
+                    <th className="px-3 py-2 font-semibold text-slate-700">
+                      Time taken{' '}
+                      <span className="font-normal text-slate-500">(seconds.milliseconds)</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -667,7 +670,7 @@ function LivePage() {
                     <tr key={row.id} className="border-b border-blue-50 last:border-b-0">
                       <td className="px-3 py-2 text-slate-700">{row.participant}</td>
                       <td className="px-3 py-2 text-slate-700">{row.response}</td>
-                      <td className="px-3 py-2 text-xs text-slate-600">
+                      <td className="px-3 py-2 font-mono text-xs tabular-nums text-slate-600">
                         {row.quizTimeLabel}
                       </td>
                     </tr>
