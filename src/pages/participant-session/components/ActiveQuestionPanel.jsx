@@ -17,6 +17,7 @@ export function ActiveQuestionPanel({
   hasAnyQuestionSaved,
   timeLimit,
   timer,
+  submittedAtSeconds,
   currentResponse,
   answerRevealMeta,
   isAnswerRevealed,
@@ -82,7 +83,9 @@ export function ActiveQuestionPanel({
       )}
       <h2 className="text-2xl font-bold text-navy-900">{question.text || 'Untitled question'}</h2>
 
-      {hasCountdown && <QuestionTimer timer={timer} timeLimit={timeLimit} />}
+      {hasCountdown && (
+        <QuestionTimer timer={timer} timeLimit={timeLimit} submittedAtSeconds={submittedAtSeconds} />
+      )}
 
       {isAnswerRevealed &&
         !hasAttemptedQuestion &&

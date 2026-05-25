@@ -222,17 +222,12 @@ function ParticipantSessionPage() {
       if (countdownFrozen != null) return countdownFrozen
       return 0
     }
-    if (hasCountdown && questionLockedBySubmission && countdownFrozen != null) return countdownFrozen
     if (!hasCountdown || !countdownEndsAt) return 0
     return Math.max(0, Math.ceil((countdownEndsAt - Date.now()) / 1000))
-  }, [
-    isSessionEnded,
-    hasCountdown,
-    questionLockedBySubmission,
-    countdownFrozen,
-    countdownEndsAt,
-    countdownTick,
-  ])
+  }, [isSessionEnded, hasCountdown, countdownFrozen, countdownEndsAt, countdownTick])
+
+  const submittedAtSeconds =
+    questionLockedBySubmission && countdownFrozen != null ? countdownFrozen : null
 
   const inputsLocked =
     isSessionEnded || (hasCountdown && (questionLockedBySubmission || timer === 0))
@@ -588,10 +583,10 @@ function ParticipantSessionPage() {
 
   useEffect(() => {
     if (isSessionEnded) return
-    if (step !== 'active' || !hasCountdown || questionLockedBySubmission) return
+    if (step !== 'active' || !hasCountdown) return
     const id = setInterval(() => setCountdownTick((t) => t + 1), 1000)
     return () => clearInterval(id)
-  }, [isSessionEnded, step, hasCountdown, question?.id, questionLockedBySubmission])
+  }, [isSessionEnded, step, hasCountdown, question?.id])
 
   useEffect(() => {
     if (isSessionEnded) return
@@ -1112,6 +1107,7 @@ function ParticipantSessionPage() {
             hasAnyQuestionSaved={hasAnyQuestionSaved}
             timeLimit={timeLimit}
             timer={timer}
+            submittedAtSeconds={submittedAtSeconds}
             currentResponse={currentResponse}
             answerRevealMeta={answerRevealMeta}
             isAnswerRevealed={isAnswerRevealed}

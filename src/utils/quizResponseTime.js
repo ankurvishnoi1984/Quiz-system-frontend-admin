@@ -11,6 +11,10 @@ export function computeResponseTimeMs(question, quizCountdownByQuestion, quizQue
     const entry = quizCountdownByQuestion?.[qid]
     if (!entry?.endsAt) return null
     const limitMs = timeLimitSec * 1000
+    if (entry.frozen != null) {
+      const usedSec = Math.max(0, timeLimitSec - entry.frozen)
+      return Math.max(0, Math.min(limitMs, Math.round(usedSec * 1000)))
+    }
     const startedAt = entry.endsAt - limitMs
     const elapsed = Date.now() - startedAt
     return Math.max(0, Math.min(limitMs, Math.round(elapsed)))

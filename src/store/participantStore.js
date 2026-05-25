@@ -8,7 +8,7 @@ const initialQuiz = {
   quizSubmitted: false,
   /** Timed sessions: question ids the participant may no longer edit (submitted or timer moved on) */
   quizSubmittedQuestionIds: {},
-  /** Per-question countdown: { [questionId]: { endsAt, frozen } } */
+  /** Per-question countdown: { [questionId]: { endsAt, frozen } } — frozen = seconds left at submit/session end */
   quizCountdownByQuestion: {},
   /** Untimed: when the participant first saw each question (epoch ms) */
   quizQuestionOpenedAt: {},
