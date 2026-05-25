@@ -1,4 +1,4 @@
-import { BarChart3, Copy, Pencil, Rocket, Share2, Trash2 } from 'lucide-react'
+import { BarChart3, Copy, LayoutList, Pencil, Rocket, Share2, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
 import KebabMenu from '../ui/KebabMenu'
 
@@ -84,7 +84,18 @@ function SessionCard({ session, onAction }) {
           <KebabMenu
             items={[
               { id: 'share', label: 'Share', icon: Share2, onClick: () => onAction('share', session) },
-              { id: 'edit', label: 'Edit', icon: Pencil, onClick: () => onAction('edit', session) },
+              {
+                id: 'edit-session',
+                label: 'Edit session',
+                icon: Pencil,
+                onClick: () => onAction('edit-session', session),
+              },
+              {
+                id: 'builder',
+                label: 'Question builder',
+                icon: LayoutList,
+                onClick: () => onAction('builder', session),
+              },
               { id: 'analytics', label: 'Analytics', icon: BarChart3, onClick: () => onAction('analytics', session) },
               { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onAction('duplicate', session) },
               { id: 'delete', label: 'Delete', icon: Trash2, variant: 'danger', onClick: () => onAction('delete', session) },

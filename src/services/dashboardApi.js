@@ -36,6 +36,14 @@ export async function duplicateSessionApi(accessToken, sessionId, input = {}) {
   return data?.session
 }
 
+export async function updateSessionApi(accessToken, sessionId, payload) {
+  const data = await authRequest(`/sessions/${sessionId}`, accessToken, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+  return data?.session || null
+}
+
 export async function archiveSessionApi(accessToken, sessionId) {
   const data = await authRequest(`/sessions/${sessionId}`, accessToken, {
     method: 'DELETE',

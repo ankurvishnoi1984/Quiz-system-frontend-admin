@@ -3,9 +3,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import SessionCard from '../components/dashboard/SessionCard'
+import SessionFormModal from '../components/dashboard/SessionFormModal'
 import ShareSessionPanel from '../components/dashboard/ShareSessionPanel'
 import StatCard from '../components/dashboard/StatCard'
 import Tabs from '../components/dashboard/Tabs'
+import { HostAlertModal } from '../components/live/HostAlertModal'
 import Modal from '../components/ui/Modal'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useAuthStore } from '../store/authStore'
@@ -17,6 +19,7 @@ import {
   duplicateSessionApi,
   listDepartmentSessionsApi,
   transitionSessionApi,
+  updateSessionApi,
 } from '../services/dashboardApi'
 
 const tabItems = ['All', 'Draft', 'Live', 'Completed']
@@ -41,12 +44,11 @@ function DashboardPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
+  const [editSession, setEditSession] = useState(null)
   const [shareSession, setShareSession] = useState(null)
+  const [sessionAlert, setSessionAlert] = useState(null)
   const [dashboardError, setDashboardError] = useState('')
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
-  const [join_type, setJoinType] = useState('name')
-  const [overallLeaderboard, setOverallLeaderboard] = useState(true)
-  const [enableNavigation, setEnableNavigation] = useState(false)
 
   const { departmentId, departments } = useShell()
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
@@ -59,12 +61,27 @@ function DashboardPage() {
 
   const createMutation = useMutation({
     mutationFn: (payload) => createSessionApi(accessToken, payload.deptId, payload.input),
-    onSuccess: () => {
+    onSuccess: (_session, variables) => {
       queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
       setDashboardError('')
+      setCreateOpen(false)
+      setSessionAlert({
+        variant: 'success',
+        title: 'Session created',
+        message: `"${variables.input.title}" was created successfully.`,
+        confirmLabel: 'OK',
+      })
     },
-    onError: (error) => {
-      setDashboardError(error.message || 'Unable to create session')
+    onError: (error, variables) => {
+      const title = variables?.input?.title
+      setSessionAlert({
+        variant: 'error',
+        title: 'Could not create session',
+        message: title
+          ? `Failed to create "${title}". ${error.message || 'Please try again.'}`
+          : error.message || 'Unable to create session. Please try again.',
+        confirmLabel: 'Close',
+      })
     },
   })
 
@@ -87,6 +104,32 @@ function DashboardPage() {
     },
     onError: (error) => {
       setDashboardError(error.message || 'Unable to update session status')
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ sessionId, input }) => updateSessionApi(accessToken, sessionId, input),
+    onSuccess: (_session, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
+      setDashboardError('')
+      setEditSession(null)
+      setSessionAlert({
+        variant: 'success',
+        title: 'Session updated',
+        message: `"${variables.input.title}" was saved successfully.`,
+        confirmLabel: 'OK',
+      })
+    },
+    onError: (error, variables) => {
+      const title = variables?.input?.title
+      setSessionAlert({
+        variant: 'error',
+        title: 'Could not update session',
+        message: title
+          ? `Failed to save "${title}". ${error.message || 'Please try again.'}`
+          : error.message || 'Unable to update session. Please try again.',
+        confirmLabel: 'Close',
+      })
     },
   })
 
@@ -241,11 +284,15 @@ function DashboardPage() {
       duplicateMutation.mutate({ session })
       return
     }
-    if (action === 'edit') {
-      /*if (session.status !== 'Draft') {
-        setDashboardError('Only draft sessions can be edited in Question Builder')
-        return
-      }*/
+    if (action === 'edit-session') {
+      const raw = (sessionsQuery.data || []).find(
+        (s) => String(s.session_id) === String(session.id),
+      )
+      setEditSession(raw || session)
+      setDashboardError('')
+      return
+    }
+    if (action === 'builder') {
       navigate(`/builder?session=${encodeURIComponent(session.id)}`)
       return
     }
@@ -282,32 +329,73 @@ function DashboardPage() {
     alert(`${action.toUpperCase()}: ${session.title}`)
   }
 
-  const handleCreate = (event) => {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    const title = String(form.get('title') ?? '').trim()
-    const description = String(form.get('description') ?? '').trim()
-    const dept = String(form.get('department') || departmentId || user?.dept_id || '')
-    const joinRequirement = String(form.get('joinRequirement') ?? 'name')
-
-    if (!title) return
+  const handleCreate = (values) => {
+    if (!values.title) return
 
     createMutation.mutate({
-      deptId: dept,
+      deptId: values.departmentId || departmentId || user?.dept_id,
       input: {
         host_id: user?.user_id,
-        title,
-        description: description || null,
-        is_anonymous_default: joinRequirement === 'anonymous',
+        title: values.title,
+        description: values.description || null,
+        is_anonymous_default: values.joinRequirement === 'anonymous',
         show_results_to_participants: true,
         allow_late_join: true,
-        leaderboard_enabled: overallLeaderboard,
-        participant_navigation_enabled: enableNavigation,
-        join_type: join_type || 'name',
+        leaderboard_enabled: values.overallLeaderboard,
+        participant_navigation_enabled: values.enableNavigation,
+        join_type: values.joinRequirement || 'name',
       },
     })
-    setCreateOpen(false)
-    setEnableNavigation(false)
+  }
+
+  const editSessionInitial = useMemo(() => {
+    if (!editSession) return null
+    const joinType = editSession.join_type || 'name'
+    return {
+      title: editSession.title ?? '',
+      description: editSession.description ?? '',
+      departmentId: String(editSession.dept_id ?? ''),
+      joinRequirement: joinType,
+      enableNavigation: editSession.participant_navigation_enabled !== false,
+      overallLeaderboard: editSession.leaderboard_enabled !== false,
+    }
+  }, [editSession])
+
+  const editSessionLiveSettingsOnly = useMemo(() => {
+    if (!editSession) return false
+    const status = editSession.status
+    return status !== 'draft'
+  }, [editSession])
+
+  const editDepartmentLabel = useMemo(() => {
+    if (!editSession) return ''
+    return (
+      departments.find((d) => String(d.dept_id) === String(editSession.dept_id))?.name ||
+      editSession.department ||
+      `Department ${editSession.dept_id}`
+    )
+  }, [editSession, departments])
+
+  const handleUpdate = (values) => {
+    if (!editSession || !values.title) return
+
+    const sessionId = editSession.session_id ?? editSession.id
+    const payload = {
+      title: values.title,
+      leaderboard_enabled: values.overallLeaderboard,
+    }
+
+    if (!editSessionLiveSettingsOnly) {
+      Object.assign(payload, {
+        description: values.description || null,
+        show_results_to_participants: true,
+        allow_late_join: true,
+        participant_navigation_enabled: values.enableNavigation,
+        join_type: values.joinRequirement || 'name',
+      })
+    }
+
+    updateMutation.mutate({ sessionId, input: payload })
   }
 
   return (
@@ -421,89 +509,33 @@ function DashboardPage() {
         )}
       </div>
 
-      <Modal open={createOpen} title="New Session" onClose={() => setCreateOpen(false)}>
-        <form onSubmit={handleCreate} className="grid gap-4 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <label className="text-sm font-semibold text-slate-700">Title</label>
-            <input name="title" className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15" placeholder="e.g., Weekly Pulse Check" />
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Description</label>
-            <input
-              name="description"
-              className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-              placeholder="e.g., Friday live polling session"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Department</label>
-            <select name="department" defaultValue={departmentId} className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15">
-              {departments.map((dept) => (
-                <option key={dept.dept_id} value={dept.dept_id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <label className="text-sm font-semibold text-slate-700">Join requirements</label>
-            <select
-              name="joinRequirement"
-              defaultValue={join_type}
-              className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-              onChange={(e) => setJoinType(e.target.value)}
-            >
-              <option value="anonymous">Anonymous (no name/email)</option>
-              <option value="name">Name only</option>
-              <option value="name_email">Name + Email</option>
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <label className="text-sm font-semibold text-slate-700" htmlFor="question-availability">
-              Question availability
-            </label>
-            <select
-              id="question-availability"
-              value={enableNavigation ? 'enabled' : 'disabled'}
-              onChange={(e) => setEnableNavigation(e.target.value === 'enabled')}
-              className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-            >
-              <option value="disabled">
-                Single active question — one live question at a time, host-led pacing
-              </option>
-              <option value="enabled">
-                Multiple active questions — participants can access all live questions
-              </option>
-            </select>
-            <p className="mt-1 text-xs text-slate-500">
-              Multiple mode lets you activate several questions at once; participants browse between them.
-              Single mode shows only the current live question until the host advances.
-            </p>
-          </div>
-          <div className="md:col-span-2">
-            <label className="flex items-center justify-between gap-3 rounded-xl border border-blue-200/70 bg-white px-3 py-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-700">Overall leaderboard (Q&A)</p>
-                <p className="text-xs text-slate-500">Show session-wide rankings to participants on the Q&A page</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={overallLeaderboard}
-                onChange={(e) => setOverallLeaderboard(e.target.checked)}
-                className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
-              />
-            </label>
-          </div>
-          <div className="flex items-end gap-2 md:justify-end md:col-span-2">
-            <button type="button" onClick={() => setCreateOpen(false)} className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50">
-              Cancel
-            </button>
-            <button type="submit" className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110">
-              Create session
-            </button>
-          </div>
-        </form>
-      </Modal>
+      <SessionFormModal
+        open={createOpen}
+        modalTitle="New Session"
+        mode="create"
+        departments={departments}
+        defaultDepartmentId={departmentId}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={handleCreate}
+        isSubmitting={createMutation.isPending}
+      />
+
+      {editSession ? (
+        <SessionFormModal
+          key={`edit-${editSession.session_id ?? editSession.id}`}
+          open
+          modalTitle="Edit Session"
+          mode="edit"
+          departments={departments}
+          defaultDepartmentId={departmentId}
+          initialValues={editSessionInitial ?? {}}
+          liveSettingsOnly={editSessionLiveSettingsOnly}
+          departmentLabel={editDepartmentLabel}
+          onClose={() => setEditSession(null)}
+          onSubmit={handleUpdate}
+          isSubmitting={updateMutation.isPending}
+        />
+      ) : null}
 
       <Modal open={Boolean(shareSession)} title="Share Session" onClose={() => setShareSession(null)}>
         {shareSession && (
@@ -514,6 +546,15 @@ function DashboardPage() {
           />
         )}
       </Modal>
+
+      <HostAlertModal
+        open={Boolean(sessionAlert)}
+        variant={sessionAlert?.variant ?? 'success'}
+        title={sessionAlert?.title ?? ''}
+        message={sessionAlert?.message ?? ''}
+        confirmLabel={sessionAlert?.confirmLabel ?? 'OK'}
+        onClose={() => setSessionAlert(null)}
+      />
     </section>
   )
 }
