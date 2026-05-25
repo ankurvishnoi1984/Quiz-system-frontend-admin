@@ -34,7 +34,9 @@ import {
   getLockedNavigationQuestion,
   isParticipantAttemptingQuestion,
   mapQuestionType,
+  participantCanUpdateSubmittedResponse,
   participantQuestionHasAnswer,
+  shouldIncludeQuestionInFinalize,
 } from './utils/questionUtils'
 
 function ParticipantSessionPage() {
@@ -632,12 +634,15 @@ function ParticipantSessionPage() {
 
   const hasFinalizePayload = useMemo(
     () =>
-      activeQuestions.some(
-        (q) =>
-          !(quizSubmittedQuestionIds || {})[String(q.id)] &&
-          buildResponsePayloadForQuestion(q, responses[q.id]) != null,
+      activeQuestions.some((q) =>
+        shouldIncludeQuestionInFinalize(
+          q,
+          quizSubmittedQuestionIds,
+          navigationEnabled,
+          responses,
+        ),
       ),
-    [activeQuestions, responses, quizSubmittedQuestionIds],
+    [activeQuestions, responses, quizSubmittedQuestionIds, navigationEnabled],
   )
 
   const currentQuestionAnswered = useMemo(
@@ -784,8 +789,11 @@ function ParticipantSessionPage() {
   const buildFinalPayload = useCallback(() => {
     const { quizCountdownByQuestion: countdowns, quizQuestionOpenedAt: openedAt } =
       useParticipantStore.getState()
+    const submittedIds = quizSubmittedQuestionIds || {}
     return activeQuestions
-      .filter((q) => !(quizSubmittedQuestionIds || {})[String(q.id)])
+      .filter((q) =>
+        shouldIncludeQuestionInFinalize(q, submittedIds, navigationEnabled, responses),
+      )
       .map((q) => {
         const payload = buildResponsePayloadForQuestion(q, responses[q.id])
         if (!payload) return null
@@ -796,7 +804,7 @@ function ParticipantSessionPage() {
         return payload
       })
       .filter(Boolean)
-  }, [activeQuestions, responses, quizSubmittedQuestionIds])
+  }, [activeQuestions, responses, quizSubmittedQuestionIds, navigationEnabled])
 
   const submitQuestionById = useCallback(
     async (questionId) => {
@@ -806,7 +814,13 @@ function ParticipantSessionPage() {
       if (!q) return false
       const payload = buildResponsePayloadForQuestion(q, responses[questionId])
       if (!payload) return false
-      if ((quizSubmittedQuestionIds || {})[String(questionId)]) return true
+      const alreadySubmitted = Boolean((quizSubmittedQuestionIds || {})[String(questionId)])
+      if (
+        alreadySubmitted &&
+        !participantCanUpdateSubmittedResponse(q, navigationEnabled)
+      ) {
+        return true
+      }
 
       const responseTimeMs = computeResponseTimeMs(
         q,
@@ -837,6 +851,7 @@ function ParticipantSessionPage() {
       quizSubmittedQuestionIds,
       markQuestionsSubmitted,
       freezeCountdownAfterSubmit,
+      navigationEnabled,
     ],
   )
 

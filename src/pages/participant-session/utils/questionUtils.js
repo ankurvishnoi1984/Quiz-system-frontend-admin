@@ -130,6 +130,23 @@ export function findNextUnsubmittedActiveQuestion(activeQuestions, submittedIds,
   )
 }
 
+/** Untimed + multi-question navigation: participant may change answers until final Submit. */
+export function participantCanUpdateSubmittedResponse(question, navigationEnabled) {
+  return Boolean(navigationEnabled) && Number(question?.timeLimit ?? 0) <= 0
+}
+
+export function shouldIncludeQuestionInFinalize(
+  question,
+  submittedIds,
+  navigationEnabled,
+  responses,
+) {
+  const payload = buildResponsePayloadForQuestion(question, responses[question.id])
+  if (!payload) return false
+  if (!submittedIds?.[String(question.id)]) return true
+  return participantCanUpdateSubmittedResponse(question, navigationEnabled)
+}
+
 export function participantQuestionHasAnswer(question, response = {}) {
   if (!question) return false
   if (question.type === 'MCQ' || question.type === 'True/False') {
