@@ -413,6 +413,7 @@ function LivePage() {
   const session = sessionQuery.data
   const statusLabel = session?.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : '—'
   const canEditLive = session?.status === 'live'
+  const singleActiveQuestionMode = session?.participant_navigation_enabled === false
   const showSessionControls = session?.status === 'live' || session?.status === 'paused'
 
   if (!sessionId) {
@@ -620,6 +621,12 @@ function LivePage() {
 
           {activeQuestion ? (
             <div className="mt-3 border-t border-slate-200/80 pt-3">
+              {canEditLive && singleActiveQuestionMode ? (
+                <p className="mb-3 rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+                  Single-question mode: activating this question will automatically deactivate any
+                  other live question.
+                </p>
+              ) : null}
               <HostQuestionControls
                 question={activeQuestion}
                 canEditLive={canEditLive}
