@@ -47,6 +47,7 @@ function DashboardPage() {
   const [editSession, setEditSession] = useState(null)
   const [shareSession, setShareSession] = useState(null)
   const [sessionAlert, setSessionAlert] = useState(null)
+  const [deleteConfirmSession, setDeleteConfirmSession] = useState(null)
   const [dashboardError, setDashboardError] = useState('')
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
 
@@ -86,13 +87,29 @@ function DashboardPage() {
   })
 
   const archiveMutation = useMutation({
-    mutationFn: (sessionId) => archiveSessionApi(accessToken, sessionId),
-    onSuccess: () => {
+    mutationFn: ({ sessionId }) => archiveSessionApi(accessToken, sessionId),
+    onSuccess: (_session, variables) => {
       queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
       setDashboardError('')
+      setDeleteConfirmSession(null)
+      setSessionAlert({
+        variant: 'success',
+        title: 'Session deleted',
+        message: variables?.title
+          ? `"${variables.title}" was removed successfully.`
+          : 'The session was removed successfully.',
+        confirmLabel: 'OK',
+      })
     },
-    onError: (error) => {
-      setDashboardError(error.message || 'Unable to archive session')
+    onError: (error, variables) => {
+      setSessionAlert({
+        variant: 'error',
+        title: 'Could not delete session',
+        message: variables?.title
+          ? `Failed to delete "${variables.title}". ${error.message || 'Please try again.'}`
+          : error.message || 'Unable to delete session. Please try again.',
+        confirmLabel: 'Close',
+      })
     },
   })
 
@@ -277,7 +294,8 @@ function DashboardPage() {
 
   const handleAction = (action, session) => {
     if (action === 'delete') {
-      archiveMutation.mutate(session.id)
+      if (session.status === 'Live') return
+      setDeleteConfirmSession(session)
       return
     }
     if (action === 'duplicate') {
@@ -545,6 +563,46 @@ function DashboardPage() {
             sessionDbId={shareSession.id}
           />
         )}
+      </Modal>
+
+      <Modal
+        open={Boolean(deleteConfirmSession)}
+        title="Delete session?"
+        onClose={() => {
+          if (!archiveMutation.isPending) setDeleteConfirmSession(null)
+        }}
+      >
+        <p className="text-sm leading-relaxed text-slate-600">
+          Are you sure you want to delete{' '}
+          <span className="font-semibold text-navy-900">
+            {deleteConfirmSession?.title || 'this session'}
+          </span>
+          ? This cannot be undone.
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            disabled={archiveMutation.isPending}
+            onClick={() => setDeleteConfirmSession(null)}
+            className="h-11 rounded-2xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={archiveMutation.isPending}
+            onClick={() => {
+              if (!deleteConfirmSession) return
+              archiveMutation.mutate({
+                sessionId: deleteConfirmSession.id,
+                title: deleteConfirmSession.title,
+              })
+            }}
+            className="h-11 rounded-2xl border border-red-200 bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+          >
+            {archiveMutation.isPending ? 'Deleting…' : 'Delete session'}
+          </button>
+        </div>
       </Modal>
 
       <HostAlertModal

@@ -41,6 +41,36 @@ function SessionCard({ session, onAction }) {
 
   const isLive = session.status === 'Live'
 
+  const menuItems = useMemo(() => {
+    const items = [
+      { id: 'share', label: 'Share', icon: Share2, onClick: () => onAction('share', session) },
+      {
+        id: 'edit-session',
+        label: 'Edit session',
+        icon: Pencil,
+        onClick: () => onAction('edit-session', session),
+      },
+      {
+        id: 'builder',
+        label: 'Question builder',
+        icon: LayoutList,
+        onClick: () => onAction('builder', session),
+      },
+      { id: 'analytics', label: 'Analytics', icon: BarChart3, onClick: () => onAction('analytics', session) },
+      { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onAction('duplicate', session) },
+    ]
+    if (!isLive) {
+      items.push({
+        id: 'delete',
+        label: 'Delete',
+        icon: Trash2,
+        variant: 'danger',
+        onClick: () => onAction('delete', session),
+      })
+    }
+    return items
+  }, [isLive, onAction, session])
+
   return (
     <div
       className="group relative z-0 overflow-visible rounded-2xl border border-blue-200/70 bg-white/90 p-4 shadow-sm shadow-blue-900/5 backdrop-blur transition hover:z-20 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-900/10"
@@ -81,26 +111,7 @@ function SessionCard({ session, onAction }) {
             Launch
           </button>
 
-          <KebabMenu
-            items={[
-              { id: 'share', label: 'Share', icon: Share2, onClick: () => onAction('share', session) },
-              {
-                id: 'edit-session',
-                label: 'Edit session',
-                icon: Pencil,
-                onClick: () => onAction('edit-session', session),
-              },
-              {
-                id: 'builder',
-                label: 'Question builder',
-                icon: LayoutList,
-                onClick: () => onAction('builder', session),
-              },
-              { id: 'analytics', label: 'Analytics', icon: BarChart3, onClick: () => onAction('analytics', session) },
-              { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onAction('duplicate', session) },
-              { id: 'delete', label: 'Delete', icon: Trash2, variant: 'danger', onClick: () => onAction('delete', session) },
-            ]}
-          />
+          <KebabMenu items={menuItems} />
         </div>
       </div>
 
