@@ -118,6 +118,20 @@ export function enrichRatingChartDataWithColors(ratingData) {
   }))
 }
 
+export function mapSessionParticipants(rows) {
+  return (rows || [])
+    .map((row) => {
+      const id = row.participant_id
+      if (!id) return null
+      return {
+        id,
+        name: row.nickname?.trim() || `Participant ${id}`,
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
 export function buildParticipantList(responses) {
   const byId = new Map()
   for (const row of responses || []) {
@@ -127,6 +141,17 @@ export function buildParticipantList(responses) {
       id,
       name: row.participant?.nickname || `Participant ${id}`,
     })
+  }
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function mergeParticipantLists(...lists) {
+  const byId = new Map()
+  for (const list of lists) {
+    for (const entry of list || []) {
+      if (!entry?.id) continue
+      byId.set(entry.id, entry)
+    }
   }
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
 }

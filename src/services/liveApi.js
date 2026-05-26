@@ -37,6 +37,11 @@ export async function getSessionResponsesApi(accessToken, sessionId) {
   return data?.responses || []
 }
 
+export async function listSessionParticipantsApi(accessToken, sessionId) {
+  const data = await authRequest(`/sessions/${sessionId}/participants`, accessToken)
+  return data?.participants || []
+}
+
 export async function listQaQuestionsApi(accessToken, sessionId) {
   const data = await authRequest(`/qa/${sessionId}/questions`, accessToken)
   return data?.questions || []
