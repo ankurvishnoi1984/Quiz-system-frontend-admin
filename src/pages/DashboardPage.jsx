@@ -52,6 +52,9 @@ function DashboardPage() {
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
 
   const { departmentId, departments } = useShell()
+  const canSelectDepartmentOnCreate = ['super_admin', 'client_admin', 'dept_admin'].includes(
+    user?.role,
+  )
   const debouncedSearch = useDebouncedValue(search, 250).trim().toLowerCase()
 
   const sessionsQuery = useQuery({
@@ -394,6 +397,15 @@ function DashboardPage() {
     )
   }, [editSession, departments])
 
+  const createDepartmentLabel = useMemo(() => {
+    const activeDepartmentId = String(departmentId || user?.dept_id || '')
+    if (!activeDepartmentId) return '—'
+    return (
+      departments.find((d) => String(d.dept_id) === activeDepartmentId)?.name ||
+      `Department ${activeDepartmentId}`
+    )
+  }, [departmentId, departments, user?.dept_id])
+
   const handleUpdate = (values) => {
     if (!editSession || !values.title) return
 
@@ -532,7 +544,9 @@ function DashboardPage() {
         modalTitle="New Session"
         mode="create"
         departments={departments}
+        allowDepartmentSelection={canSelectDepartmentOnCreate}
         defaultDepartmentId={departmentId}
+        departmentLabel={createDepartmentLabel}
         onClose={() => setCreateOpen(false)}
         onSubmit={handleCreate}
         isSubmitting={createMutation.isPending}

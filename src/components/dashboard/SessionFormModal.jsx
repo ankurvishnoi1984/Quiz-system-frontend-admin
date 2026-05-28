@@ -15,6 +15,7 @@ function SessionFormModal({
   modalTitle,
   mode = 'create',
   departments = [],
+  allowDepartmentSelection = true,
   defaultDepartmentId = '',
   initialValues = defaultInitial,
   liveSettingsOnly = false,
@@ -75,7 +76,7 @@ function SessionFormModal({
         ) : null}
         <div className={liveSettingsOnly ? 'md:col-span-2' : ''}>
           <label className="text-sm font-semibold text-slate-700">Department</label>
-          {mode === 'edit' ? (
+          {mode === 'edit' || !allowDepartmentSelection ? (
             <p className="mt-1 flex h-11 items-center rounded-xl border border-blue-200/70 bg-slate-50 px-3 text-sm text-slate-700">
               {departmentLabel || '—'}
             </p>
