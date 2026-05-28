@@ -24,6 +24,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { HostQuestionActionButton } from '../components/live/HostQuestionActionButton'
 import Modal from '../components/ui/Modal'
 import { useAuthStore } from '../store/authStore'
 import {
@@ -1442,61 +1443,49 @@ function BuilderPage() {
                   {quizMode ? <ToggleRight className="size-4 text-emerald-600" /> : <ToggleLeft className="size-4 text-slate-500" />}
                   Quiz mode
                 </button>
-                      {!isDraftSession && quizMode && selected.questionId ? (
-                        <button
-                          type="button"
-                          disabled={questionLeaderboardMutation.isPending}
-                          onClick={() =>
-                            questionLeaderboardMutation.mutate({
-                              questionId: selected.questionId,
-                              visible: !selected.showLeaderboard,
-                            })
-                          }
-                          className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${selected.showLeaderboard
-                              ? 'bg-linear-to-r from-emerald-600 to-green-600'
-                              : 'bg-linear-to-r from-slate-500 to-slate-600'
-                            }`}
-                        >
-                          <Trophy className="size-4" />
-                          {selected.showLeaderboard
-                            ? 'Hide leaderboard (this question)'
-                            : 'Show leaderboard (this question)'}
-                        </button>
-                      ) : null}
+                {!isDraftSession && quizMode && selected.questionId ? (
+                  <HostQuestionActionButton
+                    disabled={questionLeaderboardMutation.isPending}
+                    onClick={() =>
+                      questionLeaderboardMutation.mutate({
+                        questionId: selected.questionId,
+                        visible: !selected.showLeaderboard,
+                      })
+                    }
+                    icon={Trophy}
+                    label="Leaderboard"
+                    title={
+                      selected.showLeaderboard
+                        ? 'Hide ranking for this question'
+                        : 'Show ranking for this question only'
+                    }
+                    active={selected.showLeaderboard}
+                    tone="amber"
+                  />
+                ) : null}
 
-                      {questionSupportsAnswerReveal(selected.type, quizMode) ? (
-                        <button
-                          type="button"
-                          disabled={isDraftSession || !selected.questionId || answerRevealMutation.isPending}
-                          onClick={() =>
-                            answerRevealMutation.mutate({
-                              questionId: selected.questionId,
-                              revealed: !selected.answerRevealed,
-                            })
-                          }
-                          title={
-                            isDraftSession
-                              ? 'Reveal answer is available when the session is live'
-                              : undefined
-                          }
-                          className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${selected.answerRevealed
-                              ? 'bg-linear-to-r from-slate-600 to-slate-700'
-                              : 'bg-linear-to-r from-emerald-500 to-green-600'
-                            }`}
-                        >
-                          {selected.answerRevealed ? (
-                            <>
-                              <EyeOff className="size-4" />
-                              Hide Answer
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="size-4" />
-                              Reveal Answer
-                            </>
-                          )}
-                        </button>
-                      ) : null}
+                {questionSupportsAnswerReveal(selected.type, quizMode) ? (
+                  <HostQuestionActionButton
+                    disabled={isDraftSession || !selected.questionId || answerRevealMutation.isPending}
+                    onClick={() =>
+                      answerRevealMutation.mutate({
+                        questionId: selected.questionId,
+                        revealed: !selected.answerRevealed,
+                      })
+                    }
+                    icon={selected.answerRevealed ? EyeOff : Eye}
+                    label={selected.answerRevealed ? 'Hide answer' : 'Reveal answer'}
+                    title={
+                      isDraftSession
+                        ? 'Reveal answer is available when the session is live'
+                        : selected.answerRevealed
+                          ? 'Correct answer is visible to participants'
+                          : 'Show the correct answer on participant screens'
+                    }
+                    active={selected.answerRevealed}
+                    tone="violet"
+                  />
+                ) : null}
                 <div className="flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-3 py-2">
                   <p className="text-sm font-semibold text-slate-700">Points</p>
                   <input

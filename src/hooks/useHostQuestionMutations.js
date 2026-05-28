@@ -19,7 +19,29 @@ export function useHostQuestionMutations(
   }
 
   const questionLiveMutation = useMutation({
-    mutationFn: ({ questionId, isLive }) => setQuestionLiveStateApi(accessToken, questionId, isLive),
+    mutationFn: async ({
+      questionId,
+      isLive,
+      answerRevealed = false,
+      showLeaderboard = false,
+      supportsReveal = false,
+      isQuizMode = false,
+    }) => {
+      const updated = await setQuestionLiveStateApi(accessToken, questionId, isLive)
+      if (isLive) return updated
+
+      const resetCalls = []
+      if (supportsReveal && answerRevealed) {
+        resetCalls.push(setQuestionAnswerRevealedApi(accessToken, questionId, false))
+      }
+      if (isQuizMode && showLeaderboard) {
+        resetCalls.push(setQuestionLeaderboardVisibleApi(accessToken, questionId, false))
+      }
+      if (resetCalls.length) {
+        await Promise.all(resetCalls)
+      }
+      return updated
+    },
     onSuccess: invalidateQuestions,
     onError: (error) =>
       onMutationError?.(error.message || 'Unable to update question live state'),

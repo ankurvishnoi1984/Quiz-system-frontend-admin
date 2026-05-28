@@ -44,6 +44,10 @@ export function HostQuestionControls({
             questionLiveMutation.mutate({
               questionId: question.id,
               isLive: !question.isLive,
+              answerRevealed: question.answerRevealed,
+              showLeaderboard: question.showLeaderboard,
+              supportsReveal,
+              isQuizMode: question.isQuizMode,
             })
           }
           icon={question.isLive ? Square : Play}
