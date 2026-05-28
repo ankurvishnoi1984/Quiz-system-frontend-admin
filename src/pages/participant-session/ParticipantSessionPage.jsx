@@ -38,6 +38,7 @@ import {
   participantQuestionHasAnswer,
   shouldIncludeQuestionInFinalize,
 } from './utils/questionUtils'
+import { canReuseStoredParticipantSession } from './utils/joinFlow'
 
 function ParticipantSessionPage() {
   const { sessionId } = useParams()
@@ -342,14 +343,6 @@ function ParticipantSessionPage() {
     }
     return unsub
   }, [])
-
-  useEffect(() => {
-    if (!participantHydrated || hasSessionCodeInUrl || sessionCodeInput) return
-    const { joinedSessionCode: storedCode } = useParticipantStore.getState()
-    if (storedCode) {
-      setSessionCodeInput(storedCode)
-    }
-  }, [participantHydrated, hasSessionCodeInUrl, sessionCodeInput])
 
   useEffect(() => {
     if (!participantHydrated || !effectiveSessionCode) return
@@ -1197,11 +1190,12 @@ function ParticipantSessionPage() {
     )
   }
 
-  const canUseStoredJoin =
-    Boolean(participantToken) &&
-    Boolean(joinedSessionCode) &&
-    Boolean(effectiveSessionCode) &&
-    joinedSessionCode === effectiveSessionCode
+  const canUseStoredJoin = canReuseStoredParticipantSession({
+    hasSessionCodeInUrl,
+    participantToken,
+    joinedSessionCode,
+    effectiveSessionCode,
+  })
 
   const showJoinForm = !canUseStoredJoin && step === 'join'
 
