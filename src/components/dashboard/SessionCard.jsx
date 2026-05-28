@@ -43,7 +43,6 @@ function SessionCard({ session, onAction }) {
 
   const menuItems = useMemo(() => {
     const items = [
-      { id: 'share', label: 'Share', icon: Share2, onClick: () => onAction('share', session) },
       {
         id: 'edit-session',
         label: 'Edit session',
@@ -59,6 +58,14 @@ function SessionCard({ session, onAction }) {
       { id: 'analytics', label: 'Analytics', icon: BarChart3, onClick: () => onAction('analytics', session) },
       { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onAction('duplicate', session) },
     ]
+    if (isLive) {
+      items.unshift({
+        id: 'share',
+        label: 'Share',
+        icon: Share2,
+        onClick: () => onAction('share', session),
+      })
+    }
     if (!isLive) {
       items.push({
         id: 'delete',

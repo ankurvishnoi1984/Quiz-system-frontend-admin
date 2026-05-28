@@ -17,6 +17,7 @@ import {
   PieChart as PieChartIcon,
   Play,
   Presentation,
+  Rocket,
   Share2,
   Square,
   Trophy,
@@ -413,6 +414,7 @@ function LivePage() {
   const session = sessionQuery.data
   const statusLabel = session?.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : '—'
   const canEditLive = session?.status === 'live'
+  const canLaunchSession = session?.status !== 'live'
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
   const showSessionControls = session?.status === 'live' || session?.status === 'paused'
 
@@ -496,6 +498,39 @@ function LivePage() {
             <Trophy className="size-4" />
             Leaderboard
           </button>
+          {canLaunchSession ? (
+            <button
+              type="button"
+              disabled={transitionMutation.isPending}
+              onClick={() =>
+                transitionMutation.mutate(
+                  { action: 'start' },
+                  {
+                    onSuccess: () => {
+                      setHostAlert({
+                        variant: 'success',
+                        title: 'Session is live',
+                        message: 'The session has been launched successfully.',
+                        confirmLabel: 'OK',
+                      })
+                    },
+                    onError: (error) => {
+                      setHostAlert({
+                        variant: 'error',
+                        title: 'Could not launch session',
+                        message: error?.message || 'Unable to launch this session. Please try again.',
+                        confirmLabel: 'Close',
+                      })
+                    },
+                  },
+                )
+              }
+              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-60"
+            >
+              <Rocket className="size-4" />
+              {transitionMutation.isPending ? 'Launching…' : 'Launch'}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -507,16 +542,18 @@ function LivePage() {
             <Presentation className="size-4" />
             Present
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShareOpen(true)
-            }}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
-          >
-            <Share2 className="size-4" />
-            Share
-          </button>
+          {session.status === 'live' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setShareOpen(true)
+              }}
+              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+            >
+              <Share2 className="size-4" />
+              Share
+            </button>
+          ) : null}
         </div>
       </div>
 
