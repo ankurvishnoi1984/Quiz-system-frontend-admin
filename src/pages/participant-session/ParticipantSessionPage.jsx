@@ -16,6 +16,11 @@ import { createRealtimeClient, RealtimeEvent } from '../../services/realtimeClie
 import { useParticipantStore } from '../../store/participantStore'
 import { hasSessionCodeInJoinPath, normalizeSessionCode } from '../../utils/joinUrl'
 import { computeResponseTimeMs } from '../../utils/quizResponseTime'
+import { isStrictLateJoinSession } from '../../utils/sessionFlags'
+import {
+  filterActiveQuestionsForLateJoinPolicy,
+  getCountdownEndsAtForQuestion,
+} from '../../utils/questionTimer'
 import { ActiveQuestionPanel } from './components/ActiveQuestionPanel'
 import { JoinFormView } from './components/JoinFormView'
 import { LeaderboardModal } from './components/LeaderboardModal'
@@ -153,12 +158,13 @@ function ParticipantSessionPage() {
         text: q.question_text,
         type: mapQuestionType(q.question_type),
         rawType: q.question_type,
-        isLive: Boolean(q.is_live),
+        isLive: q.is_live === true || q.is_live === 1 || q.is_live === '1',
         answerRevealed: Boolean(q.answer_revealed),
         correctOptionIds: (q.correct_option_ids || []).map(Number),
         showLeaderboard: Boolean(q.show_leaderboard),
         options: q.question_options || [],
         timeLimit: q.time_limit_seconds || 0,
+        liveActivatedAt: q.live_activated_at || null,
       })),
     [questionsQuery.data],
   )
@@ -191,16 +197,17 @@ function ParticipantSessionPage() {
     })
   }, [mappedQuestions])
 
-  const activeQuestions = useMemo(
-    () => mappedQuestions.filter((q) => q.isLive),
-    [mappedQuestions],
-  )
-
   const session = sessionQuery.data
   const isSessionEnded =
     session?.status === 'completed' || session?.status === 'archived'
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
   const navigationEnabled = session?.participant_navigation_enabled !== false
+  const strictLateJoin = isStrictLateJoinSession(session)
+
+  const activeQuestions = useMemo(
+    () => filterActiveQuestionsForLateJoinPolicy(mappedQuestions, strictLateJoin),
+    [mappedQuestions, strictLateJoin, countdownTick],
+  )
 
   const question = useMemo(() => {
     if (!activeQuestions.length) return null
@@ -440,6 +447,26 @@ function ParticipantSessionPage() {
     }
 
     const offQuestion = client.on('question_changed', (data) => {
+      if (dbSessionId && data?.question_id != null) {
+        queryClient.setQueryData(['participant-questions', dbSessionId], (old) => {
+          if (!Array.isArray(old)) return old
+          const qid = Number(data.question_id)
+          return old.map((q) => {
+            if (Number(q.question_id) !== qid) return q
+            return {
+              ...q,
+              is_live: Boolean(data.is_live),
+              live_activated_at:
+                data.is_live && data.live_activated_at != null
+                  ? data.live_activated_at
+                  : data.is_live
+                    ? q.live_activated_at
+                    : null,
+            }
+          })
+        })
+      }
+
       queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
 
       if (!data.question_id) return
@@ -493,6 +520,8 @@ function ParticipantSessionPage() {
               leaderboard_enabled: data.leaderboard_enabled ?? old.leaderboard_enabled,
               participant_navigation_enabled:
                 data.participant_navigation_enabled ?? old.participant_navigation_enabled,
+              allow_late_join:
+                data.allow_late_join !== undefined ? data.allow_late_join : old.allow_late_join,
             }
           : old,
       )
@@ -671,10 +700,11 @@ function ParticipantSessionPage() {
 
   useEffect(() => {
     if (isSessionEnded) return
-    if (step !== 'active' || !hasCountdown) return
+    if (step !== 'active') return
+    if (!strictLateJoin && !hasCountdown) return
     const id = setInterval(() => setCountdownTick((t) => t + 1), 1000)
     return () => clearInterval(id)
-  }, [isSessionEnded, step, hasCountdown, question?.id])
+  }, [isSessionEnded, step, hasCountdown, strictLateJoin, question?.id])
 
   useEffect(() => {
     if (isSessionEnded) return
@@ -696,13 +726,19 @@ function ParticipantSessionPage() {
       return
     }
     if (byQuestion[qidStr]?.endsAt != null) return
-    setQuizCountdown({ questionId: qid, endsAt: Date.now() + timeLimit * 1000 })
+    const endsAt = getCountdownEndsAtForQuestion({
+      question,
+      strictLateJoin,
+    })
+    if (endsAt == null) return
+    setQuizCountdown({ questionId: qid, endsAt })
   }, [
     isSessionEnded,
     step,
-    question?.id,
+    question,
     hasCountdown,
     timeLimit,
+    strictLateJoin,
     setQuizCountdown,
     quizSubmittedQuestionIds,
   ])

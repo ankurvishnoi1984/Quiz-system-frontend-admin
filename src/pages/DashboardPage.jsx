@@ -361,7 +361,7 @@ function DashboardPage() {
         description: values.description || null,
         is_anonymous_default: values.joinRequirement === 'anonymous',
         show_results_to_participants: true,
-        allow_late_join: true,
+        allow_late_join: Boolean(values.allowLateJoin),
         leaderboard_enabled: values.overallLeaderboard,
         participant_navigation_enabled: values.enableNavigation,
         join_type: values.joinRequirement || 'name',
@@ -378,6 +378,7 @@ function DashboardPage() {
       departmentId: String(editSession.dept_id ?? ''),
       joinRequirement: joinType,
       enableNavigation: editSession.participant_navigation_enabled !== false,
+      allowLateJoin: Boolean(editSession.allow_late_join),
       overallLeaderboard: editSession.leaderboard_enabled !== false,
     }
   }, [editSession])
@@ -419,7 +420,7 @@ function DashboardPage() {
       Object.assign(payload, {
         description: values.description || null,
         show_results_to_participants: true,
-        allow_late_join: true,
+        allow_late_join: Boolean(values.allowLateJoin),
         participant_navigation_enabled: values.enableNavigation,
         join_type: values.joinRequirement || 'name',
       })
