@@ -30,17 +30,11 @@ export function isTimedLiveQuestionExpired(question, now = Date.now()) {
   return now >= deadline
 }
 
-/**
- * @param {boolean} strictLateJoin When true (single-question timed mode), hide timed live questions past deadline.
- */
-export function filterActiveQuestionsForLateJoinPolicy(questions, strictLateJoin) {
-  const live = (questions || []).filter(
+/** Live questions visible to participants (including expired timed; answers lock via timer). */
+export function filterActiveQuestionsForLateJoinPolicy(questions) {
+  return (questions || []).filter(
     (q) => q.isLive === true || q.is_live === true || q.is_live === 1,
   )
-  if (!strictLateJoin) return live
-
-  const now = Date.now()
-  return live.filter((q) => !isTimedLiveQuestionExpired(q, now))
 }
 
 /**

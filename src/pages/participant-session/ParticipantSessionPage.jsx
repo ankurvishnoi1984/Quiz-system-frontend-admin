@@ -208,8 +208,8 @@ function ParticipantSessionPage() {
   )
 
   const activeQuestions = useMemo(
-    () => filterActiveQuestionsForLateJoinPolicy(mappedQuestions, strictLateJoin),
-    [mappedQuestions, strictLateJoin, countdownTick],
+    () => filterActiveQuestionsForLateJoinPolicy(mappedQuestions),
+    [mappedQuestions],
   )
 
   const question = useMemo(() => {
@@ -1034,9 +1034,7 @@ function ParticipantSessionPage() {
           await submitQuestionById(qid)
         }
         setSubmitted(true)
-        const moved =
-          tryApplyPendingActivatedQuestion() || advanceToNextUnsubmittedActiveQuestion()
-        if (moved) {
+        if (tryApplyPendingActivatedQuestion()) {
           setSubmitted(false)
         }
       }, 800)
@@ -1299,7 +1297,7 @@ function ParticipantSessionPage() {
           onStepChange={setStep}
         />
 
-        {step === 'active' && !activeQuestions.length && <WaitingForQuestion />}
+        {step === 'active' && !question && <WaitingForQuestion />}
 
         {step === 'active' && question && (
           <ActiveQuestionPanel
