@@ -77,6 +77,13 @@ export async function openQuestionForReattemptApi(accessToken, questionId) {
   return data?.question || null
 }
 
+export async function closeQuestionSubmissionsApi(accessToken, questionId) {
+  const data = await authRequest(`/questions/${questionId}/close`, accessToken, {
+    method: 'POST',
+  })
+  return data?.question || null
+}
+
 export async function qaModerateApi(accessToken, qaId, action, body = null) {
   const data = await authRequest(`/qa/${qaId}/${action}`, accessToken, {
     method: 'PUT',

@@ -116,7 +116,9 @@ function ParticipantSessionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitModal, setSubmitModal] = useState(null)
   const [reattemptModal, setReattemptModal] = useState(null)
+  const [closedByHostModal, setClosedByHostModal] = useState(null)
   const [sessionEndedModal, setSessionEndedModal] = useState(false)
+  const closedNoticeShownRef = useRef(new Set())
   const sessionEndedNotifiedRef = useRef(false)
   const [leaderboard, setLeaderboard] = useState([])
   const [questionLeaderboardByQuestion, setQuestionLeaderboardByQuestion] = useState({})
@@ -165,6 +167,10 @@ function ParticipantSessionPage() {
         options: q.question_options || [],
         timeLimit: q.time_limit_seconds || 0,
         liveActivatedAt: q.live_activated_at || null,
+        submissionsClosed:
+          q.submissions_closed === true ||
+          q.submissions_closed === 1 ||
+          q.submissions_closed === '1',
       })),
     [questionsQuery.data],
   )
@@ -259,8 +265,32 @@ function ParticipantSessionPage() {
   const submittedAtSeconds =
     questionLockedBySubmission && countdownFrozen != null ? countdownFrozen : null
 
+  const submissionsClosed = Boolean(question?.submissionsClosed)
+
   const inputsLocked =
-    isSessionEnded || (hasCountdown && (questionLockedBySubmission || timer === 0))
+    isSessionEnded ||
+    submissionsClosed ||
+    (hasCountdown && (questionLockedBySubmission || timer === 0))
+
+  const showClosedByHostNotice = useCallback((questionText) => {
+    const preview = String(questionText || '').trim()
+    setClosedByHostModal({
+      variant: 'info',
+      title: 'Question closed',
+      message: preview
+        ? `This question was closed by the host and is no longer accepting submissions:\n\n“${preview.slice(0, 120)}${preview.length > 120 ? '…' : ''}”`
+        : 'This question was closed by the host and is no longer accepting submissions.',
+      confirmLabel: 'OK',
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!question?.id || !submissionsClosed) return
+    const key = String(question.id)
+    if (closedNoticeShownRef.current.has(key)) return
+    closedNoticeShownRef.current.add(key)
+    showClosedByHostNotice(question.text)
+  }, [question?.id, question?.text, submissionsClosed, showClosedByHostNotice])
 
   const activeQuestionsRef = useRef(activeQuestions)
   activeQuestionsRef.current = activeQuestions
@@ -431,6 +461,7 @@ function ParticipantSessionPage() {
       const qid = Number(data?.question_id)
       if (!qid) return
 
+      closedNoticeShownRef.current.delete(String(qid))
       unlockQuestionForReattempt(qid)
       setStep('active')
       setLiveQuestionId(qid)
@@ -465,6 +496,10 @@ function ParticipantSessionPage() {
                   : data.is_live
                     ? q.live_activated_at
                     : null,
+              submissions_closed:
+                data.submissions_closed !== undefined
+                  ? Boolean(data.submissions_closed)
+                  : q.submissions_closed,
             }
           })
         })
@@ -485,6 +520,31 @@ function ParticipantSessionPage() {
     })
 
     const offReattempt = client.on(RealtimeEvent.QUESTION_REATTEMPT_OPENED, handleReattemptOpened)
+
+    const offSubmissionsClosed = client.on(
+      RealtimeEvent.QUESTION_SUBMISSIONS_CLOSED,
+      (data) => {
+        const qid = Number(data?.question_id)
+        if (!qid) return
+
+        if (dbSessionId) {
+          queryClient.setQueryData(['participant-questions', dbSessionId], (old) => {
+            if (!Array.isArray(old)) return old
+            return old.map((q) =>
+              Number(q.question_id) === qid
+                ? { ...q, submissions_closed: true }
+                : q,
+            )
+          })
+        }
+
+        const key = String(qid)
+        if (!closedNoticeShownRef.current.has(key)) {
+          closedNoticeShownRef.current.add(key)
+          showClosedByHostNotice(data?.question_text)
+        }
+      },
+    )
 
     const offAnswerReveal = client.on(RealtimeEvent.ANSWER_REVEALED, (data) => {
       const qid = String(data?.question_id ?? '')
@@ -557,6 +617,7 @@ function ParticipantSessionPage() {
       offSession()
       offQuestion()
       offReattempt()
+      offSubmissionsClosed()
       offAnswerReveal()
       offResp()
       offLeaderboard()
@@ -574,6 +635,7 @@ function ParticipantSessionPage() {
     setLiveQuestionId,
     handleHostQuestionActivated,
     freezeAllCountdowns,
+    showClosedByHostNotice,
   ])
 
   useEffect(() => {
@@ -863,6 +925,17 @@ function ParticipantSessionPage() {
         payload.response_time_ms = responseTimeMs
       }
 
+      if (q.submissionsClosed) {
+        setSubmitModal({
+          variant: 'error',
+          title: 'Question closed',
+          message:
+            'This question was closed by the host and is no longer accepting submissions.',
+          confirmLabel: 'OK',
+        })
+        return false
+      }
+
       try {
         await submitResponseApi(participantToken, payload)
         markQuestionsSubmitted([questionId])
@@ -871,6 +944,16 @@ function ParticipantSessionPage() {
         }
         return true
       } catch (err) {
+        const message = err?.message || ''
+        if (/closed/i.test(message)) {
+          setSubmitModal({
+            variant: 'error',
+            title: 'Question closed',
+            message:
+              'This question was closed by the host and is no longer accepting submissions.',
+            confirmLabel: 'OK',
+          })
+        }
         console.error(err)
         return false
       }
@@ -912,6 +995,10 @@ function ParticipantSessionPage() {
 
   const handleSubmitCurrentQuestion = async () => {
     if (isSessionEnded || !question?.id) return
+    if (submissionsClosed) {
+      showClosedByHostNotice(question.text)
+      return
+    }
     if ((quizSubmittedQuestionIds || {})[String(question.id)]) {
       const moved = tryApplyPendingActivatedQuestion() || advanceToNextUnsubmittedActiveQuestion()
       if (!moved) {
@@ -1307,6 +1394,7 @@ function ParticipantSessionPage() {
             hasCountdown={hasCountdown}
             canGoToNextQuestion={canGoToNextQuestion}
             inputsLocked={inputsLocked}
+            submissionsClosed={submissionsClosed}
             hasAnyQuestionSaved={hasAnyQuestionSaved}
             timeLimit={timeLimit}
             timer={timer}
@@ -1376,6 +1464,15 @@ function ParticipantSessionPage() {
         message={reattemptModal?.message ?? ''}
         confirmLabel={reattemptModal?.confirmLabel ?? 'Go to question'}
         onClose={() => setReattemptModal(null)}
+      />
+
+      <ParticipantAlertModal
+        open={Boolean(closedByHostModal)}
+        variant={closedByHostModal?.variant ?? 'info'}
+        title={closedByHostModal?.title ?? 'Question closed'}
+        message={closedByHostModal?.message ?? ''}
+        confirmLabel={closedByHostModal?.confirmLabel ?? 'OK'}
+        onClose={() => setClosedByHostModal(null)}
       />
 
       <ParticipantAlertModal

@@ -24,14 +24,36 @@ function PresentModePage() {
   const [hostAlert, setHostAlert] = useState(null)
 
   const canEditLive = session?.status === 'live'
+  const singleActiveQuestionMode = session?.participant_navigation_enabled === false
 
   const {
     questionLiveMutation,
     questionLeaderboardMutation,
     answerRevealMutation,
+    closeQuestionMutation,
     reattemptMutation,
     openForReattempt,
+    closeQuestion,
   } = useHostQuestionMutations(accessToken, sessionId, {
+    onCloseQuestionSuccess: (questionText) => {
+      const preview = String(questionText || '').trim()
+      setHostAlert({
+        variant: 'success',
+        title: 'Question closed',
+        message: preview
+          ? `Participants can still see this question but can no longer submit answers:\n\n“${preview.slice(0, 120)}${preview.length > 120 ? '…' : ''}”`
+          : 'Participants can still see this question but can no longer submit answers.',
+        confirmLabel: 'OK',
+      })
+    },
+    onCloseQuestionError: (error) => {
+      setHostAlert({
+        variant: 'error',
+        title: 'Could not close question',
+        message: error.message || 'Something went wrong. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
     onReattemptSuccess: (questionText) => {
       const preview = String(questionText || '').trim()
       setHostAlert({
@@ -142,12 +164,15 @@ function PresentModePage() {
               <HostQuestionControls
                 question={currentQuestion}
                 canEditLive={canEditLive}
+                singleActiveQuestionMode={singleActiveQuestionMode}
                 size="compact"
                 showLabel
                 questionLiveMutation={questionLiveMutation}
                 answerRevealMutation={answerRevealMutation}
                 questionLeaderboardMutation={questionLeaderboardMutation}
+                closeQuestionMutation={closeQuestionMutation}
                 reattemptMutation={reattemptMutation}
+                onCloseQuestion={() => closeQuestion(currentQuestion)}
                 onOpenForReattempt={() => openForReattempt(currentQuestion)}
               />
             </div>

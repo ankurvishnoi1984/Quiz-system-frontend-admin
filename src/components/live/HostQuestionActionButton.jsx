@@ -36,6 +36,14 @@ const HOST_ACTION_TONES = {
     idleIcon: 'bg-sky-200/80 text-sky-700',
     dot: 'bg-sky-600',
   },
+  slate: {
+    active:
+      'border-slate-500 bg-slate-100 text-slate-950 shadow-sm shadow-slate-200/60 ring-1 ring-slate-300/70',
+    activeIcon: 'bg-slate-600 text-white',
+    idle: 'border-slate-200/90 bg-slate-50/90 text-slate-800 hover:border-slate-400 hover:bg-slate-100',
+    idleIcon: 'bg-slate-200/80 text-slate-700',
+    dot: 'bg-slate-600',
+  },
 }
 
 export function HostQuestionActionButton({

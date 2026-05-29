@@ -1,5 +1,6 @@
-import { Eye, EyeOff, Play, RotateCcw, Square, Trophy } from 'lucide-react'
+import { Eye, EyeOff, Lock, Play, RotateCcw, Square, Trophy } from 'lucide-react'
 import { questionSupportsAnswerReveal } from '../../utils/answerReveal'
+import { canHostCloseQuestion } from '../../utils/hostQuestionControls'
 import { HostQuestionActionButton } from './HostQuestionActionButton'
 
 /**
@@ -12,7 +13,10 @@ import { HostQuestionActionButton } from './HostQuestionActionButton'
  *   answerRevealMutation: import('@tanstack/react-query').UseMutationResult,
  *   questionLeaderboardMutation: import('@tanstack/react-query').UseMutationResult,
  *   reattemptMutation: import('@tanstack/react-query').UseMutationResult,
+ *   closeQuestionMutation?: import('@tanstack/react-query').UseMutationResult,
  *   onOpenForReattempt: () => void,
+ *   onCloseQuestion?: () => void,
+ *   singleActiveQuestionMode?: boolean,
  * }} props
  */
 export function HostQuestionControls({
@@ -24,11 +28,15 @@ export function HostQuestionControls({
   answerRevealMutation,
   questionLeaderboardMutation,
   reattemptMutation,
+  closeQuestionMutation,
   onOpenForReattempt,
+  onCloseQuestion,
+  singleActiveQuestionMode = false,
 }) {
   if (!question) return null
 
   const supportsReveal = questionSupportsAnswerReveal(question.type, question.isQuizMode)
+  const showCloseQuestion = canHostCloseQuestion(question, singleActiveQuestionMode)
 
   return (
     <div>
@@ -100,6 +108,17 @@ export function HostQuestionControls({
             }
             active={question.showLeaderboard}
             tone="amber"
+            size={size}
+          />
+        ) : null}
+        {showCloseQuestion ? (
+          <HostQuestionActionButton
+            disabled={!canEditLive || closeQuestionMutation?.isPending}
+            onClick={onCloseQuestion}
+            icon={Lock}
+            label={closeQuestionMutation?.isPending ? 'Closing…' : 'Close question'}
+            title="Stop accepting new responses while keeping this question visible"
+            tone="slate"
             size={size}
           />
         ) : null}

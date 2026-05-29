@@ -155,6 +155,7 @@ function LivePage() {
         answerRevealed: Boolean(q.answer_revealed),
         showLeaderboard: Boolean(q.show_leaderboard),
         timeLimit: Number(q.time_limit_seconds) || 0,
+        submissionsClosed: Boolean(q.submissions_closed),
         options: q.question_options || q.QuestionOptions || [],
       })),
     [questionsQuery.data],
@@ -262,10 +263,32 @@ function LivePage() {
     questionLiveMutation,
     questionLeaderboardMutation,
     answerRevealMutation,
+    closeQuestionMutation,
     reattemptMutation,
     openForReattempt,
+    closeQuestion,
   } = useHostQuestionMutations(accessToken, sessionId, {
     onMutationError: (message) => setErrorMessage(message),
+    onCloseQuestionSuccess: (questionText) => {
+      setErrorMessage('')
+      const preview = String(questionText || '').trim()
+      setHostAlert({
+        variant: 'success',
+        title: 'Question closed',
+        message: preview
+          ? `Participants can still see this question but can no longer submit answers:\n\n“${preview.slice(0, 120)}${preview.length > 120 ? '…' : ''}”`
+          : 'Participants can still see this question but can no longer submit answers.',
+        confirmLabel: 'OK',
+      })
+    },
+    onCloseQuestionError: (error) => {
+      setHostAlert({
+        variant: 'error',
+        title: 'Could not close question',
+        message: error.message || 'Something went wrong. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
     onReattemptSuccess: (questionText) => {
       setErrorMessage('')
       const preview = String(questionText || '').trim()
@@ -667,10 +690,16 @@ function LivePage() {
               <HostQuestionControls
                 question={activeQuestion}
                 canEditLive={canEditLive}
+                singleActiveQuestionMode={singleActiveQuestionMode}
                 questionLiveMutation={questionLiveMutation}
                 answerRevealMutation={answerRevealMutation}
                 questionLeaderboardMutation={questionLeaderboardMutation}
+                closeQuestionMutation={closeQuestionMutation}
                 reattemptMutation={reattemptMutation}
+                onCloseQuestion={() => {
+                  if (!canEditLive) return
+                  closeQuestion(activeQuestion)
+                }}
                 onOpenForReattempt={() => {
                   if (!canEditLive) return
                   openForReattempt(activeQuestion)

@@ -76,6 +76,8 @@ export function mapLiveQuestions(questions) {
       type: mapLiveQuestionType(q.question_type),
       rawType: q.question_type,
       isLive: Boolean(q.is_live),
+      timeLimit: Number(q.time_limit_seconds) || 0,
+      submissionsClosed: Boolean(q.submissions_closed),
       isQuizMode: Boolean(q.is_quiz_mode),
       answerRevealed,
       showLeaderboard: Boolean(q.show_leaderboard),

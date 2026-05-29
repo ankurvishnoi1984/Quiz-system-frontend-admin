@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
+  closeQuestionSubmissionsApi,
   openQuestionForReattemptApi,
   setQuestionAnswerRevealedApi,
   setQuestionLeaderboardVisibleApi,
@@ -9,7 +10,13 @@ import {
 export function useHostQuestionMutations(
   accessToken,
   sessionId,
-  { onReattemptSuccess, onReattemptError, onMutationError } = {},
+  {
+    onReattemptSuccess,
+    onReattemptError,
+    onCloseQuestionSuccess,
+    onCloseQuestionError,
+    onMutationError,
+  } = {},
 ) {
   const queryClient = useQueryClient()
 
@@ -63,6 +70,17 @@ export function useHostQuestionMutations(
       onMutationError?.(error.message || 'Unable to update answer visibility'),
   })
 
+  const closeQuestionMutation = useMutation({
+    mutationFn: ({ questionId }) => closeQuestionSubmissionsApi(accessToken, questionId),
+    onSuccess: (_data, { questionText }) => {
+      invalidateQuestions()
+      onCloseQuestionSuccess?.(questionText)
+    },
+    onError: (error) => {
+      onCloseQuestionError?.(error)
+    },
+  })
+
   const reattemptMutation = useMutation({
     mutationFn: ({ questionId }) => openQuestionForReattemptApi(accessToken, questionId),
     onSuccess: (_data, { questionText }) => {
@@ -82,11 +100,21 @@ export function useHostQuestionMutations(
     })
   }
 
+  const closeQuestion = (question) => {
+    if (!question?.id) return
+    closeQuestionMutation.mutate({
+      questionId: question.id,
+      questionText: question.text,
+    })
+  }
+
   return {
     questionLiveMutation,
     questionLeaderboardMutation,
     answerRevealMutation,
+    closeQuestionMutation,
     reattemptMutation,
     openForReattempt,
+    closeQuestion,
   }
 }

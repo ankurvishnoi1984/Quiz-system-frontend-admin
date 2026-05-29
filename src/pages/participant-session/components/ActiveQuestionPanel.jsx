@@ -14,6 +14,7 @@ export function ActiveQuestionPanel({
   hasCountdown,
   canGoToNextQuestion,
   inputsLocked,
+  submissionsClosed = false,
   hasAnyQuestionSaved,
   timeLimit,
   timer,
@@ -68,12 +69,18 @@ export function ActiveQuestionPanel({
             No timer: revisit questions with Previous; use Submit on the last question to update.
           </p>
         )}
-        {!navigationEnabled && (
+        {!navigationEnabled && !submissionsClosed && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             Answer and submit; the host will show the next question when ready.
           </p>
         )}
       </div>
+
+      {submissionsClosed ? (
+        <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          This question was closed by the host and is no longer accepting submissions.
+        </p>
+      ) : null}
 
       {question.media?.url && question.media.kind === 'image' && (
         <img
@@ -185,6 +192,8 @@ export function ActiveQuestionPanel({
             }
             disabled={
               sessionEnded ||
+              submissionsClosed ||
+              inputsLocked ||
               isSubmitting ||
               (navigationEnabled
                 ? isLastDisplayedQuestion
@@ -195,11 +204,13 @@ export function ActiveQuestionPanel({
             title={
               sessionEnded
                 ? 'Session has ended'
-                : hasCountdown && !canGoToNextQuestion
-                  ? 'Answer this question or wait for the timer'
-                  : !hasFinalizePayload
-                    ? 'Answer this question before submitting'
-                    : undefined
+                : submissionsClosed
+                  ? 'This question was closed by the host'
+                  : hasCountdown && !canGoToNextQuestion
+                    ? 'Answer this question or wait for the timer'
+                    : !hasFinalizePayload
+                      ? 'Answer this question before submitting'
+                      : undefined
             }
             onClick={onNextOrSubmit}
             className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
