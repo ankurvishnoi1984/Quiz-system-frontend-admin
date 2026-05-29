@@ -7,7 +7,6 @@ const defaultInitial = {
   departmentId: '',
   joinRequirement: 'name',
   enableNavigation: false,
-  allowLateJoin: false,
   overallLeaderboard: true,
 }
 
@@ -27,14 +26,12 @@ function SessionFormModal({
 }) {
   const [joinRequirement, setJoinRequirement] = useState(defaultInitial.joinRequirement)
   const [enableNavigation, setEnableNavigation] = useState(defaultInitial.enableNavigation)
-  const [allowLateJoin, setAllowLateJoin] = useState(defaultInitial.allowLateJoin)
   const [overallLeaderboard, setOverallLeaderboard] = useState(defaultInitial.overallLeaderboard)
 
   useEffect(() => {
     if (!open) return
     setJoinRequirement(initialValues.joinRequirement ?? defaultInitial.joinRequirement)
     setEnableNavigation(Boolean(initialValues.enableNavigation))
-    setAllowLateJoin(Boolean(initialValues.allowLateJoin))
     setOverallLeaderboard(initialValues.overallLeaderboard !== false)
   }, [open, initialValues])
 
@@ -47,7 +44,6 @@ function SessionFormModal({
       departmentId: String(form.get('department') || defaultDepartmentId || ''),
       joinRequirement,
       enableNavigation,
-      allowLateJoin,
       overallLeaderboard,
     })
   }
@@ -113,24 +109,6 @@ function SessionFormModal({
               </select>
             </div>
             <div className="md:col-span-2">
-              <label className="flex items-center justify-between gap-3 rounded-xl border border-blue-200/70 bg-white px-3 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">Allow late join</p>
-                  <p className="text-xs text-slate-500">
-                    When off, participants who join mid-question get only the remaining time, and
-                    miss timed questions that already ended. They can join only while the session is
-                    live.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={allowLateJoin}
-                  onChange={(e) => setAllowLateJoin(e.target.checked)}
-                  className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
-                />
-              </label>
-            </div>
-            <div className="md:col-span-2">
               <label className="text-sm font-semibold text-slate-700" htmlFor="question-availability">
                 Question availability
               </label>
@@ -149,7 +127,9 @@ function SessionFormModal({
               </select>
               <p className="mt-1 text-xs text-slate-500">
                 Multiple mode lets you activate several questions at once; participants browse between
-                them. Single mode shows only the current live question until the host advances.
+                them. Single mode shows only the current live question until the host advances. Timed
+                questions in single mode use a shared host countdown — late joiners get only remaining
+                time.
               </p>
             </div>
           </>

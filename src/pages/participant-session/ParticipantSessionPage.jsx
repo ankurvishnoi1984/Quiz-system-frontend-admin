@@ -202,7 +202,10 @@ function ParticipantSessionPage() {
     session?.status === 'completed' || session?.status === 'archived'
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
   const navigationEnabled = session?.participant_navigation_enabled !== false
-  const strictLateJoin = isStrictLateJoinSession(session)
+  const strictLateJoin = useMemo(
+    () => isStrictLateJoinSession(session, mappedQuestions),
+    [session, mappedQuestions],
+  )
 
   const activeQuestions = useMemo(
     () => filterActiveQuestionsForLateJoinPolicy(mappedQuestions, strictLateJoin),
