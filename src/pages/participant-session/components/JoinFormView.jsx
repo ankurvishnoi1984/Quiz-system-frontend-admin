@@ -15,6 +15,8 @@ export function JoinFormView({
   email,
   onEmailChange,
   joinError,
+  joinBlocked = false,
+  joinBlockedMessage = '',
   onSubmit,
 }) {
   return (
@@ -90,13 +92,19 @@ export function JoinFormView({
           </>
         ) : null}
 
-        {joinError && (
+        {joinBlocked ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+            {joinBlockedMessage || 'Session has already started'}
+          </p>
+        ) : null}
+
+        {joinError && !joinBlocked ? (
           <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{joinError}</p>
-        )}
+        ) : null}
 
         <button
           type="submit"
-          disabled={!showJoinDetails}
+          disabled={!showJoinDetails || joinBlocked}
           className="h-11 w-full rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Join

@@ -137,6 +137,8 @@ function ParticipantSessionPage() {
     retry: false,
     refetchInterval: (query) => {
       const status = query.state.data?.status
+      const onJoinStep = step === 'join' && !participantToken
+      if (onJoinStep && status === 'live') return 5000
       if (step === 'waiting' || status === 'draft') return 3000
       if (participantToken && (status === 'live' || status === 'paused')) return 5000
       return false
@@ -1311,6 +1313,11 @@ function ParticipantSessionPage() {
       return
     }
 
+    if (session.join_blocked) {
+      setJoinError(session.join_blocked_message || 'Session has already started')
+      return
+    }
+
     try {
       let nickname, checkEmail, isAnonymous
 
@@ -1447,6 +1454,10 @@ function ParticipantSessionPage() {
   const showJoinForm = !canUseStoredJoin && step === 'join'
 
   if (showJoinForm) {
+    const joinBlocked = Boolean(session?.join_blocked)
+    const joinBlockedMessage =
+      session?.join_blocked_message || 'Session has already started'
+
     return (
       <JoinFormView
         hasSessionCodeInUrl={hasSessionCodeInUrl}
@@ -1463,6 +1474,8 @@ function ParticipantSessionPage() {
         email={email}
         onEmailChange={setEmail}
         joinError={joinError}
+        joinBlocked={joinBlocked}
+        joinBlockedMessage={joinBlockedMessage}
         onSubmit={handleJoin}
       />
     )
