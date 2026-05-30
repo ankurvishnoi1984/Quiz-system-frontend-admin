@@ -894,17 +894,23 @@ function ParticipantSessionPage() {
   }, [leaderboardQuery.data])
 
   const currentResponse = responses[question?.id] || {}
-  const answerRevealMeta =
-    answerRevealByQuestion[String(question?.id)] ||
-    (question?.answerRevealed
-      ? {
-          revealed: true,
-          correctOptionIds: question.correctOptionIds || [],
-        }
-      : null)
-  const isAnswerRevealed = Boolean(answerRevealMeta?.revealed)
-  const hasAttemptedQuestion = Boolean(questionLockedBySubmission || (hasCountdown && timer === 0))
-  const canSeeAnswerReveal = isAnswerRevealed && hasAttemptedQuestion
+  const hasSubmittedQuestion = questionLockedBySubmission
+  const isAnswerRevealedByHost = Boolean(
+    answerRevealByQuestion[String(question?.id)]?.revealed ?? question?.answerRevealed,
+  )
+  const canSeeAnswerReveal = isAnswerRevealedByHost && hasSubmittedQuestion
+  const answerRevealMeta = canSeeAnswerReveal
+    ? {
+        revealed: true,
+        correctOptionIds:
+          answerRevealByQuestion[String(question?.id)]?.correctOptionIds ??
+          question?.correctOptionIds ??
+          [],
+      }
+    : isAnswerRevealedByHost
+      ? { revealed: true, correctOptionIds: [] }
+      : null
+  const isAnswerRevealed = isAnswerRevealedByHost
   const participantAnswerIsCorrect = useMemo(() => {
     if (!canSeeAnswerReveal || !question) return null
     return isParticipantChoiceCorrect(question, currentResponse, answerRevealMeta)
@@ -1442,7 +1448,7 @@ function ParticipantSessionPage() {
             currentResponse={currentResponse}
             answerRevealMeta={answerRevealMeta}
             isAnswerRevealed={isAnswerRevealed}
-            hasAttemptedQuestion={hasAttemptedQuestion}
+            hasSubmittedQuestion={hasSubmittedQuestion}
             canSeeAnswerReveal={canSeeAnswerReveal}
             participantAnswerIsCorrect={participantAnswerIsCorrect}
             sessionEnded={isSessionEnded}

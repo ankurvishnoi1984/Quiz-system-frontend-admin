@@ -22,7 +22,7 @@ export function ActiveQuestionPanel({
   currentResponse,
   answerRevealMeta,
   isAnswerRevealed,
-  hasAttemptedQuestion,
+  hasSubmittedQuestion,
   canSeeAnswerReveal,
   participantAnswerIsCorrect,
   sessionEnded = false,
@@ -103,11 +103,12 @@ export function ActiveQuestionPanel({
       )}
 
       {isAnswerRevealed &&
-        !hasAttemptedQuestion &&
+        !hasSubmittedQuestion &&
         (question.type === 'MCQ' || question.type === 'True/False') && (
           <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-slate-600">
-            Answer this question first. The correct answer will be shown after you submit or when
-            time runs out.
+            {hasCountdown && timer === 0
+              ? 'Time is up. The correct answer is shown only to participants who submitted a response.'
+              : 'The correct answer will be shown here only after you submit a response.'}
           </p>
         )}
 
