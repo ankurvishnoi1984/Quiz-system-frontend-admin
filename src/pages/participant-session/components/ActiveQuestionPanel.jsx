@@ -83,7 +83,7 @@ export function ActiveQuestionPanel({
         </p>
       ) : null}
 
-      {submissionsClosed && !allQuestionsClosedByHost ? (
+      {submissionsClosed && !allQuestionsClosedByHost && !question?.openForReattempt ? (
         <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
           This question was closed by the host and is no longer accepting submissions.
         </p>
@@ -203,8 +203,8 @@ export function ActiveQuestionPanel({
               isSubmitting ||
               (navigationEnabled && !isLastDisplayedQuestion
                 ? hasCountdown && !canGoToNextQuestion
-                : submissionsClosed ||
-                  allQuestionsClosedByHost ||
+                : (submissionsClosed && !question?.openForReattempt) ||
+                  (allQuestionsClosedByHost && !question?.openForReattempt) ||
                   inputsLocked ||
                   (navigationEnabled
                     ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
@@ -217,9 +217,9 @@ export function ActiveQuestionPanel({
                   ? hasCountdown && !canGoToNextQuestion
                     ? 'Answer this question or wait for the timer'
                     : undefined
-                  : allQuestionsClosedByHost
+                  : allQuestionsClosedByHost && !question?.openForReattempt
                     ? 'All questions are closed by the host'
-                    : submissionsClosed
+                    : submissionsClosed && !question?.openForReattempt
                       ? 'This question was closed by the host'
                       : hasCountdown && !canGoToNextQuestion
                         ? 'Answer this question or wait for the timer'

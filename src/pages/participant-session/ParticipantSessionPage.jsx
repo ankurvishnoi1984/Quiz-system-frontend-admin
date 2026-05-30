@@ -280,11 +280,12 @@ function ParticipantSessionPage() {
     questionLockedBySubmission && countdownFrozen != null ? countdownFrozen : null
 
   const submissionsClosed = Boolean(question?.submissionsClosed)
+  const openForReattempt = Boolean(question?.openForReattempt)
 
   const inputsLocked =
     isSessionEnded ||
-    submissionsClosed ||
-    (navigationEnabled && allQuestionsClosedByHost) ||
+    (submissionsClosed && !openForReattempt) ||
+    (navigationEnabled && allQuestionsClosedByHost && !openForReattempt) ||
     (hasCountdown && (questionLockedBySubmission || timer === 0))
 
   const showClosedByHostNotice = useCallback((questionText) => {
@@ -310,11 +311,15 @@ function ParticipantSessionPage() {
   }, [])
 
   useEffect(() => {
-    if (!navigationEnabled || !allLiveQuestionsClosed) return
-    setAllQuestionsClosedByHost(true)
-    if (allQuestionsClosedNoticeShownRef.current) return
-    allQuestionsClosedNoticeShownRef.current = true
-    showAllQuestionsClosedNotice()
+    if (!navigationEnabled) return
+    if (allLiveQuestionsClosed) {
+      setAllQuestionsClosedByHost(true)
+      if (allQuestionsClosedNoticeShownRef.current) return
+      allQuestionsClosedNoticeShownRef.current = true
+      showAllQuestionsClosedNotice()
+    } else {
+      setAllQuestionsClosedByHost(false)
+    }
   }, [navigationEnabled, allLiveQuestionsClosed, showAllQuestionsClosedNotice])
 
   useEffect(() => {
@@ -1029,7 +1034,7 @@ function ParticipantSessionPage() {
         payload.response_time_ms = responseTimeMs
       }
 
-      if (q.submissionsClosed) {
+      if (q.submissionsClosed && !q.openForReattempt) {
         setSubmitModal({
           variant: 'error',
           title: 'Question closed',
@@ -1099,7 +1104,10 @@ function ParticipantSessionPage() {
 
   const handleSubmitCurrentQuestion = async () => {
     if (isSessionEnded || !question?.id) return
-    if (submissionsClosed || (navigationEnabled && allQuestionsClosedByHost)) {
+    if (
+      (submissionsClosed && !question?.openForReattempt) ||
+      (navigationEnabled && allQuestionsClosedByHost && !question?.openForReattempt)
+    ) {
       if (navigationEnabled && allQuestionsClosedByHost) {
         showAllQuestionsClosedNotice()
       } else {
@@ -1153,7 +1161,9 @@ function ParticipantSessionPage() {
   const handleNext = async () => {
     if (isSessionEnded || !navigationEnabled) return
     if (!question?.id || isLastDisplayedQuestion) return
-    const submissionsBlocked = submissionsClosed || allQuestionsClosedByHost
+    const submissionsBlocked =
+      (submissionsClosed && !question?.openForReattempt) ||
+      (allQuestionsClosedByHost && !question?.openForReattempt)
     if (
       !submissionsBlocked &&
       participantQuestionHasAnswer(question, responses[question.id])

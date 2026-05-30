@@ -141,6 +141,7 @@ export function shouldIncludeQuestionInFinalize(
   navigationEnabled,
   responses,
 ) {
+  if (question?.submissionsClosed && !question?.openForReattempt) return false
   const payload = buildResponsePayloadForQuestion(question, responses[question.id])
   if (!payload) return false
   if (!submittedIds?.[String(question.id)]) return true
