@@ -14,6 +14,7 @@ import {
 import {
   BarChart3,
   Eye,
+  Layers,
   PieChart as PieChartIcon,
   Play,
   Presentation,
@@ -32,6 +33,7 @@ import { CHART_COLORS, CHART_TOOLTIP_STYLE, getChartColor } from '../utils/chart
 import ShareSessionPanel from '../components/dashboard/ShareSessionPanel'
 import Modal from '../components/ui/Modal'
 import { HostAlertModal } from '../components/live/HostAlertModal'
+import { HostQuestionActionButton } from '../components/live/HostQuestionActionButton'
 import { HostQuestionControls } from '../components/live/HostQuestionControls'
 import { useHostQuestionMutations } from '../hooks/useHostQuestionMutations'
 import { LiveQaPanel } from '../components/leaderboard/LiveQaPanel'
@@ -440,6 +442,7 @@ function LivePage() {
   const canLaunchSession = session?.status !== 'live'
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
   const showSessionControls = session?.status === 'live' || session?.status === 'paused'
+  const showCloseAllQuestionsButton = canEditLive && !singleActiveQuestionMode
 
   if (!sessionId) {
     return (
@@ -587,11 +590,22 @@ function LivePage() {
 
 
       <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5">
-        <div>
-          <p className="text-sm font-semibold text-navy-900">Session questions</p>
-          <p className="text-xs text-slate-600">
-            {mappedQuestions.length} question{mappedQuestions.length === 1 ? '' : 's'} • select a question to control and view results
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-navy-900">Session questions</p>
+            <p className="text-xs text-slate-600">
+              {mappedQuestions.length} question{mappedQuestions.length === 1 ? '' : 's'} • select a question to control and view results
+            </p>
+          </div>
+          {showCloseAllQuestionsButton ? (
+            <HostQuestionActionButton
+              icon={Layers}
+              label="Close all questions"
+              title="Deactivate every live question"
+              tone="rose"
+              onClick={() => {}}
+            />
+          ) : null}
         </div>
 
         {!mappedQuestions.length ? (
