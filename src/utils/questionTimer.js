@@ -40,18 +40,26 @@ export function filterActiveQuestionsForLateJoinPolicy(questions) {
 /**
  * Countdown end timestamp for the participant UI.
  * Strict late join: shared host deadline (remaining time only).
- * Otherwise: full limit from when the participant opens the question.
+ * Reattempt always gets a fresh window (host resets live_activated_at).
  */
 export function getCountdownEndsAtForQuestion({ question, strictLateJoin }) {
   const limit = Number(question?.timeLimit ?? question?.time_limit_seconds ?? 0)
   if (limit <= 0) return null
 
-  if (!strictLateJoin) {
+  const isReattempt =
+    question?.openForReattempt === true ||
+    question?.open_for_reattempt === true ||
+    question?.open_for_reattempt === 1
+
+  if (!strictLateJoin || isReattempt) {
+    if (isReattempt && strictLateJoin) {
+      const deadline = getQuestionDeadlineMs(question)
+      if (deadline != null && deadline > Date.now()) return deadline
+    }
     return Date.now() + limit * 1000
   }
 
   const deadline = getQuestionDeadlineMs(question)
   if (deadline != null) return deadline
-  // Host activation time unknown — participant still sees the question with a fresh window.
   return Date.now() + limit * 1000
 }

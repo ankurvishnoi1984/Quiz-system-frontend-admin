@@ -167,6 +167,10 @@ function ParticipantSessionPage() {
         options: q.question_options || [],
         timeLimit: q.time_limit_seconds || 0,
         liveActivatedAt: q.live_activated_at || null,
+        openForReattempt:
+          q.open_for_reattempt === true ||
+          q.open_for_reattempt === 1 ||
+          q.open_for_reattempt === '1',
         submissionsClosed:
           q.submissions_closed === true ||
           q.submissions_closed === 1 ||
@@ -462,9 +466,38 @@ function ParticipantSessionPage() {
       if (!qid) return
 
       closedNoticeShownRef.current.delete(String(qid))
-      unlockQuestionForReattempt(qid)
+
+      const cachedQuestions = queryClient.getQueryData(['participant-questions', dbSessionId])
+      const cachedQuestion = Array.isArray(cachedQuestions)
+        ? cachedQuestions.find((q) => Number(q.question_id) === qid)
+        : null
+      const timeLimitSeconds =
+        Number(data?.time_limit_seconds) ||
+        Number(cachedQuestion?.time_limit_seconds) ||
+        0
+      const liveActivatedAt = data?.live_activated_at || new Date().toISOString()
+
+      if (dbSessionId) {
+        queryClient.setQueryData(['participant-questions', dbSessionId], (old) => {
+          if (!Array.isArray(old)) return old
+          return old.map((q) =>
+            Number(q.question_id) === qid
+              ? {
+                  ...q,
+                  is_live: true,
+                  live_activated_at: liveActivatedAt,
+                  open_for_reattempt: true,
+                  submissions_closed: false,
+                }
+              : q,
+          )
+        })
+      }
+
+      unlockQuestionForReattempt(qid, { timeLimitSeconds })
       setStep('active')
       setLiveQuestionId(qid)
+      setSubmitted(false)
       const preview = String(data?.question_text || '').trim()
       setReattemptModal({
         variant: 'info',
@@ -496,6 +529,10 @@ function ParticipantSessionPage() {
                   : data.is_live
                     ? q.live_activated_at
                     : null,
+              open_for_reattempt:
+                data.open_for_reattempt !== undefined
+                  ? Boolean(data.open_for_reattempt)
+                  : q.open_for_reattempt,
               submissions_closed:
                 data.submissions_closed !== undefined
                   ? Boolean(data.submissions_closed)
@@ -783,14 +820,17 @@ function ParticipantSessionPage() {
     const submittedIds = s.quizSubmittedQuestionIds || {}
     const qidStr = String(qid)
     const byQuestion = s.quizCountdownByQuestion || {}
+    const existingCountdown = byQuestion[qidStr]
     if (submittedIds[qidStr]) {
-      if (!byQuestion[qidStr]) {
+      if (!existingCountdown) {
         setQuizCountdown({ questionId: qid, endsAt: Date.now() })
         useParticipantStore.getState().freezeCountdownAfterSubmit(qid)
       }
       return
     }
-    if (byQuestion[qidStr]?.endsAt != null) return
+    if (existingCountdown?.endsAt != null && existingCountdown.endsAt > Date.now()) {
+      return
+    }
     const endsAt = getCountdownEndsAtForQuestion({
       question,
       strictLateJoin,

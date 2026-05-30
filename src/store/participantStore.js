@@ -64,13 +64,21 @@ export const useParticipantStore = create(
       clearQuizSubmissionLocks: () => set({ quizSubmittedQuestionIds: {} }),
 
       /** Host opened question for reattempt — allow editing and resubmit */
-      unlockQuestionForReattempt: (questionId) => {
+      unlockQuestionForReattempt: (questionId, { timeLimitSeconds = 0 } = {}) => {
         const qid = String(questionId)
+        const limit = Number(timeLimitSeconds) || 0
         set((s) => {
           const locks = { ...(s.quizSubmittedQuestionIds || {}) }
           delete locks[qid]
           const countdowns = { ...(s.quizCountdownByQuestion || {}) }
-          delete countdowns[qid]
+          if (limit > 0) {
+            countdowns[qid] = {
+              endsAt: Date.now() + limit * 1000,
+              frozen: null,
+            }
+          } else {
+            delete countdowns[qid]
+          }
           const openedAt = { ...(s.quizQuestionOpenedAt || {}) }
           delete openedAt[qid]
           return {

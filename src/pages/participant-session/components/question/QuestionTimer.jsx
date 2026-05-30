@@ -87,10 +87,10 @@ export function QuestionTimer({ timer, timeLimit, submittedAtSeconds = null }) {
         <p className="mt-0.5 text-xs text-slate-500">
           {submitted
             ? urgent
-              ? 'Answer locked — timer almost up'
+              ? 'Answer locked — timer up'
               : `Answer locked — ${timer} second${timer === 1 ? '' : 's'} until time runs out`
             : urgent
-              ? 'Hurry — time is almost up'
+              ? 'Time is up'
               : `${timer} second${timer === 1 ? '' : 's'} remaining`}
         </p>
       </div>
