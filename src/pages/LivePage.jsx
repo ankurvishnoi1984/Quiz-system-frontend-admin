@@ -35,6 +35,8 @@ import Modal from '../components/ui/Modal'
 import { HostAlertModal } from '../components/live/HostAlertModal'
 import { HostQuestionActionButton } from '../components/live/HostQuestionActionButton'
 import { canHostCloseAllQuestions } from '../utils/hostQuestionControls'
+import { HostNoSessionsEmpty } from '../components/layout/HostNoSessionsEmpty'
+import { useHostNavSessions } from '../hooks/useHostNavSessions'
 import { HostQuestionControls } from '../components/live/HostQuestionControls'
 import { useHostQuestionMutations } from '../hooks/useHostQuestionMutations'
 import { LiveQaPanel } from '../components/leaderboard/LiveQaPanel'
@@ -90,6 +92,7 @@ function LivePage() {
   const queryClient = useQueryClient()
   const accessToken = useAuthStore((state) => state.accessToken)
   const sessionId = searchParams.get('session') || ''
+  const navSessionsQuery = useHostNavSessions()
 
 
   const [questionIndex, setQuestionIndex] = useState(0)
@@ -476,9 +479,19 @@ function LivePage() {
   )
 
   if (!sessionId) {
+    if (navSessionsQuery.isLoading) {
+      return (
+        <div className="rounded-2xl border border-blue-200 bg-white p-8 text-center text-slate-600">
+          Loading sessions...
+        </div>
+      )
+    }
+    if (!navSessionsQuery.data?.length) {
+      return <HostNoSessionsEmpty pageLabel="Live Present Mode" />
+    }
     return (
       <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-10 text-center text-slate-600 shadow-sm">
-        No session selected. Open Dashboard and click <strong>Launch</strong>.
+        No session selected. Open <strong>Dashboard</strong> and click <strong>Launch</strong>.
       </div>
     )
   }

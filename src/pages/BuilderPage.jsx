@@ -40,6 +40,8 @@ import {
 import { setQuestionAnswerRevealedApi, setQuestionLeaderboardVisibleApi } from '../services/liveApi'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 import { questionSupportsAnswerReveal } from '../utils/answerReveal'
+import { HostNoSessionsEmpty } from '../components/layout/HostNoSessionsEmpty'
+import { useHostNavSessions } from '../hooks/useHostNavSessions'
 
 function InlineEditableSessionTitle({ title, onSave, isSaving }) {
   const [editing, setEditing] = useState(false)
@@ -631,6 +633,7 @@ function ParticipantPreview({ question, quizMode }) {
 function BuilderPage() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session') || ''
+  const navSessionsQuery = useHostNavSessions()
   const navigate = useNavigate()
   const accessToken = useAuthStore((state) => state.accessToken)
   const queryClient = useQueryClient()
@@ -1108,6 +1111,25 @@ function BuilderPage() {
     const timer = window.setTimeout(() => setSaveSuccess(''), 2600)
     return () => window.clearTimeout(timer)
   }, [saveSuccess])
+
+  if (!sessionId) {
+    if (navSessionsQuery.isLoading) {
+      return (
+        <div className="rounded-2xl border border-blue-200 bg-white p-8 text-center text-slate-600">
+          Loading sessions...
+        </div>
+      )
+    }
+    if (!navSessionsQuery.data?.length) {
+      return <HostNoSessionsEmpty pageLabel="Question Builder" />
+    }
+    return (
+      <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-10 text-center text-slate-600 shadow-sm">
+        No session selected. Go to <strong>Dashboard</strong> and click <strong>Edit</strong> on a
+        session.
+      </div>
+    )
+  }
 
   if (!session) {
     return (

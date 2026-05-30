@@ -531,11 +531,11 @@ function DashboardPage() {
         {filtered.map((session) => (
           <SessionCard key={session.id} session={session} onAction={handleAction} />
         ))}
-        {!filtered.length && (
+        {!filtered.length && !sessionsQuery.isLoading && !sessionsQuery.error ? (
           <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-10 text-center text-slate-600 shadow-sm lg:col-span-2">
-            No sessions found for these filters.
+            {sessions.length === 0 ? 'No sessions found.' : 'No sessions found for these filters.'}
           </div>
-        )}
+        ) : null}
       </div>
 
       <SessionFormModal

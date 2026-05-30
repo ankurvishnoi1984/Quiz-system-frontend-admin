@@ -34,12 +34,12 @@ export function getLivePresenterSessionId(sessions) {
 
 export function getBuilderNavTo(sessions) {
   const id = getLatestSessionId(sessions)
-  return id ? `/builder?session=${encodeURIComponent(id)}` : '/dashboard'
+  return id ? `/builder?session=${encodeURIComponent(id)}` : '/builder'
 }
 
 export function getLiveNavTo(sessions) {
   const id = getLivePresenterSessionId(sessions)
-  return id ? `/live?session=${encodeURIComponent(id)}` : '/dashboard'
+  return id ? `/live?session=${encodeURIComponent(id)}` : '/live'
 }
 
 const STATUS_LABEL = {
