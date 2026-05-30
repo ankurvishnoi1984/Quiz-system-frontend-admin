@@ -15,6 +15,7 @@ export function ActiveQuestionPanel({
   canGoToNextQuestion,
   inputsLocked,
   submissionsClosed = false,
+  allQuestionsClosedByHost = false,
   hasAnyQuestionSaved,
   timeLimit,
   timer,
@@ -76,7 +77,13 @@ export function ActiveQuestionPanel({
         )}
       </div>
 
-      {submissionsClosed ? (
+      {allQuestionsClosedByHost ? (
+        <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          All questions are closed by the host and no longer accepting submissions.
+        </p>
+      ) : null}
+
+      {submissionsClosed && !allQuestionsClosedByHost ? (
         <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
           This question was closed by the host and is no longer accepting submissions.
         </p>
@@ -193,25 +200,32 @@ export function ActiveQuestionPanel({
             }
             disabled={
               sessionEnded ||
-              submissionsClosed ||
-              inputsLocked ||
               isSubmitting ||
-              (navigationEnabled
-                ? isLastDisplayedQuestion
-                  ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
-                  : hasCountdown && !canGoToNextQuestion
-                : !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion))
+              (navigationEnabled && !isLastDisplayedQuestion
+                ? hasCountdown && !canGoToNextQuestion
+                : submissionsClosed ||
+                  allQuestionsClosedByHost ||
+                  inputsLocked ||
+                  (navigationEnabled
+                    ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
+                    : !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)))
             }
             title={
               sessionEnded
                 ? 'Session has ended'
-                : submissionsClosed
-                  ? 'This question was closed by the host'
-                  : hasCountdown && !canGoToNextQuestion
+                : navigationEnabled && !isLastDisplayedQuestion
+                  ? hasCountdown && !canGoToNextQuestion
                     ? 'Answer this question or wait for the timer'
-                    : !hasFinalizePayload
-                      ? 'Answer this question before submitting'
-                      : undefined
+                    : undefined
+                  : allQuestionsClosedByHost
+                    ? 'All questions are closed by the host'
+                    : submissionsClosed
+                      ? 'This question was closed by the host'
+                      : hasCountdown && !canGoToNextQuestion
+                        ? 'Answer this question or wait for the timer'
+                        : !hasFinalizePayload
+                          ? 'Answer this question before submitting'
+                          : undefined
             }
             onClick={onNextOrSubmit}
             className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"

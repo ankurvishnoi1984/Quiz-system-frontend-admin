@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
+  closeAllQuestionSubmissionsApi,
   closeQuestionSubmissionsApi,
   openQuestionForReattemptApi,
   setQuestionAnswerRevealedApi,
@@ -15,6 +16,8 @@ export function useHostQuestionMutations(
     onReattemptError,
     onCloseQuestionSuccess,
     onCloseQuestionError,
+    onCloseAllQuestionsSuccess,
+    onCloseAllQuestionsError,
     onMutationError,
   } = {},
 ) {
@@ -81,6 +84,17 @@ export function useHostQuestionMutations(
     },
   })
 
+  const closeAllQuestionsMutation = useMutation({
+    mutationFn: () => closeAllQuestionSubmissionsApi(accessToken, sessionId),
+    onSuccess: (data) => {
+      invalidateQuestions()
+      onCloseAllQuestionsSuccess?.(data?.closed_count ?? 0)
+    },
+    onError: (error) => {
+      onCloseAllQuestionsError?.(error)
+    },
+  })
+
   const reattemptMutation = useMutation({
     mutationFn: ({ questionId }) => openQuestionForReattemptApi(accessToken, questionId),
     onSuccess: (_data, { questionText }) => {
@@ -108,13 +122,19 @@ export function useHostQuestionMutations(
     })
   }
 
+  const closeAllQuestions = () => {
+    closeAllQuestionsMutation.mutate()
+  }
+
   return {
     questionLiveMutation,
     questionLeaderboardMutation,
     answerRevealMutation,
     closeQuestionMutation,
+    closeAllQuestionsMutation,
     reattemptMutation,
     openForReattempt,
     closeQuestion,
+    closeAllQuestions,
   }
 }

@@ -117,8 +117,11 @@ function ParticipantSessionPage() {
   const [submitModal, setSubmitModal] = useState(null)
   const [reattemptModal, setReattemptModal] = useState(null)
   const [closedByHostModal, setClosedByHostModal] = useState(null)
+  const [allQuestionsClosedModal, setAllQuestionsClosedModal] = useState(null)
+  const [allQuestionsClosedByHost, setAllQuestionsClosedByHost] = useState(false)
   const [sessionEndedModal, setSessionEndedModal] = useState(false)
   const closedNoticeShownRef = useRef(new Set())
+  const allQuestionsClosedNoticeShownRef = useRef(false)
   const sessionEndedNotifiedRef = useRef(false)
   const [leaderboard, setLeaderboard] = useState([])
   const [questionLeaderboardByQuestion, setQuestionLeaderboardByQuestion] = useState({})
@@ -212,6 +215,13 @@ function ParticipantSessionPage() {
     session?.status === 'completed' || session?.status === 'archived'
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
   const navigationEnabled = session?.participant_navigation_enabled !== false
+  const allLiveQuestionsClosed = useMemo(() => {
+    if (!navigationEnabled) return false
+    const live = mappedQuestions.filter((q) => q.isLive)
+    if (!live.length) return false
+    return live.every((q) => q.submissionsClosed)
+  }, [mappedQuestions, navigationEnabled])
+
   const strictLateJoin = useMemo(
     () => isStrictLateJoinSession(session, mappedQuestions),
     [session, mappedQuestions],
@@ -274,6 +284,7 @@ function ParticipantSessionPage() {
   const inputsLocked =
     isSessionEnded ||
     submissionsClosed ||
+    (navigationEnabled && allQuestionsClosedByHost) ||
     (hasCountdown && (questionLockedBySubmission || timer === 0))
 
   const showClosedByHostNotice = useCallback((questionText) => {
@@ -288,8 +299,26 @@ function ParticipantSessionPage() {
     })
   }, [])
 
+  const showAllQuestionsClosedNotice = useCallback(() => {
+    setAllQuestionsClosedModal({
+      variant: 'info',
+      title: 'All questions closed',
+      message:
+        'All questions were closed by the host and are no longer accepting submissions. You can still review them.',
+      confirmLabel: 'OK',
+    })
+  }, [])
+
   useEffect(() => {
-    if (!question?.id || !submissionsClosed) return
+    if (!navigationEnabled || !allLiveQuestionsClosed) return
+    setAllQuestionsClosedByHost(true)
+    if (allQuestionsClosedNoticeShownRef.current) return
+    allQuestionsClosedNoticeShownRef.current = true
+    showAllQuestionsClosedNotice()
+  }, [navigationEnabled, allLiveQuestionsClosed, showAllQuestionsClosedNotice])
+
+  useEffect(() => {
+    if (!question?.id || !submissionsClosed || navigationEnabled) return
     const key = String(question.id)
     if (closedNoticeShownRef.current.has(key)) return
     closedNoticeShownRef.current.add(key)
@@ -467,6 +496,9 @@ function ParticipantSessionPage() {
 
       closedNoticeShownRef.current.delete(String(qid))
 
+      closedNoticeShownRef.current.delete(String(qid))
+      setAllQuestionsClosedByHost(false)
+
       const cachedQuestions = queryClient.getQueryData(['participant-questions', dbSessionId])
       const cachedQuestion = Array.isArray(cachedQuestions)
         ? cachedQuestions.find((q) => Number(q.question_id) === qid)
@@ -578,7 +610,30 @@ function ParticipantSessionPage() {
         const key = String(qid)
         if (!closedNoticeShownRef.current.has(key)) {
           closedNoticeShownRef.current.add(key)
-          showClosedByHostNotice(data?.question_text)
+          if (!navigationEnabled) {
+            showClosedByHostNotice(data?.question_text)
+          }
+        }
+      },
+    )
+
+    const offAllQuestionsClosed = client.on(
+      RealtimeEvent.ALL_QUESTIONS_SUBMISSIONS_CLOSED,
+      () => {
+        if (dbSessionId) {
+          queryClient.setQueryData(['participant-questions', dbSessionId], (old) => {
+            if (!Array.isArray(old)) return old
+            return old.map((q) =>
+              q.is_live === true || q.is_live === 1 || q.is_live === '1'
+                ? { ...q, submissions_closed: true }
+                : q,
+            )
+          })
+        }
+        setAllQuestionsClosedByHost(true)
+        if (!allQuestionsClosedNoticeShownRef.current) {
+          allQuestionsClosedNoticeShownRef.current = true
+          showAllQuestionsClosedNotice()
         }
       },
     )
@@ -655,6 +710,7 @@ function ParticipantSessionPage() {
       offQuestion()
       offReattempt()
       offSubmissionsClosed()
+      offAllQuestionsClosed()
       offAnswerReveal()
       offResp()
       offLeaderboard()
@@ -673,6 +729,8 @@ function ParticipantSessionPage() {
     handleHostQuestionActivated,
     freezeAllCountdowns,
     showClosedByHostNotice,
+    showAllQuestionsClosedNotice,
+    navigationEnabled,
   ])
 
   useEffect(() => {
@@ -1041,8 +1099,12 @@ function ParticipantSessionPage() {
 
   const handleSubmitCurrentQuestion = async () => {
     if (isSessionEnded || !question?.id) return
-    if (submissionsClosed) {
-      showClosedByHostNotice(question.text)
+    if (submissionsClosed || (navigationEnabled && allQuestionsClosedByHost)) {
+      if (navigationEnabled && allQuestionsClosedByHost) {
+        showAllQuestionsClosedNotice()
+      } else {
+        showClosedByHostNotice(question.text)
+      }
       return
     }
     if ((quizSubmittedQuestionIds || {})[String(question.id)]) {
@@ -1091,7 +1153,11 @@ function ParticipantSessionPage() {
   const handleNext = async () => {
     if (isSessionEnded || !navigationEnabled) return
     if (!question?.id || isLastDisplayedQuestion) return
-    if (participantQuestionHasAnswer(question, responses[question.id])) {
+    const submissionsBlocked = submissionsClosed || allQuestionsClosedByHost
+    if (
+      !submissionsBlocked &&
+      participantQuestionHasAnswer(question, responses[question.id])
+    ) {
       await submitQuestionById(question.id)
     }
     if (tryApplyPendingActivatedQuestion()) {
@@ -1441,6 +1507,7 @@ function ParticipantSessionPage() {
             canGoToNextQuestion={canGoToNextQuestion}
             inputsLocked={inputsLocked}
             submissionsClosed={submissionsClosed}
+            allQuestionsClosedByHost={allQuestionsClosedByHost}
             hasAnyQuestionSaved={hasAnyQuestionSaved}
             timeLimit={timeLimit}
             timer={timer}
@@ -1519,6 +1586,15 @@ function ParticipantSessionPage() {
         message={closedByHostModal?.message ?? ''}
         confirmLabel={closedByHostModal?.confirmLabel ?? 'OK'}
         onClose={() => setClosedByHostModal(null)}
+      />
+
+      <ParticipantAlertModal
+        open={Boolean(allQuestionsClosedModal)}
+        variant={allQuestionsClosedModal?.variant ?? 'info'}
+        title={allQuestionsClosedModal?.title ?? 'All questions closed'}
+        message={allQuestionsClosedModal?.message ?? ''}
+        confirmLabel={allQuestionsClosedModal?.confirmLabel ?? 'OK'}
+        onClose={() => setAllQuestionsClosedModal(null)}
       />
 
       <ParticipantAlertModal

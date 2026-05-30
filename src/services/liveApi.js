@@ -84,6 +84,13 @@ export async function closeQuestionSubmissionsApi(accessToken, questionId) {
   return data?.question || null
 }
 
+export async function closeAllQuestionSubmissionsApi(accessToken, sessionId) {
+  const data = await authRequest(`/sessions/${sessionId}/close-all-questions`, accessToken, {
+    method: 'POST',
+  })
+  return data
+}
+
 export async function qaModerateApi(accessToken, qaId, action, body = null) {
   const data = await authRequest(`/qa/${qaId}/${action}`, accessToken, {
     method: 'PUT',

@@ -34,6 +34,7 @@ import ShareSessionPanel from '../components/dashboard/ShareSessionPanel'
 import Modal from '../components/ui/Modal'
 import { HostAlertModal } from '../components/live/HostAlertModal'
 import { HostQuestionActionButton } from '../components/live/HostQuestionActionButton'
+import { canHostCloseAllQuestions } from '../utils/hostQuestionControls'
 import { HostQuestionControls } from '../components/live/HostQuestionControls'
 import { useHostQuestionMutations } from '../hooks/useHostQuestionMutations'
 import { LiveQaPanel } from '../components/leaderboard/LiveQaPanel'
@@ -266,9 +267,11 @@ function LivePage() {
     questionLeaderboardMutation,
     answerRevealMutation,
     closeQuestionMutation,
+    closeAllQuestionsMutation,
     reattemptMutation,
     openForReattempt,
     closeQuestion,
+    closeAllQuestions,
   } = useHostQuestionMutations(accessToken, sessionId, {
     onMutationError: (message) => setErrorMessage(message),
     onCloseQuestionSuccess: (questionText) => {
@@ -287,6 +290,26 @@ function LivePage() {
       setHostAlert({
         variant: 'error',
         title: 'Could not close question',
+        message: error.message || 'Something went wrong. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
+    onCloseAllQuestionsSuccess: (closedCount) => {
+      setErrorMessage('')
+      setHostAlert({
+        variant: 'success',
+        title: 'All questions closed',
+        message:
+          closedCount > 0
+            ? `All ${closedCount} live question${closedCount === 1 ? '' : 's'} ${closedCount === 1 ? 'was' : 'were'} successfully closed. Participants can still view them but cannot submit responses.`
+            : 'All questions were successfully closed. Participants can still view them but cannot submit responses.',
+        confirmLabel: 'OK',
+      })
+    },
+    onCloseAllQuestionsError: (error) => {
+      setHostAlert({
+        variant: 'error',
+        title: 'Could not close all questions',
         message: error.message || 'Something went wrong. Please try again.',
         confirmLabel: 'Close',
       })
@@ -442,7 +465,14 @@ function LivePage() {
   const canLaunchSession = session?.status !== 'live'
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
   const showSessionControls = session?.status === 'live' || session?.status === 'paused'
-  const showCloseAllQuestionsButton = canEditLive && !singleActiveQuestionMode
+  const showCloseAllQuestionsButton = useMemo(
+    () =>
+      canHostCloseAllQuestions(mappedQuestions, {
+        canEditLive,
+        singleActiveQuestionMode,
+      }),
+    [mappedQuestions, canEditLive, singleActiveQuestionMode],
+  )
 
   if (!sessionId) {
     return (
@@ -599,11 +629,12 @@ function LivePage() {
           </div>
           {showCloseAllQuestionsButton ? (
             <HostQuestionActionButton
+              disabled={closeAllQuestionsMutation.isPending}
               icon={Layers}
-              label="Close all questions"
-              title="Deactivate every live question"
+              label={closeAllQuestionsMutation.isPending ? 'Closing…' : 'Close all questions'}
+              title="Stop accepting responses on all live untimed questions"
               tone="rose"
-              onClick={() => {}}
+              onClick={closeAllQuestions}
             />
           ) : null}
         </div>

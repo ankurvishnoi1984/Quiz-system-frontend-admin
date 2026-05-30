@@ -392,6 +392,7 @@ export const RealtimeEvent = {
   SESSION_UPDATED: 'session_updated',
   QUESTION_CHANGED: 'question_changed',
   QUESTION_SUBMISSIONS_CLOSED: 'question_submissions_closed',
+  ALL_QUESTIONS_SUBMISSIONS_CLOSED: 'all_questions_submissions_closed',
   QUESTION_REATTEMPT_OPENED: 'question_reattempt_opened',
   ANSWER_REVEALED: 'answer_revealed',
   QUESTION_LEADERBOARD_VISIBILITY: 'question_leaderboard_visibility',
