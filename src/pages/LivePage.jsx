@@ -319,6 +319,7 @@ function LivePage() {
     },
     onReattemptSuccess: (questionText) => {
       setErrorMessage('')
+      setQuestionLeaderboardOpen(false)
       const preview = String(questionText || '').trim()
       setHostAlert({
         variant: 'success',
@@ -960,7 +961,7 @@ function LivePage() {
           <QuestionLeaderboardPanel
             activeQuestion={activeQuestion}
             questionNumber={activeQuestion ? questionIndex + 1 : null}
-            canShowLeaderboard={Boolean(activeQuestion?.isQuizMode)}
+            canShowLeaderboard={Boolean(activeQuestion?.isQuizMode && activeQuestion?.isLive)}
             onShowLeaderboard={() => setQuestionLeaderboardOpen(true)}
           />
             </div>

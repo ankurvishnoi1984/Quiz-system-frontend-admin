@@ -37,6 +37,7 @@ export function HostQuestionControls({
 
   const supportsReveal = questionSupportsAnswerReveal(question.type, question.isQuizMode)
   const showCloseQuestion = canHostCloseQuestion(question, singleActiveQuestionMode)
+  const isActiveQuestion = Boolean(question.isLive)
 
   return (
     <div>
@@ -71,7 +72,7 @@ export function HostQuestionControls({
         />
         {supportsReveal ? (
           <HostQuestionActionButton
-            disabled={!canEditLive || answerRevealMutation.isPending}
+            disabled={!canEditLive || !isActiveQuestion || answerRevealMutation.isPending}
             onClick={() =>
               answerRevealMutation.mutate({
                 questionId: question.id,
@@ -81,9 +82,11 @@ export function HostQuestionControls({
             icon={question.answerRevealed ? EyeOff : Eye}
             label={question.answerRevealed ? 'Hide answer' : 'Reveal answer'}
             title={
-              question.answerRevealed
-                ? 'Correct answer is visible to participants'
-                : 'Show the correct answer on participant screens'
+              !isActiveQuestion
+                ? 'Activate this question before revealing the answer'
+                : question.answerRevealed
+                  ? 'Correct answer is visible to participants'
+                  : 'Show the correct answer on participant screens'
             }
             active={question.answerRevealed}
             tone="violet"
@@ -92,7 +95,7 @@ export function HostQuestionControls({
         ) : null}
         {canEditLive && question.isQuizMode ? (
           <HostQuestionActionButton
-            disabled={questionLeaderboardMutation.isPending}
+            disabled={!isActiveQuestion || questionLeaderboardMutation.isPending}
             onClick={() =>
               questionLeaderboardMutation.mutate({
                 questionId: question.id,
@@ -102,9 +105,11 @@ export function HostQuestionControls({
             icon={Trophy}
             label="Leaderboard"
             title={
-              question.showLeaderboard
-                ? 'Hide ranking for this question'
-                : 'Show ranking for this question only'
+              !isActiveQuestion
+                ? 'Activate this question before showing its leaderboard'
+                : question.showLeaderboard
+                  ? 'Hide ranking for this question'
+                  : 'Show ranking for this question only'
             }
             active={question.showLeaderboard}
             tone="amber"
