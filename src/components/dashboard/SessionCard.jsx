@@ -40,6 +40,7 @@ function SessionCard({ session, onAction }) {
   }, [session.participants, session.status, session.tags])
 
   const isLive = session.status === 'Live'
+  const isCompleted = session.status === 'Completed'
 
   const menuItems = useMemo(() => {
     const items = [
@@ -111,7 +112,9 @@ function SessionCard({ session, onAction }) {
         <div className="flex flex-col items-end gap-2">
           <button
             type="button"
-            className="rounded-xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+            disabled={isCompleted}
+            title={isCompleted ? 'This session has ended' : undefined}
+            className="rounded-xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => onAction('launch', session)}
           >
             <Rocket className="mr-2 inline size-4" />

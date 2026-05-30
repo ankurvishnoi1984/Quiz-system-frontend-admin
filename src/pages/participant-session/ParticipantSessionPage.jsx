@@ -28,6 +28,7 @@ import { PageCenteredShell } from './components/PageCenteredShell'
 import { ParticipantAlertModal } from './components/ParticipantAlertModal'
 import { QaPanel } from './components/QaPanel'
 import { SessionHeader } from './components/SessionHeader'
+import { SessionEndedBanner } from './components/SessionEndedBanner'
 import { WaitingForQuestion } from './components/WaitingForQuestion'
 import { WaitingView } from './components/WaitingView'
 import { isParticipantChoiceCorrect } from '../../utils/answerReveal'
@@ -472,7 +473,7 @@ function ParticipantSessionPage() {
       queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
     })
 
-    const offSession = client.on('session_updated', (data) => {
+    const offSession = client.on(RealtimeEvent.SESSION_UPDATED, (data) => {
       if (data?.status) {
         queryClient.setQueryData(['participant-session', effectiveSessionCode], (old) =>
           old ? { ...old, status: data.status } : old,
@@ -1506,7 +1507,19 @@ function ParticipantSessionPage() {
           onStepChange={setStep}
         />
 
-        {step === 'active' && !question && <WaitingForQuestion />}
+        {isSessionEnded ? <SessionEndedBanner /> : null}
+
+        {step === 'active' && !question && !isSessionEnded && <WaitingForQuestion />}
+
+        {step === 'active' && !question && isSessionEnded && (
+          <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
+            <h2 className="text-xl font-bold text-navy-900">Session ended</h2>
+            <p className="text-sm text-slate-600">
+              The host has ended this session. Switch to Q&amp;A to see the leaderboard or review
+              past activity.
+            </p>
+          </section>
+        )}
 
         {step === 'active' && question && (
           <ActiveQuestionPanel
@@ -1611,7 +1624,7 @@ function ParticipantSessionPage() {
         open={sessionEndedModal}
         variant="info"
         title="Session ended"
-        message="This session was ended by the host. Thank you for participating."
+        message="The host has ended this session. You can review your answers but can no longer submit new responses. Thank you for participating!"
         confirmLabel="OK"
         onClose={() => setSessionEndedModal(false)}
       />

@@ -254,9 +254,10 @@ export function ActiveQuestionPanel({
 
       {sessionEnded && (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-semibold text-slate-800">Session ended</p>
+          <p className="text-sm font-semibold text-slate-800">Session ended by host</p>
           <p className="mt-1 text-xs text-slate-600">
-            This session has ended. You can review your answers but cannot submit new responses.
+            This session was ended by the host. You can review your answers but cannot submit new
+            responses.
           </p>
         </div>
       )}

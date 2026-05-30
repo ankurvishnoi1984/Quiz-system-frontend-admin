@@ -462,7 +462,8 @@ function LivePage() {
   const session = sessionQuery.data
   const statusLabel = session?.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : '—'
   const canEditLive = session?.status === 'live'
-  const canLaunchSession = session?.status !== 'live'
+  const canLaunchSession =
+    session?.status === 'draft' || session?.status === 'paused'
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
   const showSessionControls = session?.status === 'live' || session?.status === 'paused'
   const showCloseAllQuestionsButton = useMemo(

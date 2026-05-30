@@ -322,6 +322,7 @@ function DashboardPage() {
       return
     }
     if (action === 'launch') {
+      if (session.status === 'Completed') return
       const goLive = () => navigate(`/live?session=${encodeURIComponent(session.id)}`)
       if (session.status === 'Draft') {
         transitionMutation.mutate(
