@@ -16,7 +16,7 @@ import { createRealtimeClient, RealtimeEvent } from '../../services/realtimeClie
 import { useParticipantStore } from '../../store/participantStore'
 import { hasSessionCodeInJoinPath, normalizeSessionCode } from '../../utils/joinUrl'
 import { computeResponseTimeMs } from '../../utils/quizResponseTime'
-import { isStrictLateJoinSession } from '../../utils/sessionFlags'
+import { isStrictLateJoinSession, sessionHasTimedQuestions } from '../../utils/sessionFlags'
 import {
   filterActiveQuestionsForLateJoinPolicy,
   getCountdownEndsAtForQuestion,
@@ -33,8 +33,10 @@ import { WaitingForQuestion } from './components/WaitingForQuestion'
 import { WaitingView } from './components/WaitingView'
 import { isParticipantChoiceCorrect } from '../../utils/answerReveal'
 import {
-  allActiveQuestionsViewedOrAttempted,
   buildResponsePayloadForQuestion,
+  canShowPreviousForTimedMultiNav,
+  canShowPreviousForUntimedMultiNav,
+  getLastActivatedLiveQuestion,
   canAutoNavigateToActivatedQuestion,
   clamp,
   findNextUnsubmittedActiveQuestion,
@@ -67,6 +69,7 @@ function ParticipantSessionPage() {
     quizCountdownByQuestion,
     quizQuestionOpenedAt,
     quizSubmittedQuestionIds,
+    quizExplicitSubmittedQuestionIds,
     setResponses,
     setQuestionIndex,
     setLiveQuestionId,
@@ -76,6 +79,7 @@ function ParticipantSessionPage() {
     freezeCountdownAfterSubmit,
     freezeAllCountdowns,
     markQuestionsSubmitted,
+    markQuestionsExplicitlySubmitted,
     unlockQuestionForReattempt,
     markQuestionOpened,
   } = useParticipantStore(
@@ -87,6 +91,7 @@ function ParticipantSessionPage() {
       quizCountdownByQuestion: s.quizCountdownByQuestion,
       quizQuestionOpenedAt: s.quizQuestionOpenedAt,
       quizSubmittedQuestionIds: s.quizSubmittedQuestionIds,
+      quizExplicitSubmittedQuestionIds: s.quizExplicitSubmittedQuestionIds,
       setResponses: s.setQuizResponses,
       setQuestionIndex: s.setQuizQuestionIndex,
       setLiveQuestionId: s.setQuizLiveQuestionId,
@@ -96,6 +101,7 @@ function ParticipantSessionPage() {
       freezeCountdownAfterSubmit: s.freezeCountdownAfterSubmit,
       freezeAllCountdowns: s.freezeAllCountdowns,
       markQuestionsSubmitted: s.markQuestionsSubmitted,
+      markQuestionsExplicitlySubmitted: s.markQuestionsExplicitlySubmitted,
       unlockQuestionForReattempt: s.unlockQuestionForReattempt,
       markQuestionOpened: s.markQuestionOpened,
     })),
@@ -882,23 +888,31 @@ function ParticipantSessionPage() {
     ? activeQuestions.length > 0 && displayQuestionIndex === activeQuestions.length - 1
     : true
 
-  const canShowPreviousQuestion = useMemo(
-    () =>
-      navigationEnabled &&
-      activeQuestions.length > 1 &&
-      allActiveQuestionsViewedOrAttempted(activeQuestions, {
-        openedAtByQuestion: quizQuestionOpenedAt,
-        submittedIds: quizSubmittedQuestionIds,
-        responses,
-      }),
-    [
-      navigationEnabled,
-      activeQuestions,
-      quizQuestionOpenedAt,
-      quizSubmittedQuestionIds,
-      responses,
-    ],
+  const multiNavTimedSession = useMemo(
+    () => navigationEnabled && sessionHasTimedQuestions(activeQuestions),
+    [navigationEnabled, activeQuestions],
   )
+
+  const lastActivatedLiveQuestion = useMemo(
+    () => (multiNavTimedSession ? getLastActivatedLiveQuestion(activeQuestions) : null),
+    [multiNavTimedSession, activeQuestions],
+  )
+
+  const canShowPreviousQuestion = useMemo(() => {
+    if (!navigationEnabled) return false
+    if (multiNavTimedSession) {
+      return canShowPreviousForTimedMultiNav(
+        activeQuestions,
+        quizExplicitSubmittedQuestionIds,
+      )
+    }
+    return canShowPreviousForUntimedMultiNav(activeQuestions)
+  }, [
+    navigationEnabled,
+    multiNavTimedSession,
+    activeQuestions,
+    quizExplicitSubmittedQuestionIds,
+  ])
 
   const highlightNextButton = useMemo(() => {
     if (!navigationEnabled || unseenActivatedQuestionIds.size === 0) return false
@@ -1199,7 +1213,11 @@ function ParticipantSessionPage() {
     const hadCountdown = hasCountdown
     try {
       await Promise.all(payloads.map((p) => submitResponseApi(participantToken, p)))
-      markQuestionsSubmitted(payloads.map((p) => p.question_id))
+      const submittedIds = payloads.map((p) => p.question_id)
+      markQuestionsSubmitted(submittedIds)
+      if (multiNavTimedSession) {
+        markQuestionsExplicitlySubmitted(submittedIds)
+      }
       if (hadCountdown && question?.id) freezeCountdownAfterSubmit(question.id)
       if (dbSessionId) {
         queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
@@ -1667,6 +1685,7 @@ function ParticipantSessionPage() {
             submitted={submitted}
             navigationEnabled={navigationEnabled}
             canShowPreviousQuestion={canShowPreviousQuestion}
+            lastActivatedLiveQuestion={lastActivatedLiveQuestion}
             highlightNextButton={highlightNextButton}
             showNewQuestionAlert={showNewQuestionAlert}
             isLastDisplayedQuestion={isLastDisplayedQuestion}

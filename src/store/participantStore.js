@@ -8,6 +8,8 @@ const initialQuiz = {
   quizSubmitted: false,
   /** Timed sessions: question ids the participant may no longer edit (submitted or timer moved on) */
   quizSubmittedQuestionIds: {},
+  /** Multi-nav: question ids submitted via the Submit button (not Next auto-save) */
+  quizExplicitSubmittedQuestionIds: {},
   /** Per-question countdown: { [questionId]: { endsAt, frozen } } — frozen = seconds left at submit/session end */
   quizCountdownByQuestion: {},
   /** Untimed: when the participant first saw each question (epoch ms) */
@@ -61,7 +63,16 @@ export const useParticipantStore = create(
           },
         })),
 
-      clearQuizSubmissionLocks: () => set({ quizSubmittedQuestionIds: {} }),
+      markQuestionsExplicitlySubmitted: (questionIds) =>
+        set((s) => ({
+          quizExplicitSubmittedQuestionIds: {
+            ...(s.quizExplicitSubmittedQuestionIds || {}),
+            ...Object.fromEntries(questionIds.map((id) => [String(id), true])),
+          },
+        })),
+
+      clearQuizSubmissionLocks: () =>
+        set({ quizSubmittedQuestionIds: {}, quizExplicitSubmittedQuestionIds: {} }),
 
       /** Host opened question for reattempt — allow editing and resubmit */
       unlockQuestionForReattempt: (questionId, { timeLimitSeconds = 0 } = {}) => {
@@ -70,6 +81,8 @@ export const useParticipantStore = create(
         set((s) => {
           const locks = { ...(s.quizSubmittedQuestionIds || {}) }
           delete locks[qid]
+          const explicit = { ...(s.quizExplicitSubmittedQuestionIds || {}) }
+          delete explicit[qid]
           const countdowns = { ...(s.quizCountdownByQuestion || {}) }
           if (limit > 0) {
             countdowns[qid] = {
@@ -83,6 +96,7 @@ export const useParticipantStore = create(
           delete openedAt[qid]
           return {
             quizSubmittedQuestionIds: locks,
+            quizExplicitSubmittedQuestionIds: explicit,
             quizCountdownByQuestion: countdowns,
             quizQuestionOpenedAt: openedAt,
             quizSubmitted: false,
@@ -182,6 +196,7 @@ export const useParticipantStore = create(
         quizLiveQuestionId: state.quizLiveQuestionId,
         quizSubmitted: state.quizSubmitted,
         quizSubmittedQuestionIds: state.quizSubmittedQuestionIds,
+        quizExplicitSubmittedQuestionIds: state.quizExplicitSubmittedQuestionIds,
         quizCountdownByQuestion: state.quizCountdownByQuestion,
         quizQuestionOpenedAt: state.quizQuestionOpenedAt,
       }),

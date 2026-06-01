@@ -1,5 +1,11 @@
+import { parseActivationTime } from '../../../utils/questionTimer'
+
 export function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n))
+}
+
+export function isLiveActiveQuestion(question) {
+  return question?.isLive === true || question?.is_live === true || question?.is_live === 1
 }
 
 export function mapQuestionType(type) {
@@ -177,17 +183,34 @@ export function hasParticipantViewedOrAttemptedQuestion(
   return participantQuestionHasAnswer(question, responses[question.id])
 }
 
-/** Multi-nav: Previous is available only after every active question was seen or attempted. */
-export function allActiveQuestionsViewedOrAttempted(
-  activeQuestions,
-  { openedAtByQuestion = {}, submittedIds = {}, responses = {} } = {},
-) {
-  if (!activeQuestions?.length) return false
-  return activeQuestions.every((q) =>
-    hasParticipantViewedOrAttemptedQuestion(q, {
-      openedAtByQuestion,
-      submittedIds,
-      responses,
-    }),
-  )
+/** Live question the host activated most recently (by live_activated_at). */
+export function getLastActivatedLiveQuestion(activeQuestions = []) {
+  const live = activeQuestions.filter(isLiveActiveQuestion)
+  if (!live.length) return null
+
+  return live.reduce((best, q) => {
+    const ms = parseActivationTime(q.liveActivatedAt ?? q.live_activated_at) ?? 0
+    const bestMs = parseActivationTime(best.liveActivatedAt ?? best.live_activated_at) ?? 0
+    if (ms > bestMs) return q
+    if (ms < bestMs) return best
+    const orderDiff = Number(q.display_order ?? 0) - Number(best.display_order ?? 0)
+    if (orderDiff !== 0) return orderDiff > 0 ? q : best
+    return Number(q.id ?? 0) > Number(best.id ?? 0) ? q : best
+  })
+}
+
+/**
+ * Multi-nav + timed: Previous only after the latest host-activated question was submitted
+ * via Submit (not merely selecting an option or Next auto-save).
+ */
+export function canShowPreviousForTimedMultiNav(activeQuestions, explicitSubmittedIds = {}) {
+  if (!activeQuestions?.length || activeQuestions.length <= 1) return false
+  const lastActivated = getLastActivatedLiveQuestion(activeQuestions)
+  if (!lastActivated?.id) return false
+  return Boolean(explicitSubmittedIds[String(lastActivated.id)])
+}
+
+/** Multi-nav + untimed: Previous is always available when multiple questions are active. */
+export function canShowPreviousForUntimedMultiNav(activeQuestions) {
+  return Boolean(activeQuestions?.length > 1)
 }

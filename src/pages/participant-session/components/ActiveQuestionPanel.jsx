@@ -29,6 +29,7 @@ export function ActiveQuestionPanel({
   sessionEnded = false,
   navigationEnabled = true,
   canShowPreviousQuestion = false,
+  lastActivatedLiveQuestion = null,
   highlightNextButton = false,
   showNewQuestionAlert = false,
   tagsInput,
@@ -70,17 +71,12 @@ export function ActiveQuestionPanel({
         )}
         {navigationEnabled && hasCountdown && canGoToNextQuestion && inputsLocked && !canShowPreviousQuestion && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
-            Visit every question with Next before you can go back with Previous.
+            Submit the latest active question before you can use Previous.
           </p>
         )}
         {navigationEnabled && !hasCountdown && hasAnyQuestionSaved && canShowPreviousQuestion && (
           <p className="max-w-[min(100%,18rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             No timer: revisit questions with Previous; use Submit on the last question to update.
-          </p>
-        )}
-        {navigationEnabled && !hasCountdown && hasAnyQuestionSaved && !canShowPreviousQuestion && (
-          <p className="max-w-[min(100%,18rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
-            Visit every question with Next before you can go back with Previous.
           </p>
         )}
         {!navigationEnabled && !submissionsClosed && (
