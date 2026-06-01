@@ -34,7 +34,7 @@ export function JoinFormView({
           </p>
         </div>
 
-        {!hasSessionCodeInUrl && (
+        {!joinBlocked && !hasSessionCodeInUrl ? (
           <div>
             <label className="text-sm font-semibold text-slate-700">Session code</label>
             <input
@@ -54,9 +54,9 @@ export function JoinFormView({
               <p className="mt-2 text-sm text-slate-500">Looking up session...</p>
             ) : null}
           </div>
-        )}
+        ) : null}
 
-        {showJoinDetails && joinRequirement === 'anonymous' ? (
+        {!joinBlocked && showJoinDetails && joinRequirement === 'anonymous' ? (
           <div>
             <label className="text-sm font-semibold text-slate-700">Name</label>
             <input
@@ -65,7 +65,7 @@ export function JoinFormView({
               className="mt-1 h-11 w-full cursor-not-allowed rounded-xl border border-blue-200/70 bg-slate-50 px-3 text-sm text-slate-500"
             />
           </div>
-        ) : showJoinDetails ? (
+        ) : !joinBlocked && showJoinDetails ? (
           <>
             <div>
               <label className="text-sm font-semibold text-slate-700">Name</label>
@@ -93,7 +93,7 @@ export function JoinFormView({
         ) : null}
 
         {joinBlocked ? (
-          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-center text-sm font-semibold leading-relaxed text-amber-900">
             {joinBlockedMessage || 'Session has already started'}
           </p>
         ) : null}
@@ -102,13 +102,15 @@ export function JoinFormView({
           <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{joinError}</p>
         ) : null}
 
-        <button
-          type="submit"
-          disabled={!showJoinDetails || joinBlocked}
-          className="h-11 w-full rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Join
-        </button>
+        {!joinBlocked ? (
+          <button
+            type="submit"
+            disabled={!showJoinDetails}
+            className="h-11 w-full rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Join
+          </button>
+        ) : null}
       </form>
     </PageCenteredShell>
   )
