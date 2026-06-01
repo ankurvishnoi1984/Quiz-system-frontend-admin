@@ -164,3 +164,30 @@ export function participantQuestionHasAnswer(question, response = {}) {
   }
   return false
 }
+
+/** Multi-nav: participant has opened, answered, or submitted this question. */
+export function hasParticipantViewedOrAttemptedQuestion(
+  question,
+  { openedAtByQuestion = {}, submittedIds = {}, responses = {} } = {},
+) {
+  if (!question?.id) return false
+  const qid = String(question.id)
+  if (openedAtByQuestion?.[qid]) return true
+  if (submittedIds?.[qid]) return true
+  return participantQuestionHasAnswer(question, responses[question.id])
+}
+
+/** Multi-nav: Previous is available only after every active question was seen or attempted. */
+export function allActiveQuestionsViewedOrAttempted(
+  activeQuestions,
+  { openedAtByQuestion = {}, submittedIds = {}, responses = {} } = {},
+) {
+  if (!activeQuestions?.length) return false
+  return activeQuestions.every((q) =>
+    hasParticipantViewedOrAttemptedQuestion(q, {
+      openedAtByQuestion,
+      submittedIds,
+      responses,
+    }),
+  )
+}

@@ -28,6 +28,9 @@ export function ActiveQuestionPanel({
   participantAnswerIsCorrect,
   sessionEnded = false,
   navigationEnabled = true,
+  canShowPreviousQuestion = false,
+  highlightNextButton = false,
+  showNewQuestionAlert = false,
   tagsInput,
   submitted,
   isLastDisplayedQuestion,
@@ -59,15 +62,25 @@ export function ActiveQuestionPanel({
             Answer this question or wait for the timer to use Next.
           </p>
         )}
-        {navigationEnabled && hasCountdown && canGoToNextQuestion && inputsLocked && (
+        {navigationEnabled && hasCountdown && canGoToNextQuestion && inputsLocked && canShowPreviousQuestion && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             Timed: use Previous and Next to browse; answers cannot be changed after submit or when
             time runs out.
           </p>
         )}
-        {navigationEnabled && !hasCountdown && hasAnyQuestionSaved && (
+        {navigationEnabled && hasCountdown && canGoToNextQuestion && inputsLocked && !canShowPreviousQuestion && (
+          <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
+            Visit every question with Next before you can go back with Previous.
+          </p>
+        )}
+        {navigationEnabled && !hasCountdown && hasAnyQuestionSaved && canShowPreviousQuestion && (
           <p className="max-w-[min(100%,18rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             No timer: revisit questions with Previous; use Submit on the last question to update.
+          </p>
+        )}
+        {navigationEnabled && !hasCountdown && hasAnyQuestionSaved && !canShowPreviousQuestion && (
+          <p className="max-w-[min(100%,18rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
+            Visit every question with Next before you can go back with Previous.
           </p>
         )}
         {!navigationEnabled && !submissionsClosed && (
@@ -76,6 +89,14 @@ export function ActiveQuestionPanel({
           </p>
         )}
       </div>
+
+      {showNewQuestionAlert ? (
+        <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+          {highlightNextButton
+            ? 'New question available — tap Next to view it.'
+            : 'New question available — use Previous to view it.'}
+        </p>
+      ) : null}
 
       {allQuestionsClosedByHost ? (
         <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
@@ -170,7 +191,7 @@ export function ActiveQuestionPanel({
       <div
         className={`flex items-center gap-2 ${navigationEnabled ? 'justify-between' : 'justify-center'}`}
       >
-        {navigationEnabled ? (
+        {navigationEnabled && canShowPreviousQuestion ? (
           <button
             type="button"
             aria-label="Previous question"
@@ -180,7 +201,9 @@ export function ActiveQuestionPanel({
           >
             Previous
           </button>
-        ) : null}
+        ) : (
+          <span className="h-11 w-0 shrink-0" aria-hidden />
+        )}
         <div
           className={`flex flex-wrap items-center gap-2 ${navigationEnabled ? 'justify-end' : 'justify-center'}`}
         >
@@ -228,7 +251,11 @@ export function ActiveQuestionPanel({
                           : undefined
             }
             onClick={onNextOrSubmit}
-            className="h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className={`h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
+              highlightNextButton && navigationEnabled && !isLastDisplayedQuestion
+                ? 'participant-next-highlight'
+                : ''
+            }`}
           >
             {isSubmitting
               ? 'Submitting...'

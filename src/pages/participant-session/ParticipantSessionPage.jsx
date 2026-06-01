@@ -33,6 +33,7 @@ import { WaitingForQuestion } from './components/WaitingForQuestion'
 import { WaitingView } from './components/WaitingView'
 import { isParticipantChoiceCorrect } from '../../utils/answerReveal'
 import {
+  allActiveQuestionsViewedOrAttempted,
   buildResponsePayloadForQuestion,
   canAutoNavigateToActivatedQuestion,
   clamp,
@@ -129,6 +130,9 @@ function ParticipantSessionPage() {
   const [questionLbVisibleByQuestion, setQuestionLbVisibleByQuestion] = useState({})
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [answerRevealByQuestion, setAnswerRevealByQuestion] = useState({})
+  const [unseenActivatedQuestionIds, setUnseenActivatedQuestionIds] = useState(
+    () => new Set(),
+  )
 
   const sessionQuery = useQuery({
     queryKey: ['participant-session', effectiveSessionCode],
@@ -336,6 +340,65 @@ function ParticipantSessionPage() {
   const activeQuestionsRef = useRef(activeQuestions)
   activeQuestionsRef.current = activeQuestions
 
+  const addUnseenActivatedQuestion = useCallback(
+    (questionId) => {
+      const qid = Number(questionId)
+      if (!qid || !navigationEnabled) return
+      const opened = useParticipantStore.getState().quizQuestionOpenedAt || {}
+      if (opened[String(qid)]) return
+      setUnseenActivatedQuestionIds((prev) => {
+        if (prev.has(qid)) return prev
+        const next = new Set(prev)
+        next.add(qid)
+        return next
+      })
+    },
+    [navigationEnabled],
+  )
+
+  const clearUnseenActivatedQuestion = useCallback((questionId) => {
+    const qid = Number(questionId)
+    if (!qid) return
+    setUnseenActivatedQuestionIds((prev) => {
+      if (!prev.has(qid)) return prev
+      const next = new Set(prev)
+      next.delete(qid)
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    setUnseenActivatedQuestionIds(new Set())
+  }, [effectiveSessionCode])
+
+  const liveUnseenSyncedRef = useRef(false)
+  useEffect(() => {
+    liveUnseenSyncedRef.current = false
+  }, [effectiveSessionCode])
+
+  useEffect(() => {
+    if (!navigationEnabled || step !== 'active' || liveUnseenSyncedRef.current) return
+    if (!activeQuestions.length) return
+    liveUnseenSyncedRef.current = true
+    const opened = quizQuestionOpenedAt || {}
+    const toAdd = activeQuestions
+      .filter((q) => q.isLive && !opened[String(q.id)])
+      .map((q) => Number(q.id))
+      .filter(Boolean)
+    if (!toAdd.length) return
+    setUnseenActivatedQuestionIds((prev) => {
+      const next = new Set(prev)
+      let changed = false
+      for (const id of toAdd) {
+        if (!next.has(id)) {
+          next.add(id)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [navigationEnabled, step, activeQuestions, quizQuestionOpenedAt])
+
   /** Host activated a question while participant was mid-timed-attempt — apply when idle. */
   const pendingActivatedQuestionIdRef = useRef(null)
 
@@ -393,9 +456,10 @@ function ParticipantSessionPage() {
   const handleHostQuestionActivated = useCallback(
     (questionId) => {
       pendingActivatedQuestionIdRef.current = questionId
+      addUnseenActivatedQuestion(questionId)
       tryApplyPendingActivatedQuestion()
     },
-    [tryApplyPendingActivatedQuestion],
+    [addUnseenActivatedQuestion, tryApplyPendingActivatedQuestion],
   )
 
   useEffect(() => {
@@ -535,6 +599,7 @@ function ParticipantSessionPage() {
       }
 
       unlockQuestionForReattempt(qid, { timeLimitSeconds })
+      addUnseenActivatedQuestion(qid)
       setStep('active')
       setLiveQuestionId(qid)
       setSubmitted(false)
@@ -592,6 +657,7 @@ function ParticipantSessionPage() {
         if (pendingActivatedQuestionIdRef.current === data.question_id) {
           pendingActivatedQuestionIdRef.current = null
         }
+        clearUnseenActivatedQuestion(data.question_id)
         setLiveQuestionId((current) => (current === data.question_id ? null : current))
       }
     })
@@ -816,6 +882,47 @@ function ParticipantSessionPage() {
     ? activeQuestions.length > 0 && displayQuestionIndex === activeQuestions.length - 1
     : true
 
+  const canShowPreviousQuestion = useMemo(
+    () =>
+      navigationEnabled &&
+      activeQuestions.length > 1 &&
+      allActiveQuestionsViewedOrAttempted(activeQuestions, {
+        openedAtByQuestion: quizQuestionOpenedAt,
+        submittedIds: quizSubmittedQuestionIds,
+        responses,
+      }),
+    [
+      navigationEnabled,
+      activeQuestions,
+      quizQuestionOpenedAt,
+      quizSubmittedQuestionIds,
+      responses,
+    ],
+  )
+
+  const highlightNextButton = useMemo(() => {
+    if (!navigationEnabled || unseenActivatedQuestionIds.size === 0) return false
+    const currentId = question?.id
+    return activeQuestions.some(
+      (q, idx) =>
+        unseenActivatedQuestionIds.has(q.id) &&
+        q.id !== currentId &&
+        idx > displayQuestionIndex,
+    )
+  }, [
+    navigationEnabled,
+    unseenActivatedQuestionIds,
+    activeQuestions,
+    question?.id,
+    displayQuestionIndex,
+  ])
+
+  const showNewQuestionAlert = useMemo(() => {
+    if (!navigationEnabled || unseenActivatedQuestionIds.size === 0) return false
+    const currentId = question?.id
+    return [...unseenActivatedQuestionIds].some((id) => id !== currentId)
+  }, [navigationEnabled, unseenActivatedQuestionIds, question?.id])
+
   const canSubmitCurrentQuestion = useMemo(() => {
     if (!question?.id) return false
     if ((quizSubmittedQuestionIds || {})[String(question.id)]) return false
@@ -915,9 +1022,10 @@ function ParticipantSessionPage() {
   ])
 
   useEffect(() => {
-    if (step !== 'active' || !question?.id || hasCountdown) return
+    if (step !== 'active' || !question?.id) return
     markQuestionOpened(question.id)
-  }, [step, question?.id, hasCountdown, markQuestionOpened])
+    clearUnseenActivatedQuestion(question.id)
+  }, [step, question?.id, markQuestionOpened, clearUnseenActivatedQuestion])
 
   useEffect(() => {
     if (!session) return
@@ -1182,7 +1290,7 @@ function ParticipantSessionPage() {
   }
 
   const handlePrevious = () => {
-    if (!navigationEnabled || displayQuestionIndex <= 0) return
+    if (!navigationEnabled || !canShowPreviousQuestion || displayQuestionIndex <= 0) return
     goToQuestionIndex(displayQuestionIndex - 1)
   }
 
@@ -1558,6 +1666,9 @@ function ParticipantSessionPage() {
             tagsInput={tagsInput}
             submitted={submitted}
             navigationEnabled={navigationEnabled}
+            canShowPreviousQuestion={canShowPreviousQuestion}
+            highlightNextButton={highlightNextButton}
+            showNewQuestionAlert={showNewQuestionAlert}
             isLastDisplayedQuestion={isLastDisplayedQuestion}
             isSubmitting={isSubmitting}
             hasFinalizePayload={navigationEnabled ? hasFinalizePayload : canSubmitCurrentQuestion}
