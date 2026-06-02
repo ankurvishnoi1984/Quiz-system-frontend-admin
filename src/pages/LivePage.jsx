@@ -34,7 +34,7 @@ import ShareSessionPanel from '../components/dashboard/ShareSessionPanel'
 import Modal from '../components/ui/Modal'
 import { HostAlertModal } from '../components/live/HostAlertModal'
 import { HostQuestionActionButton } from '../components/live/HostQuestionActionButton'
-import { canHostCloseAllQuestions } from '../utils/hostQuestionControls'
+import { canHostActivateAllQuestions, canHostCloseAllQuestions } from '../utils/hostQuestionControls'
 import { HostNoSessionsEmpty } from '../components/layout/HostNoSessionsEmpty'
 import { useHostNavSessions } from '../hooks/useHostNavSessions'
 import { HostQuestionControls } from '../components/live/HostQuestionControls'
@@ -271,10 +271,12 @@ function LivePage() {
     answerRevealMutation,
     closeQuestionMutation,
     closeAllQuestionsMutation,
+    activateAllQuestionsMutation,
     reattemptMutation,
     openForReattempt,
     closeQuestion,
     closeAllQuestions,
+    activateAllQuestions,
   } = useHostQuestionMutations(accessToken, sessionId, {
     onMutationError: (message) => setErrorMessage(message),
     onCloseQuestionSuccess: (questionText) => {
@@ -313,6 +315,26 @@ function LivePage() {
       setHostAlert({
         variant: 'error',
         title: 'Could not close all questions',
+        message: error.message || 'Something went wrong. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
+    onActivateAllQuestionsSuccess: (activatedCount) => {
+      setErrorMessage('')
+      setHostAlert({
+        variant: 'success',
+        title: 'All questions activated',
+        message:
+          activatedCount > 0
+            ? `${activatedCount} question${activatedCount === 1 ? '' : 's'} ${activatedCount === 1 ? 'is' : 'are'} now live. Participants can answer and navigate between them.`
+            : 'All questions are now live. Participants can answer and navigate between them.',
+        confirmLabel: 'OK',
+      })
+    },
+    onActivateAllQuestionsError: (error) => {
+      setHostAlert({
+        variant: 'error',
+        title: 'Could not activate all questions',
         message: error.message || 'Something went wrong. Please try again.',
         confirmLabel: 'Close',
       })
@@ -473,6 +495,15 @@ function LivePage() {
   const showCloseAllQuestionsButton = useMemo(
     () =>
       canHostCloseAllQuestions(mappedQuestions, {
+        canEditLive,
+        singleActiveQuestionMode,
+      }),
+    [mappedQuestions, canEditLive, singleActiveQuestionMode],
+  )
+
+  const showActivateAllQuestionsButton = useMemo(
+    () =>
+      canHostActivateAllQuestions(mappedQuestions, {
         canEditLive,
         singleActiveQuestionMode,
       }),
@@ -642,16 +673,30 @@ function LivePage() {
               {mappedQuestions.length} question{mappedQuestions.length === 1 ? '' : 's'} • select a question to control and view results
             </p>
           </div>
-          {showCloseAllQuestionsButton ? (
-            <HostQuestionActionButton
-              disabled={closeAllQuestionsMutation.isPending}
-              icon={Layers}
-              label={closeAllQuestionsMutation.isPending ? 'Closing…' : 'Close all questions'}
-              title="Stop accepting responses on all live untimed questions"
-              tone="rose"
-              onClick={closeAllQuestions}
-            />
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {showActivateAllQuestionsButton ? (
+              <HostQuestionActionButton
+                disabled={activateAllQuestionsMutation.isPending}
+                icon={Play}
+                label={
+                  activateAllQuestionsMutation.isPending ? 'Activating…' : 'Activate all questions'
+                }
+                title="Make all questions live at once (timed questions share the same start time)"
+                tone="emerald"
+                onClick={activateAllQuestions}
+              />
+            ) : null}
+            {showCloseAllQuestionsButton ? (
+              <HostQuestionActionButton
+                disabled={closeAllQuestionsMutation.isPending}
+                icon={Layers}
+                label={closeAllQuestionsMutation.isPending ? 'Closing…' : 'Close all questions'}
+                title="Stop accepting responses on all live untimed questions"
+                tone="rose"
+                onClick={closeAllQuestions}
+              />
+            ) : null}
+          </div>
         </div>
 
         {!mappedQuestions.length ? (

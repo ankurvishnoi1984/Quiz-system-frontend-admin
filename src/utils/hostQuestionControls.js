@@ -13,3 +13,11 @@ export function canHostCloseAllQuestions(questions, { canEditLive, singleActiveQ
   if (live.some((q) => Number(q.timeLimit ?? 0) > 0)) return false
   return live.some((q) => !q.submissionsClosed)
 }
+
+/** Multi-question sessions (timed or untimed): activate every question at once. */
+export function canHostActivateAllQuestions(questions, { canEditLive, singleActiveQuestionMode }) {
+  if (!canEditLive || singleActiveQuestionMode) return false
+  const list = questions || []
+  if (!list.length) return false
+  return list.some((q) => !q.isLive)
+}
