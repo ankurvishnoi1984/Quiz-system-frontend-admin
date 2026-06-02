@@ -1,24 +1,10 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import { Download, FileText, Loader2, Printer, Trophy } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
-import WordCloudChart from '../components/charts/WordCloudChart'
-import { renderPieLabel } from '../components/charts/renderPieLabel'
+import { AnalyticsQuestionChartSection } from '../components/analytics/AnalyticsQuestionChartSection'
+import { AnalyticsQuestionInsights } from '../components/analytics/AnalyticsQuestionInsights'
 import Modal from '../components/ui/Modal'
-import { CHART_TOOLTIP_STYLE, getChartColor, RESPONSE_RATE_PIE_COLORS } from '../utils/chartColors'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
 import { useShell } from '../context/ShellContext'
 import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
@@ -26,10 +12,6 @@ import { getSessionReportApi } from '../services/analyticsApi'
 import { getSessionDetailApi, listSessionQuestionsApi } from '../services/builderApi'
 import { getQuestionResultsApi, getSessionResponsesApi } from '../services/liveApi'
 import { useAuthStore } from '../store/authStore'
-
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n))
-}
 
 function downloadText(filename, text, mime = 'text/plain') {
   const blob = new Blob([text], { type: mime })
@@ -125,78 +107,6 @@ function correctRateForQuestion(question, responses) {
   return Math.round((correct / qResponses.length) * 100)
 }
 
-function QuestionAnalyticsChart({ question, participantsJoined }) {
-  if (!question) return null
-
-  if (question.rawType === 'word_cloud') {
-    return (
-      <WordCloudChart words={question.wordCloud} className="h-full" emptyLabel="No words submitted yet" />
-    )
-  }
-
-  const hasOptionChart =
-    question.chart.length > 0 && (question.rawType === 'mcq' || question.rawType === 'true_false')
-
-  if (hasOptionChart) {
-    return (
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={question.chart} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-          <YAxis unit="%" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-          <Tooltip
-            cursor={{ fill: 'rgba(79, 70, 229, 0.06)' }}
-            contentStyle={CHART_TOOLTIP_STYLE}
-            formatter={(value, _name, props) => [`${value}% (${props.payload.count} responses)`, 'Share']}
-          />
-          <Bar dataKey="value" radius={[10, 10, 0, 0]} maxBarSize={56}>
-            {question.chart.map((entry, idx) => (
-              <Cell key={entry.name} fill={getChartColor(entry.name, idx, question.rawType)} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    )
-  }
-
-  const respondedPct = clamp(
-    Math.round((question.responseCount / Math.max(1, participantsJoined)) * 100),
-    0,
-    100,
-  )
-
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-        <Legend
-          verticalAlign="bottom"
-          height={28}
-          formatter={(value) => <span className="text-xs font-medium text-slate-600">{value}</span>}
-        />
-        <Pie
-          data={[
-            { name: 'Responded', value: respondedPct },
-            { name: 'No response', value: clamp(100 - respondedPct, 0, 100) },
-          ]}
-          dataKey="value"
-          nameKey="name"
-          outerRadius={92}
-          innerRadius={50}
-          paddingAngle={2}
-          stroke="#ffffff"
-          strokeWidth={2}
-          label={renderPieLabel}
-          labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
-        >
-          <Cell fill={RESPONSE_RATE_PIE_COLORS.responded} />
-          <Cell fill={RESPONSE_RATE_PIE_COLORS.empty} />
-        </Pie>
-      </PieChart>
-    </ResponsiveContainer>
-  )
-}
-
 function AnalyticsPage() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session')
@@ -209,6 +119,7 @@ function AnalyticsPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [selectedQuestionId, setSelectedQuestionId] = useState(null)
+  const [chartView, setChartView] = useState('bar')
 
   const defaultSessionId =
     sessionId ||
@@ -370,13 +281,19 @@ function AnalyticsPage() {
         chart,
         wordCloud,
         rawType: q.question_type,
+        rankingAnalytics: results?.ranking_analytics || null,
       }
     })
   }, [sortedQuestions, breakdownByQuestionId, resultsByQuestionId, allResponses])
 
   useEffect(() => {
     setSelectedQuestionId(null)
+    setChartView('bar')
   }, [numericSessionId])
+
+  useEffect(() => {
+    setChartView('bar')
+  }, [selectedQuestionId])
 
   useEffect(() => {
     if (!perQuestion.length) {
@@ -684,29 +601,14 @@ function AnalyticsPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 h-72 rounded-2xl border border-blue-200/70 bg-white p-3">
-                  <QuestionAnalyticsChart
-                    question={selectedQuestion}
-                    participantsJoined={summary.joined}
-                  />
-                </div>
+                <AnalyticsQuestionChartSection
+                  question={selectedQuestion}
+                  participantsJoined={summary.joined}
+                  chartView={chartView}
+                  onChartViewChange={setChartView}
+                />
 
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white p-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Correct-answer rate</p>
-                    <p className="mt-1 text-lg font-bold text-navy-900">
-                      {selectedQuestion.correctRate == null ? '—' : `${selectedQuestion.correctRate}%`}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {selectedQuestion.correctRate == null
-                        ? 'Not a scored question'
-                        : 'Based on marked correct options'}
-                    </p>
-                  </div>
-                </div>
+                <AnalyticsQuestionInsights question={selectedQuestion} />
               </div>
             ) : null}
           </div>
