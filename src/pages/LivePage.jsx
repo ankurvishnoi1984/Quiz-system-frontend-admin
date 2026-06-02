@@ -12,10 +12,8 @@ import {
   YAxis,
 } from 'recharts'
 import {
-  BarChart3,
   Eye,
   Layers,
-  PieChart as PieChartIcon,
   Play,
   Presentation,
   Rocket,
@@ -38,6 +36,8 @@ import { canHostActivateAllQuestions, canHostCloseAllQuestions } from '../utils/
 import { HostNoSessionsEmpty } from '../components/layout/HostNoSessionsEmpty'
 import { useHostNavSessions } from '../hooks/useHostNavSessions'
 import { HostQuestionControls } from '../components/live/HostQuestionControls'
+import { LiveChartViewToggle } from '../components/live/LiveChartViewToggle'
+import { RankingLiveChartPanel } from '../components/live/RankingLiveChartPanel'
 import { useHostQuestionMutations } from '../hooks/useHostQuestionMutations'
 import { LiveQaPanel } from '../components/leaderboard/LiveQaPanel'
 import { QuestionLeaderboardModal } from '../components/leaderboard/QuestionLeaderboardModal'
@@ -912,35 +912,12 @@ function LivePage() {
                   </p>
                 )}
               </div>
-              {showOptionBreakdown && (
-                <div className="inline-flex rounded-xl border border-blue-200/70 bg-white p-0.5 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setChartView('bar')}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                      chartView === 'bar'
-                        ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow'
-                        : 'text-slate-600 hover:bg-blue-50'
-                    }`}
-                    aria-pressed={chartView === 'bar'}
-                  >
-                    <BarChart3 className="size-3.5" />
-                    Bar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setChartView('pie')}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                      chartView === 'pie'
-                        ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow'
-                        : 'text-slate-600 hover:bg-blue-50'
-                    }`}
-                    aria-pressed={chartView === 'pie'}
-                  >
-                    <PieChartIcon className="size-3.5" />
-                    Pie
-                  </button>
-                </div>
+              {(showOptionBreakdown || showRankingBreakdown) && (
+                <LiveChartViewToggle
+                  view={chartView}
+                  onChange={setChartView}
+                  modes={showRankingBreakdown ? ['table', 'bar', 'pie'] : ['bar', 'pie']}
+                />
               )}
             </div>
             <div className="mt-3 h-[300px] rounded-2xl border border-blue-200 bg-white p-3">
@@ -948,30 +925,10 @@ function LivePage() {
                 <WordCloudChart words={wordCloudWords} className="h-full" />
               ) : (
                 showRankingBreakdown ? (
-                  <div className="h-full overflow-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="sticky top-0 bg-white">
-                        <tr className="border-b border-blue-100">
-                          <th className="px-3 py-2 font-semibold text-slate-700">Rank</th>
-                          <th className="px-3 py-2 font-semibold text-slate-700">Option</th>
-                          <th className="px-3 py-2 font-semibold text-slate-700">Score</th>
-                          <th className="px-3 py-2 font-semibold text-slate-700">Avg Score</th>
-                          <th className="px-3 py-2 font-semibold text-slate-700">Avg Rank</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rankingAnalytics.rankings.map((row) => (
-                          <tr key={row.optionId} className="border-b border-blue-50 last:border-b-0">
-                            <td className="px-3 py-2 font-semibold text-navy-900">{row.rank}</td>
-                            <td className="px-3 py-2 text-slate-700">{row.optionText}</td>
-                            <td className="px-3 py-2 text-slate-700">{row.totalScore}</td>
-                            <td className="px-3 py-2 text-slate-700">{row.averageScore}</td>
-                            <td className="px-3 py-2 text-slate-700">{row.averageRank}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <RankingLiveChartPanel
+                    rankings={rankingAnalytics.rankings}
+                    chartView={chartView}
+                  />
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     {showOptionBreakdown ? (
@@ -1052,6 +1009,11 @@ function LivePage() {
             )}
             {showOptionBreakdown && !optionTotal && (
               <p className="mt-2 text-center text-xs text-slate-500">Waiting for participants to answer…</p>
+            )}
+            {activeQuestion?.rawType === 'ranking' && !showRankingBreakdown && (
+              <p className="mt-2 text-center text-xs text-slate-500">
+                Waiting for participants to submit rankings…
+              </p>
             )}
           </div>
 
