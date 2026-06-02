@@ -50,10 +50,24 @@ export function buildResponsePayloadForQuestion(q, res) {
 
   if (q.type === 'Rating') payload.rating_value = res.rating
 
-  if (q.type === 'Text' || q.type === 'Ranking') {
+  if (q.type === 'Text') {
     const text = res.textResponse?.trim()
     if (!text) return null
     payload.text_response = text
+  }
+
+  if (q.type === 'Ranking') {
+    const order = Array.isArray(res.rankingOrder) ? res.rankingOrder.map(Number).filter(Boolean) : []
+    const expectedOptionIds = (q.options || []).map((o) => Number(o.option_id)).filter(Boolean)
+    const uniqueOrder = [...new Set(order)]
+    if (
+      expectedOptionIds.length < 2 ||
+      uniqueOrder.length !== expectedOptionIds.length ||
+      !expectedOptionIds.every((id) => uniqueOrder.includes(id))
+    ) {
+      return null
+    }
+    payload.ranking_order = uniqueOrder
   }
 
   if (q.type === 'Word Cloud') {
@@ -162,8 +176,16 @@ export function participantQuestionHasAnswer(question, response = {}) {
   if (question.type === 'Rating') {
     return Number(response.rating) > 0
   }
-  if (question.type === 'Text' || question.type === 'Ranking') {
+  if (question.type === 'Text') {
     return Boolean(String(response.textResponse || '').trim())
+  }
+  if (question.type === 'Ranking') {
+    const order = Array.isArray(response.rankingOrder) ? response.rankingOrder.map(Number).filter(Boolean) : []
+    const optionIds = (question.options || []).map((o) => Number(o.option_id)).filter(Boolean)
+    if (optionIds.length < 2) return false
+    if (order.length !== optionIds.length) return false
+    if (new Set(order).size !== order.length) return false
+    return optionIds.every((id) => order.includes(id))
   }
   if (question.type === 'Word Cloud') {
     return (response.tags || []).length > 0

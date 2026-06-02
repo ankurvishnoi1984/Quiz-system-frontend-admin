@@ -86,6 +86,14 @@ function sortTrueFalseOptionData(data) {
   })
 }
 
+function buildRankingResponseLabel(row, optionsById) {
+  const order = Array.isArray(row?.ranking_order) ? row.ranking_order.map(Number).filter(Boolean) : []
+  if (!order.length) return null
+  return order
+    .map((optionId, idx) => `${idx + 1}. ${optionsById.get(optionId) || `Option ${optionId}`}`)
+    .join(' | ')
+}
+
 function LivePage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -214,6 +222,10 @@ function LivePage() {
       queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
       queryClient.invalidateQueries({ queryKey: ['live-responses', sessionId] })
     })
+    const offRankingResp = client.on(RealtimeEvent.RANKING_RESPONSE_SUBMITTED, () => {
+      queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
+      queryClient.invalidateQueries({ queryKey: ['live-responses', sessionId] })
+    })
     const offSession = client.on('session_updated', (data) => {
       queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
       queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
@@ -241,6 +253,7 @@ function LivePage() {
       offClose()
       offError()
       offResp()
+      offRankingResp()
       offSession()
       offQuestion()
       offAnswerReveal()
@@ -433,6 +446,11 @@ function LivePage() {
   }, [activeQuestion?.rawType, questionResultsQuery.data, currentResponses])
 
   const usesOptionChart = questionUsesOptionChart(activeQuestion?.rawType)
+  const rankingAnalytics = questionResultsQuery.data?.ranking_analytics || null
+  const showRankingBreakdown =
+    activeQuestion?.rawType === 'ranking' &&
+    Array.isArray(rankingAnalytics?.rankings) &&
+    rankingAnalytics.rankings.length > 0
   const showWordCloud = activeQuestion?.rawType === 'word_cloud'
   const showOptionBreakdown = usesOptionChart && optionData.length > 0
   const optionTotal = optionData.reduce((sum, row) => sum + row.value, 0)
@@ -448,6 +466,12 @@ function LivePage() {
         participant: row.participant?.nickname || `Participant ${row.participant_id}`,
         response:
           row.question_option?.option_text ||
+          (activeQuestion?.rawType === 'ranking'
+            ? buildRankingResponseLabel(
+                row,
+                new Map((activeQuestion?.options || []).map((opt) => [Number(opt.option_id), opt.option_text])),
+              )
+            : null) ||
           row.text_response ||
           (row.rating_value !== null && row.rating_value !== undefined
             ? String(row.rating_value)
@@ -881,6 +905,12 @@ function LivePage() {
                     {optionTotal} response{optionTotal === 1 ? '' : 's'} by answer
                   </p>
                 )}
+                {showRankingBreakdown && (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {rankingAnalytics.totalResponses || 0} ranked submission
+                    {(rankingAnalytics.totalResponses || 0) === 1 ? '' : 's'} · avg score shown per option
+                  </p>
+                )}
               </div>
               {showOptionBreakdown && (
                 <div className="inline-flex rounded-xl border border-blue-200/70 bg-white p-0.5 shadow-sm">
@@ -917,8 +947,34 @@ function LivePage() {
               {showWordCloud ? (
                 <WordCloudChart words={wordCloudWords} className="h-full" />
               ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  {showOptionBreakdown ? (
+                showRankingBreakdown ? (
+                  <div className="h-full overflow-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="sticky top-0 bg-white">
+                        <tr className="border-b border-blue-100">
+                          <th className="px-3 py-2 font-semibold text-slate-700">Rank</th>
+                          <th className="px-3 py-2 font-semibold text-slate-700">Option</th>
+                          <th className="px-3 py-2 font-semibold text-slate-700">Score</th>
+                          <th className="px-3 py-2 font-semibold text-slate-700">Avg Score</th>
+                          <th className="px-3 py-2 font-semibold text-slate-700">Avg Rank</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rankingAnalytics.rankings.map((row) => (
+                          <tr key={row.optionId} className="border-b border-blue-50 last:border-b-0">
+                            <td className="px-3 py-2 font-semibold text-navy-900">{row.rank}</td>
+                            <td className="px-3 py-2 text-slate-700">{row.optionText}</td>
+                            <td className="px-3 py-2 text-slate-700">{row.totalScore}</td>
+                            <td className="px-3 py-2 text-slate-700">{row.averageScore}</td>
+                            <td className="px-3 py-2 text-slate-700">{row.averageRank}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    {showOptionBreakdown ? (
                     chartView === 'bar' ? (
                       <BarChart data={optionData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" vertical={false} />
@@ -973,7 +1029,7 @@ function LivePage() {
                         </Pie>
                       </PieChart>
                     )
-                  ) : (
+                    ) : (
                     <PieChart>
                       <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                       <Pie
@@ -986,8 +1042,9 @@ function LivePage() {
                         <Cell fill={CHART_COLORS[0]} />
                       </Pie>
                     </PieChart>
-                  )}
-                </ResponsiveContainer>
+                    )}
+                  </ResponsiveContainer>
+                )
               )}
             </div>
             {showWordCloud && !wordCloudWords.length && (

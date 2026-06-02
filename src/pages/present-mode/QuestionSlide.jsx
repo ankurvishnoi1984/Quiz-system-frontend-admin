@@ -90,7 +90,12 @@ export function QuestionSlide({
   const usesOptionChart = questionUsesOptionChart(question.rawType)
   const showWordCloud = question.rawType === 'word_cloud'
   const showRating = question.rawType === 'rating'
-  const showTextList = question.rawType === 'open_text' || question.rawType === 'ranking'
+  const rankingAnalytics = questionResultsQuery.data?.ranking_analytics || null
+  const showRanking =
+    question.rawType === 'ranking' &&
+    Array.isArray(rankingAnalytics?.rankings) &&
+    rankingAnalytics.rankings.length > 0
+  const showTextList = question.rawType === 'open_text'
   const showQuestionLeaderboard = Boolean(question.isQuizMode && question.showLeaderboard)
 
   const chartData = showRating ? ratingData : optionData
@@ -145,6 +150,34 @@ export function QuestionSlide({
       return (
         <div className="min-h-0 flex-1 rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10">
           <TextResponsesPanel rows={responseRows} />
+        </div>
+      )
+    }
+    if (showRanking) {
+      return (
+        <div className="min-h-0 flex-1 overflow-auto rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10">
+          <table className="w-full text-left text-[clamp(0.85rem,1.4vw,1rem)]">
+            <thead className="sticky top-0 bg-white">
+              <tr className="border-b border-blue-100">
+                <th className="px-3 py-2 font-semibold text-slate-700">Rank</th>
+                <th className="px-3 py-2 font-semibold text-slate-700">Option</th>
+                <th className="px-3 py-2 font-semibold text-slate-700">Score</th>
+                <th className="px-3 py-2 font-semibold text-slate-700">Avg Score</th>
+                <th className="px-3 py-2 font-semibold text-slate-700">Avg Rank</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rankingAnalytics.rankings.map((row) => (
+                <tr key={row.optionId} className="border-b border-blue-50 last:border-b-0">
+                  <td className="px-3 py-2 font-semibold text-navy-900">{row.rank}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.optionText}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.totalScore}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.averageScore}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.averageRank}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )
     }

@@ -1700,6 +1700,9 @@ function ParticipantSessionPage() {
             }
             onSelectRating={(questionId, rating) => updateResponse(questionId, { rating })}
             onTextChange={(questionId, text) => updateResponse(questionId, { textResponse: text })}
+            onRankingChange={(questionId, rankingOrder) =>
+              updateResponse(questionId, { rankingOrder })
+            }
             onPrevious={handlePrevious}
             onNextOrSubmit={handleNextOrSubmit}
             onGoToQa={() => setStep('qa')}

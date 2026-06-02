@@ -3,6 +3,7 @@ import { McqOptions } from './question/McqOptions'
 import { QuestionLeaderboard } from './question/QuestionLeaderboard'
 import { QuestionTimer } from './question/QuestionTimer'
 import { RatingOptions } from './question/RatingOptions'
+import { RankingOptions } from './question/RankingOptions'
 import { TextResponse } from './question/TextResponse'
 import { TrueFalseOptions } from './question/TrueFalseOptions'
 import { WordCloudInput } from './question/WordCloudInput'
@@ -44,6 +45,7 @@ export function ActiveQuestionPanel({
   onSelectOption,
   onSelectRating,
   onTextChange,
+  onRankingChange,
   onPrevious,
   onNextOrSubmit,
   onGoToQa,
@@ -155,11 +157,20 @@ export function ActiveQuestionPanel({
         />
       )}
 
-      {(question.type === 'Text' || question.type === 'Ranking') && (
+      {question.type === 'Text' && (
         <TextResponse
           currentResponse={currentResponse}
           inputsLocked={inputsLocked}
           onTextChange={(text) => onTextChange(question.id, text)}
+        />
+      )}
+
+      {question.type === 'Ranking' && (
+        <RankingOptions
+          question={question}
+          currentResponse={currentResponse}
+          inputsLocked={inputsLocked}
+          onRankingChange={(rankingOrder) => onRankingChange(question.id, rankingOrder)}
         />
       )}
 

@@ -158,7 +158,7 @@ function normalizeTrueFalseOptions(apiOptions = []) {
 }
 
 function questionTypeUsesOptions(type) {
-  return type === 'MCQ' || type === 'True/False'
+  return type === 'MCQ' || type === 'True/False' || type === 'Ranking'
 }
 
 function buildOptionsPayload(question) {
@@ -181,6 +181,14 @@ function buildOptionsPayload(question) {
       ...(option.optionId != null ? { option_id: option.optionId } : {}),
       option_text: option.text,
       is_correct: Boolean(option.isCorrect),
+      display_order: optionIndex + 1,
+    }))
+  }
+  if (question.type === 'Ranking') {
+    return (question.options || []).map((option, optionIndex) => ({
+      ...(option.optionId != null ? { option_id: option.optionId } : {}),
+      option_text: option.text || `Option ${optionIndex + 1}`,
+      is_correct: false,
       display_order: optionIndex + 1,
     }))
   }
@@ -404,6 +412,7 @@ function OptionsEditor({ question, quizMode, onChange, structureLocked }) {
 
   const addOption = () => {
     if (structureLocked) return
+    if (question.type === 'Ranking' && question.options.length >= 10) return
     onChange({
       ...question,
       options: [...question.options, { id: uid('opt'), text: `Option ${question.options.length + 1}`, isCorrect: false }],
@@ -435,31 +444,33 @@ function OptionsEditor({ question, quizMode, onChange, structureLocked }) {
 
   const optionRows = question.options.map((opt) => (
     <div key={opt.id} className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={() => toggleCorrect(opt.id)}
-        disabled={structureLocked}
-        className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-          structureLocked
-            ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500'
-            : quizMode
-              ? opt.isCorrect
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-              : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500'
-        }`}
-        title={
-          structureLocked
-            ? 'Correct answers cannot be changed after the session is live'
-            : quizMode
-              ? 'Toggle correct answer'
-              : 'Enable Quiz Mode to select correct answers'
-        }
-        aria-label="Toggle correct"
-      >
-        <CheckCircle2 className="size-4" />
-        {structureLocked ? (opt.isCorrect ? 'Correct' : '—') : quizMode ? (opt.isCorrect ? 'Correct' : 'Mark correct') : 'Quiz mode off'}
-      </button>
+      {question.type === 'MCQ' ? (
+        <button
+          type="button"
+          onClick={() => toggleCorrect(opt.id)}
+          disabled={structureLocked}
+          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+            structureLocked
+              ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500'
+              : quizMode
+                ? opt.isCorrect
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500'
+          }`}
+          title={
+            structureLocked
+              ? 'Correct answers cannot be changed after the session is live'
+              : quizMode
+                ? 'Toggle correct answer'
+                : 'Enable Quiz Mode to select correct answers'
+          }
+          aria-label="Toggle correct"
+        >
+          <CheckCircle2 className="size-4" />
+          {structureLocked ? (opt.isCorrect ? 'Correct' : '—') : quizMode ? (opt.isCorrect ? 'Correct' : 'Mark correct') : 'Quiz mode off'}
+        </button>
+      ) : null}
       <input
         className="h-10 min-w-[220px] flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
         value={opt.text}
@@ -488,7 +499,7 @@ function OptionsEditor({ question, quizMode, onChange, structureLocked }) {
         <button
           type="button"
           onClick={addOption}
-          disabled={structureLocked}
+          disabled={structureLocked || (question.type === 'Ranking' && question.options.length >= 10)}
           className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
             structureLocked
               ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
@@ -499,6 +510,9 @@ function OptionsEditor({ question, quizMode, onChange, structureLocked }) {
           Add option
         </button>
       </div>
+      {question.type === 'Ranking' ? (
+        <p className="text-xs text-slate-600">Provide 2 to 10 options. Participants will rank all options.</p>
+      ) : null}
 
       {structureLocked ? (
         <div className="space-y-2">{optionRows}</div>
@@ -509,22 +523,24 @@ function OptionsEditor({ question, quizMode, onChange, structureLocked }) {
               {question.options.map((opt) => (
                 <SortableRow key={opt.id} id={opt.id}>
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleCorrect(opt.id)}
-                      className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                        quizMode
-                          ? opt.isCorrect
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
-                          : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500'
-                      }`}
-                      title={quizMode ? 'Toggle correct answer' : 'Enable Quiz Mode to select correct answers'}
-                      aria-label="Toggle correct"
-                    >
-                      <CheckCircle2 className="size-4" />
-                      {quizMode ? (opt.isCorrect ? 'Correct' : 'Mark correct') : 'Quiz mode off'}
-                    </button>
+                    {question.type === 'MCQ' ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleCorrect(opt.id)}
+                        className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                          quizMode
+                            ? opt.isCorrect
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                              : 'border-blue-200/70 bg-white text-slate-700 hover:bg-blue-50'
+                            : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500'
+                        }`}
+                        title={quizMode ? 'Toggle correct answer' : 'Enable Quiz Mode to select correct answers'}
+                        aria-label="Toggle correct"
+                      >
+                        <CheckCircle2 className="size-4" />
+                        {quizMode ? (opt.isCorrect ? 'Correct' : 'Mark correct') : 'Quiz mode off'}
+                      </button>
+                    ) : null}
                     <input
                       className="h-10 min-w-[220px] flex-1 rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
                       value={opt.text}
@@ -576,6 +592,20 @@ function ParticipantPreview({ question, quizMode }) {
         </div>
       )}
 
+      {question.type === 'Ranking' && (
+        <div className="grid gap-2">
+          {question.options.map((o, idx) => (
+            <div
+              key={o.id}
+              className="flex items-center rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+            >
+              <span className="mr-3 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-navy-700">#{idx + 1}</span>
+              {o.text}
+            </div>
+          ))}
+        </div>
+      )}
+
       {question.type === 'Text' && (
         <textarea
           className="h-28 w-full resize-none rounded-2xl border border-blue-200/70 bg-white p-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
@@ -621,7 +651,7 @@ function ParticipantPreview({ question, quizMode }) {
         </div>
       )}
 
-      {(question.type === 'Word Cloud' || question.type === 'Ranking') && (
+      {question.type === 'Word Cloud' && (
         <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-8 text-center text-sm text-slate-600">
           Preview for <strong>{question.type}</strong> will be implemented next.
         </div>
@@ -959,6 +989,11 @@ function BuilderPage() {
             ]
           : type === 'True/False'
             ? createTrueFalseOptions(true)
+            : type === 'Ranking'
+              ? [
+                  { id: uid('opt'), optionId: null, text: 'Option 1', isCorrect: false },
+                  { id: uid('opt'), optionId: null, text: 'Option 2', isCorrect: false },
+                ]
             : [],
     }
     setQuestions((prev) => [q, ...prev])
@@ -1029,6 +1064,15 @@ function BuilderPage() {
             throw new Error(
               `Question "${question.text || 'Untitled'}" must have exactly one correct answer (True or False).`,
             )
+          }
+        }
+        if (question.type === 'Ranking') {
+          const opts = question.options || []
+          if (opts.length < 2) {
+            throw new Error(`Question "${question.text || 'Untitled'}" must have at least 2 ranking options.`)
+          }
+          if (opts.length > 10) {
+            throw new Error(`Question "${question.text || 'Untitled'}" cannot have more than 10 ranking options.`)
           }
         }
       }
@@ -1543,7 +1587,7 @@ function BuilderPage() {
                 disabled={!isDraftSession}
               />
 
-              {selected.type === 'MCQ' && (
+              {(selected.type === 'MCQ' || selected.type === 'Ranking') && (
                 <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
                   <OptionsEditor
                     question={selected}
