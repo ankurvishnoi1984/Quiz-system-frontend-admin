@@ -34,6 +34,15 @@ export async function getDepartmentOverviewApi(accessToken, deptId) {
   return data?.overview || null
 }
 
+export async function getDepartmentReportApi(accessToken, deptId, { from, to } = {}) {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  const query = params.toString() ? `?${params.toString()}` : ''
+  const data = await authRequest(`/departments/${deptId}/report${query}`, accessToken)
+  return data?.report || null
+}
+
 export async function getDepartmentSessionsAnalyticsApi(accessToken, deptId) {
   const data = await authRequest(`/analytics/dept/${deptId}/sessions`, accessToken)
   return data?.sessions || []

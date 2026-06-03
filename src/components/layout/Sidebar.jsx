@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
+  Building2,
   ChartColumnBig,
   CirclePlay,
   FileBarChart2,
@@ -10,16 +11,20 @@ import {
   PanelLeftOpen,
 } from 'lucide-react'
 import { useHostNavSessions, getBuilderNavTo, getLiveNavTo } from '../../hooks/useHostNavSessions'
+import { useAuthStore } from '../../store/authStore'
+import { isAdminRole } from '../../utils/adminRoles'
 
 const staticNavigationItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, kind: 'static' },
   { kind: 'builder', label: 'Question Builder', icon: FileQuestion, isNew: true },
   { kind: 'live', label: 'Live Present Mode', icon: CirclePlay, live: true },
   { to: '/analytics', label: 'Session Analytics', icon: ChartColumnBig, kind: 'static' },
+  { to: '/department-analytics', label: 'Department Analytics', icon: Building2, kind: 'static', adminOnly: true },
   { to: '/reports', label: 'Reports', icon: FileBarChart2, kind: 'static' },
 ]
 
 function Sidebar({ collapsed, onToggle }) {
+  const user = useAuthStore((state) => state.user)
   const sessionsQuery = useHostNavSessions()
   const sessions = sessionsQuery.data
 
@@ -28,12 +33,14 @@ function Sidebar({ collapsed, onToggle }) {
 
   const navigationItems = useMemo(
     () =>
-      staticNavigationItems.map((item) => {
-        if (item.kind === 'builder') return { ...item, to: builderTo }
-        if (item.kind === 'live') return { ...item, to: liveTo }
-        return item
-      }),
-    [builderTo, liveTo],
+      staticNavigationItems
+        .filter((item) => !item.adminOnly || isAdminRole(user?.role))
+        .map((item) => {
+          if (item.kind === 'builder') return { ...item, to: builderTo }
+          if (item.kind === 'live') return { ...item, to: liveTo }
+          return item
+        }),
+    [builderTo, liveTo, user?.role],
   )
 
   return (

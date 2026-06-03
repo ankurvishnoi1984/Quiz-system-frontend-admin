@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import HostLayout from './layouts/HostLayout'
+import { AdminOnlyRoute } from './components/auth/AdminOnlyRoute'
+import DepartmentAnalyticsPage from './pages/DepartmentAnalyticsPage'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import BuilderPage from './pages/BuilderPage'
@@ -11,6 +12,7 @@ import ParticipantSessionPage from './pages/participant-session'
 import PresentModePage from './pages/present-mode'
 import { SessionsProvider } from './context/SessionsContext'
 import { useAuthStore } from './store/authStore'
+import HostLayout from './layouts/HostLayout'
 
 function App() {
   const user = useAuthStore((state) => state.user)
@@ -61,6 +63,14 @@ function App() {
           <Route path="/builder" element={<BuilderPage />} />
           <Route path="/live" element={<LivePage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route
+            path="/department-analytics"
+            element={
+              <AdminOnlyRoute>
+                <DepartmentAnalyticsPage />
+              </AdminOnlyRoute>
+            }
+          />
           <Route path="/reports" element={<ReportsPage />} />
         </Route>
 

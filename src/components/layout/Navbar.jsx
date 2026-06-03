@@ -9,6 +9,7 @@ const pageTitles = {
   '/builder': 'Question Builder',
   '/live': 'Live Present Mode',
   '/analytics': 'Session Analytics',
+  '/department-analytics': 'Department Analytics',
   '/reports': 'Reports',
 }
 
