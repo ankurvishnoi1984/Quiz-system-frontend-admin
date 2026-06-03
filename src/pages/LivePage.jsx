@@ -48,6 +48,8 @@ import {
   buildSessionLeaderboardFromResponses,
 } from '../utils/leaderboard'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
+import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
+import { getSessionQaReportApi } from '../services/analyticsApi'
 import { useAuthStore } from '../store/authStore'
 import {
   getQuestionResultsApi,
@@ -114,6 +116,7 @@ function LivePage() {
   const [chartView, setChartView] = useState('bar')
   const [hostAlert, setHostAlert] = useState(null)
   const [endSessionConfirmOpen, setEndSessionConfirmOpen] = useState(false)
+  const [qaExporting, setQaExporting] = useState(false)
 
 
   const sessionQuery = useQuery({
@@ -146,6 +149,12 @@ function LivePage() {
   const qaQuery = useQuery({
     queryKey: ['live-qa', sessionId],
     queryFn: () => listQaQuestionsApi(accessToken, sessionId),
+    enabled: Boolean(accessToken && sessionId),
+  })
+
+  const qaReportQuery = useQuery({
+    queryKey: ['session-qa-report', sessionId],
+    queryFn: () => getSessionQaReportApi(accessToken, sessionId),
     enabled: Boolean(accessToken && sessionId),
   })
 
@@ -377,7 +386,10 @@ function LivePage() {
 
   const qaMutation = useMutation({
     mutationFn: ({ qaId, action, body }) => qaModerateApi(accessToken, qaId, action, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['live-qa', sessionId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['live-qa', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['session-qa-report', sessionId] })
+    },
     onError: (error) => setErrorMessage(error.message || 'Unable to update Q&A state'),
   })
 
@@ -1019,6 +1031,21 @@ function LivePage() {
 
           <LiveQaPanel
             questions={qaQuery.data}
+            report={qaReportQuery.data}
+            isReportLoading={qaReportQuery.isLoading}
+            isExporting={qaExporting}
+            onExportExcel={async () => {
+              try {
+                setQaExporting(true)
+                const report =
+                  qaReportQuery.data || (await getSessionQaReportApi(accessToken, sessionId))
+                await exportQaAnalyticsExcel(report)
+              } catch (error) {
+                setErrorMessage(error.message || 'Q&A export failed')
+              } finally {
+                setQaExporting(false)
+              }
+            }}
             onModerate={(qaId, action) => qaMutation.mutate({ qaId, action })}
           />
 

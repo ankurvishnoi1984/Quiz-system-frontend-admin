@@ -18,6 +18,12 @@ export const SESSION_REPORT_EXPORTS = [
     format: 'xlsx',
   },
   {
+    id: 'qa',
+    label: 'Q&A Analytics Report',
+    description: 'Full Q&A log including rejected questions, sorted by upvotes',
+    format: 'xlsx',
+  },
+  {
     id: 'raw-responses',
     label: 'Raw responses',
     description: 'Flat CSV export of every participant response',
@@ -33,5 +39,9 @@ export const SESSION_REPORT_VIEWS = [
   {
     id: 'question-breakdown',
     label: 'Question Breakdown',
+  },
+  {
+    id: 'qa-analytics',
+    label: 'Q&A Analytics',
   },
 ]

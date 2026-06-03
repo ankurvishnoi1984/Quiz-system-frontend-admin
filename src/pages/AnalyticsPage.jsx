@@ -8,10 +8,12 @@ import { AnalyticsQuestionInsights } from '../components/analytics/AnalyticsQues
 import { AnalyticsPrintReport } from '../components/analytics/AnalyticsPrintReport'
 import { SessionSummaryPrintReport } from '../components/analytics/SessionSummaryPrintReport'
 import { SessionSummaryReportCard } from '../components/analytics/SessionSummaryReportCard'
+import { QaAnalyticsReportCard } from '../components/analytics/QaAnalyticsReportCard'
 import { ParticipantLeaderboardTable } from '../components/analytics/ParticipantLeaderboardTable'
 import { PerQuestionReportDetails } from '../components/analytics/PerQuestionReportDetails'
 import { SESSION_REPORT_VIEWS } from '../constants/sessionReportTypes'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
+import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
 import { exportPerParticipantExcel } from '../utils/perParticipantExcelExport'
 import { exportPerQuestionBreakdownExcel } from '../utils/perQuestionBreakdownExcelExport'
 import { exportSessionSummaryExcel } from '../utils/sessionSummaryExcelExport'
@@ -20,6 +22,7 @@ import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
 import {
   getSessionParticipantsReportApi,
   getSessionQuestionsReportApi,
+  getSessionQaReportApi,
   getSessionReportApi,
   getSessionSummaryReportApi,
 } from '../services/analyticsApi'
@@ -188,6 +191,12 @@ function AnalyticsPage() {
   const participantsReportQuery = useQuery({
     queryKey: ['session-participants-report', numericSessionId],
     queryFn: () => getSessionParticipantsReportApi(accessToken, numericSessionId),
+    enabled: Boolean(accessToken && numericSessionId),
+  })
+
+  const qaReportQuery = useQuery({
+    queryKey: ['session-qa-report', numericSessionId],
+    queryFn: () => getSessionQaReportApi(accessToken, numericSessionId),
     enabled: Boolean(accessToken && numericSessionId),
   })
 
@@ -472,6 +481,10 @@ function AnalyticsPage() {
         await exportPerQuestionBreakdownExcel(report)
       } else if (reportId === 'participants') {
         await exportParticipantReport()
+      } else if (reportId === 'qa') {
+        const report =
+          qaReportQuery.data || (await getSessionQaReportApi(accessToken, numericSessionId))
+        await exportQaAnalyticsExcel(report)
       } else if (reportId === 'raw-responses') {
         exportCsv()
       }
@@ -506,13 +519,16 @@ function AnalyticsPage() {
   const questionsReportLoading = questionsReportQuery.isLoading
   const participantsReport = participantsReportQuery.data
   const participantsReportLoading = participantsReportQuery.isLoading
+  const qaReport = qaReportQuery.data
+  const qaReportLoading = qaReportQuery.isLoading
 
   const loadError =
     reportQuery.error ||
     questionsQuery.error ||
     summaryReportQuery.error ||
     questionsReportQuery.error ||
-    participantsReportQuery.error
+    participantsReportQuery.error ||
+    qaReportQuery.error
 
   if (!activeSessionId || !sessionMeta) {
     return (
@@ -652,6 +668,8 @@ function AnalyticsPage() {
 
       {activeReportView === 'summary' ? (
         <SessionSummaryReportCard report={summaryReport} isLoading={summaryReportLoading} />
+      ) : activeReportView === 'qa-analytics' ? (
+        <QaAnalyticsReportCard report={qaReport} isLoading={qaReportLoading} />
       ) : (
       <>
       <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
