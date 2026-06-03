@@ -2,13 +2,18 @@ import { Download, FileText, Loader2, Printer, Trophy } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
+import { AnalyticsExportModal } from '../components/analytics/AnalyticsExportModal'
 import { AnalyticsQuestionChartSection } from '../components/analytics/AnalyticsQuestionChartSection'
 import { AnalyticsQuestionInsights } from '../components/analytics/AnalyticsQuestionInsights'
 import { AnalyticsPrintReport } from '../components/analytics/AnalyticsPrintReport'
+import { SessionSummaryPrintReport } from '../components/analytics/SessionSummaryPrintReport'
+import { SessionSummaryReportCard } from '../components/analytics/SessionSummaryReportCard'
+import { SESSION_REPORT_VIEWS } from '../constants/sessionReportTypes'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
+import { exportSessionSummaryExcel } from '../utils/sessionSummaryExcelExport'
 import { useShell } from '../context/ShellContext'
 import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
-import { getSessionReportApi } from '../services/analyticsApi'
+import { getSessionReportApi, getSessionSummaryReportApi } from '../services/analyticsApi'
 import { getSessionDetailApi, listSessionQuestionsApi } from '../services/builderApi'
 import { getQuestionResultsApi, getSessionResponsesApi } from '../services/liveApi'
 import { useAuthStore } from '../store/authStore'
@@ -119,6 +124,9 @@ function AnalyticsPage() {
   const [toDate, setToDate] = useState('')
   const [selectedQuestionId, setSelectedQuestionId] = useState(null)
   const [chartView, setChartView] = useState('bar')
+  const [activeReportView, setActiveReportView] = useState('summary')
+  const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [exportingReportId, setExportingReportId] = useState(null)
 
   const defaultSessionId =
     sessionId ||
@@ -153,6 +161,12 @@ function AnalyticsPage() {
   const reportQuery = useQuery({
     queryKey: ['analytics-session-report', numericSessionId],
     queryFn: () => getSessionReportApi(accessToken, numericSessionId),
+    enabled: Boolean(accessToken && numericSessionId),
+  })
+
+  const summaryReportQuery = useQuery({
+    queryKey: ['session-summary-report', numericSessionId],
+    queryFn: () => getSessionSummaryReportApi(accessToken, numericSessionId),
     enabled: Boolean(accessToken && numericSessionId),
   })
 
@@ -288,6 +302,7 @@ function AnalyticsPage() {
   useEffect(() => {
     setSelectedQuestionId(null)
     setChartView('bar')
+    setActiveReportView('summary')
   }, [numericSessionId])
 
   useEffect(() => {
@@ -385,8 +400,31 @@ function AnalyticsPage() {
     downloadText(`session-${sessionMeta.id}-responses.csv`, csv, 'text/csv')
   }
 
-  const printPdf = () => {
+  const printPdf = async () => {
+    if (activeReportView === 'summary' && !summaryReport && accessToken && numericSessionId) {
+      await summaryReportQuery.refetch()
+    }
     window.print()
+  }
+
+  const handleExportReport = async (reportId) => {
+    try {
+      setExportingReportId(reportId)
+      if (reportId === 'summary') {
+        const report =
+          summaryReportQuery.data ||
+          (await getSessionSummaryReportApi(accessToken, numericSessionId))
+        await exportSessionSummaryExcel(report)
+      } else if (reportId === 'raw-responses') {
+        exportCsv()
+      }
+      setExportModalOpen(false)
+    } catch (error) {
+      console.error(error)
+      window.alert(error?.message || 'Export failed')
+    } finally {
+      setExportingReportId(null)
+    }
   }
 
   const filteredSessions = sessions
@@ -406,7 +444,10 @@ function AnalyticsPage() {
       questionsQuery.isLoading ||
       responsesQuery.isLoading)
 
-  const loadError = reportQuery.error || questionsQuery.error
+  const summaryReportLoading = summaryReportQuery.isLoading
+  const summaryReport = summaryReportQuery.data
+
+  const loadError = reportQuery.error || questionsQuery.error || summaryReportQuery.error
 
   if (!activeSessionId || !sessionMeta) {
     return (
@@ -427,13 +468,17 @@ function AnalyticsPage() {
 
   return (
     <>
-      <AnalyticsPrintReport
-        sessionMeta={sessionMeta}
-        summary={summary}
-        perQuestion={perQuestion}
-        leaderboard={leaderboard}
-        settingsSnapshot={settingsSnapshot}
-      />
+      {activeReportView === 'summary' ? (
+        <SessionSummaryPrintReport report={summaryReport} />
+      ) : (
+        <AnalyticsPrintReport
+          sessionMeta={sessionMeta}
+          summary={summary}
+          perQuestion={perQuestion}
+          leaderboard={leaderboard}
+          settingsSnapshot={settingsSnapshot}
+        />
+      )}
 
       <section className="analytics-screen-only space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -481,12 +526,12 @@ function AnalyticsPage() {
 
           <button
             type="button"
-            onClick={exportCsv}
+            onClick={() => setExportModalOpen(true)}
             disabled={isLoading}
             className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 shadow-sm shadow-blue-900/5 transition hover:bg-blue-50 disabled:opacity-50"
           >
             <Download className="size-4" />
-            Export CSV
+            Export
           </button>
           <button
             type="button"
@@ -523,6 +568,27 @@ function AnalyticsPage() {
         ))}
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {SESSION_REPORT_VIEWS.map((view) => (
+          <button
+            key={view.id}
+            type="button"
+            onClick={() => setActiveReportView(view.id)}
+            className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+              activeReportView === view.id
+                ? 'bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 text-white shadow-md shadow-navy-900/20'
+                : 'border border-blue-200/70 bg-white/90 text-slate-700 hover:bg-blue-50'
+            }`}
+          >
+            {view.label}
+          </button>
+        ))}
+      </div>
+
+      {activeReportView === 'summary' ? (
+        <SessionSummaryReportCard report={summaryReport} isLoading={summaryReportLoading} />
+      ) : (
+      <>
       <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -695,6 +761,15 @@ function AnalyticsPage() {
           </div>
         </div>
       </div>
+      </>
+      )}
+
+      <AnalyticsExportModal
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        onExport={handleExportReport}
+        exportingId={exportingReportId}
+      />
 
     </section>
     </>
