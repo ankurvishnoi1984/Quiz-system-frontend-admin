@@ -73,3 +73,51 @@
       0 10px 20px -3px rgb(30 58 138 / 0.35);
   }
 }
+
+/* Host shell: hide sidebar/navbar and screen UI when printing */
+@media print {
+  @page {
+    margin: 12mm;
+    size: A4;
+  }
+
+  body {
+    background: #fff !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  [data-host-layout] {
+    display: block !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  [data-host-decor],
+  [data-host-sidebar],
+  [data-host-navbar],
+  .host-print-hide {
+    display: none !important;
+  }
+
+  [data-host-main] {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    flex: none !important;
+  }
+
+  [data-host-main] main {
+    padding: 0 !important;
+  }
+
+  .analytics-screen-only {
+    display: none !important;
+  }
+
+  .analytics-print-only {
+    display: block !important;
+    width: 100% !important;
+  }
+}

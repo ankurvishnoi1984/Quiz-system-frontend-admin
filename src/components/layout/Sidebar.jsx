@@ -38,6 +38,7 @@ function Sidebar({ collapsed, onToggle }) {
 
   return (
     <aside
+      data-host-sidebar
       className={`relative z-20 border-r border-navy-700/70 bg-linear-to-b from-navy-950 via-navy-900 to-navy-800 text-slate-100 shadow-2xl shadow-navy-950/30 transition-all duration-300 ${
         collapsed ? 'w-20' : 'w-72'
       }`}

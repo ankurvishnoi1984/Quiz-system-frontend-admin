@@ -14,7 +14,7 @@ function Modal({ open, title, children, onClose }) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="host-print-hide fixed inset-0 z-50">
       <button
         type="button"
         className="absolute inset-0 bg-navy-950/25 backdrop-blur-sm"

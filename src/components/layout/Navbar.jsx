@@ -46,7 +46,10 @@ function Navbar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-blue-200/70 bg-white/70 px-6 backdrop-blur-xl">
+    <header
+      data-host-navbar
+      className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-blue-200/70 bg-white/70 px-6 backdrop-blur-xl"
+    >
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-navy-700">Host Workspace</p>
         <h1 className="text-lg font-semibold text-navy-900">{pageTitles[pathname] ?? 'Quiz Management System'}</h1>
