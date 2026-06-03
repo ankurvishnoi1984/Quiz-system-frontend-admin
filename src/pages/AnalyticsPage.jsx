@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { AnalyticsQuestionChartSection } from '../components/analytics/AnalyticsQuestionChartSection'
 import { AnalyticsQuestionInsights } from '../components/analytics/AnalyticsQuestionInsights'
-import Modal from '../components/ui/Modal'
+import { AnalyticsPrintReport } from '../components/analytics/AnalyticsPrintReport'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
 import { useShell } from '../context/ShellContext'
 import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
@@ -115,7 +115,6 @@ function AnalyticsPage() {
   const { departmentId } = useShell()
   const { sessions } = useDepartmentSessionsList()
 
-  const [pdfOpen, setPdfOpen] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [selectedQuestionId, setSelectedQuestionId] = useState(null)
@@ -387,8 +386,7 @@ function AnalyticsPage() {
   }
 
   const printPdf = () => {
-    setPdfOpen(true)
-    setTimeout(() => window.print(), 50)
+    window.print()
   }
 
   const filteredSessions = sessions
@@ -428,7 +426,16 @@ function AnalyticsPage() {
   }
 
   return (
-    <section className="space-y-6">
+    <>
+      <AnalyticsPrintReport
+        sessionMeta={sessionMeta}
+        summary={summary}
+        perQuestion={perQuestion}
+        leaderboard={leaderboard}
+        settingsSnapshot={settingsSnapshot}
+      />
+
+      <section className="analytics-screen-only space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Session Analytics</p>
@@ -689,66 +696,8 @@ function AnalyticsPage() {
         </div>
       </div>
 
-      <Modal open={pdfOpen} title="PDF Report (Print)" onClose={() => setPdfOpen(false)}>
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Report</p>
-            <h3 className="mt-2 text-lg font-bold text-navy-900">{sessionMeta.title}</h3>
-            <p className="mt-1 text-sm text-slate-600">Session {sessionMeta.id}</p>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Joined</p>
-              <p className="mt-1 text-xl font-bold text-navy-900">{summary.joined}</p>
-            </div>
-            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Avg response</p>
-              <p className="mt-1 text-xl font-bold text-navy-900">{summary.avg}%</p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-            <p className="text-sm font-semibold text-navy-900">Per-question summary</p>
-            <div className="mt-3 space-y-2">
-              {perQuestion.map((q) => (
-                <div
-                  key={q.id}
-                  className="flex items-start justify-between gap-3 border-b border-blue-50 py-2 last:border-b-0"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-navy-900">
-                      Q{q.index}: {q.text || 'Untitled'}
-                    </p>
-                    <p className="text-xs text-slate-600">{q.type}</p>
-                  </div>
-                  <p className="text-sm font-bold text-navy-900">{q.responseCount} responses</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
-            >
-              <Printer className="size-4" />
-              Print / Save as PDF
-            </button>
-            <button
-              type="button"
-              onClick={() => setPdfOpen(false)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
-            >
-              <FileText className="size-4" />
-              Close
-            </button>
-          </div>
-        </div>
-      </Modal>
     </section>
+    </>
   )
 }
 
