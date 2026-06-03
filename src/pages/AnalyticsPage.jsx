@@ -1,4 +1,4 @@
-import { Download, FileText, Loader2, Printer, Trophy } from 'lucide-react'
+import { Download, FileText, Loader2, Printer } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
@@ -8,14 +8,17 @@ import { AnalyticsQuestionInsights } from '../components/analytics/AnalyticsQues
 import { AnalyticsPrintReport } from '../components/analytics/AnalyticsPrintReport'
 import { SessionSummaryPrintReport } from '../components/analytics/SessionSummaryPrintReport'
 import { SessionSummaryReportCard } from '../components/analytics/SessionSummaryReportCard'
+import { ParticipantLeaderboardTable } from '../components/analytics/ParticipantLeaderboardTable'
 import { PerQuestionReportDetails } from '../components/analytics/PerQuestionReportDetails'
 import { SESSION_REPORT_VIEWS } from '../constants/sessionReportTypes'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
+import { exportPerParticipantExcel } from '../utils/perParticipantExcelExport'
 import { exportPerQuestionBreakdownExcel } from '../utils/perQuestionBreakdownExcelExport'
 import { exportSessionSummaryExcel } from '../utils/sessionSummaryExcelExport'
 import { useShell } from '../context/ShellContext'
 import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
 import {
+  getSessionParticipantsReportApi,
   getSessionQuestionsReportApi,
   getSessionReportApi,
   getSessionSummaryReportApi,
@@ -179,6 +182,12 @@ function AnalyticsPage() {
   const questionsReportQuery = useQuery({
     queryKey: ['session-questions-report', numericSessionId],
     queryFn: () => getSessionQuestionsReportApi(accessToken, numericSessionId),
+    enabled: Boolean(accessToken && numericSessionId),
+  })
+
+  const participantsReportQuery = useQuery({
+    queryKey: ['session-participants-report', numericSessionId],
+    queryFn: () => getSessionParticipantsReportApi(accessToken, numericSessionId),
     enabled: Boolean(accessToken && numericSessionId),
   })
 
@@ -441,6 +450,13 @@ function AnalyticsPage() {
     window.print()
   }
 
+  const exportParticipantReport = async () => {
+    const report =
+      participantsReportQuery.data ||
+      (await getSessionParticipantsReportApi(accessToken, numericSessionId))
+    await exportPerParticipantExcel(report)
+  }
+
   const handleExportReport = async (reportId) => {
     try {
       setExportingReportId(reportId)
@@ -454,6 +470,8 @@ function AnalyticsPage() {
           questionsReportQuery.data ||
           (await getSessionQuestionsReportApi(accessToken, numericSessionId))
         await exportPerQuestionBreakdownExcel(report)
+      } else if (reportId === 'participants') {
+        await exportParticipantReport()
       } else if (reportId === 'raw-responses') {
         exportCsv()
       }
@@ -486,9 +504,15 @@ function AnalyticsPage() {
   const summaryReportLoading = summaryReportQuery.isLoading
   const summaryReport = summaryReportQuery.data
   const questionsReportLoading = questionsReportQuery.isLoading
+  const participantsReport = participantsReportQuery.data
+  const participantsReportLoading = participantsReportQuery.isLoading
 
   const loadError =
-    reportQuery.error || questionsQuery.error || summaryReportQuery.error || questionsReportQuery.error
+    reportQuery.error ||
+    questionsQuery.error ||
+    summaryReportQuery.error ||
+    questionsReportQuery.error ||
+    participantsReportQuery.error
 
   if (!activeSessionId || !sessionMeta) {
     return (
@@ -739,35 +763,22 @@ function AnalyticsPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-2xl border border-amber-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Leaderboard</p>
-              <h3 className="mt-1 text-lg font-bold text-navy-900">Top participants</h3>
-            </div>
-            <Trophy className="size-5 text-amber-600" />
-          </div>
-          <div className="mt-4 space-y-2">
-            {leaderboard.length ? (
-              leaderboard.map((row, idx) => (
-                <div
-                  key={`${row.name}-${idx}`}
-                  className="flex items-center justify-between rounded-2xl border border-amber-200/60 bg-amber-50/40 px-4 py-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="grid size-9 place-items-center rounded-2xl bg-linear-to-br from-amber-400 to-amber-600 text-white">
-                      {idx + 1}
-                    </div>
-                    <p className="font-semibold text-navy-900">{row.name}</p>
-                  </div>
-                  <p className="text-sm font-bold text-navy-900">{row.score}</p>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-600">No scored responses yet.</p>
-            )}
-          </div>
-        </div>
+        <ParticipantLeaderboardTable
+          leaderboard={participantsReport?.leaderboard}
+          isLoading={participantsReportLoading}
+          onExport={async () => {
+            try {
+              setExportingReportId('participants')
+              await exportParticipantReport()
+            } catch (error) {
+              console.error(error)
+              window.alert(error?.message || 'Export failed')
+            } finally {
+              setExportingReportId(null)
+            }
+          }}
+          isExporting={exportingReportId === 'participants'}
+        />
 
         <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
           <div className="flex items-center justify-between gap-3">

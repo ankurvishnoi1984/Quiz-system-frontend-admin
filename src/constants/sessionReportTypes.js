@@ -12,6 +12,12 @@ export const SESSION_REPORT_EXPORTS = [
     format: 'xlsx',
   },
   {
+    id: 'participants',
+    label: 'Per-Participant Report',
+    description: 'Summary per participant plus every answer row for HR/training review',
+    format: 'xlsx',
+  },
+  {
     id: 'raw-responses',
     label: 'Raw responses',
     description: 'Flat CSV export of every participant response',
