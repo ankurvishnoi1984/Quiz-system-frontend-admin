@@ -8,12 +8,18 @@ import { AnalyticsQuestionInsights } from '../components/analytics/AnalyticsQues
 import { AnalyticsPrintReport } from '../components/analytics/AnalyticsPrintReport'
 import { SessionSummaryPrintReport } from '../components/analytics/SessionSummaryPrintReport'
 import { SessionSummaryReportCard } from '../components/analytics/SessionSummaryReportCard'
+import { PerQuestionReportDetails } from '../components/analytics/PerQuestionReportDetails'
 import { SESSION_REPORT_VIEWS } from '../constants/sessionReportTypes'
 import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
+import { exportPerQuestionBreakdownExcel } from '../utils/perQuestionBreakdownExcelExport'
 import { exportSessionSummaryExcel } from '../utils/sessionSummaryExcelExport'
 import { useShell } from '../context/ShellContext'
 import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
-import { getSessionReportApi, getSessionSummaryReportApi } from '../services/analyticsApi'
+import {
+  getSessionQuestionsReportApi,
+  getSessionReportApi,
+  getSessionSummaryReportApi,
+} from '../services/analyticsApi'
 import { getSessionDetailApi, listSessionQuestionsApi } from '../services/builderApi'
 import { getQuestionResultsApi, getSessionResponsesApi } from '../services/liveApi'
 import { useAuthStore } from '../store/authStore'
@@ -167,6 +173,12 @@ function AnalyticsPage() {
   const summaryReportQuery = useQuery({
     queryKey: ['session-summary-report', numericSessionId],
     queryFn: () => getSessionSummaryReportApi(accessToken, numericSessionId),
+    enabled: Boolean(accessToken && numericSessionId),
+  })
+
+  const questionsReportQuery = useQuery({
+    queryKey: ['session-questions-report', numericSessionId],
+    queryFn: () => getSessionQuestionsReportApi(accessToken, numericSessionId),
     enabled: Boolean(accessToken && numericSessionId),
   })
 
@@ -325,6 +337,25 @@ function AnalyticsPage() {
     return perQuestion.find((q) => q.id === selectedQuestionId) ?? perQuestion[0]
   }, [perQuestion, selectedQuestionId])
 
+  const questionsReport = questionsReportQuery.data
+  const questionsReportById = useMemo(() => {
+    const map = {}
+    for (const question of questionsReport?.questions || []) {
+      map[question.question_id] = question
+    }
+    return map
+  }, [questionsReport?.questions])
+
+  const selectedQuestionReport = useMemo(() => {
+    if (!selectedQuestion) return null
+    const report = questionsReportById[Number(selectedQuestion.id)]
+    if (!report) return null
+    return {
+      ...report,
+      total_participants: questionsReport?.total_participants ?? summary.joined,
+    }
+  }, [selectedQuestion, questionsReportById, questionsReport?.total_participants, summary.joined])
+
   const leaderboard = useMemo(() => buildLeaderboard(allResponses), [allResponses])
 
   const settingsSnapshot = useMemo(() => {
@@ -404,6 +435,9 @@ function AnalyticsPage() {
     if (activeReportView === 'summary' && !summaryReport && accessToken && numericSessionId) {
       await summaryReportQuery.refetch()
     }
+    if (activeReportView === 'question-breakdown' && !questionsReport && accessToken && numericSessionId) {
+      await questionsReportQuery.refetch()
+    }
     window.print()
   }
 
@@ -415,6 +449,11 @@ function AnalyticsPage() {
           summaryReportQuery.data ||
           (await getSessionSummaryReportApi(accessToken, numericSessionId))
         await exportSessionSummaryExcel(report)
+      } else if (reportId === 'question-breakdown') {
+        const report =
+          questionsReportQuery.data ||
+          (await getSessionQuestionsReportApi(accessToken, numericSessionId))
+        await exportPerQuestionBreakdownExcel(report)
       } else if (reportId === 'raw-responses') {
         exportCsv()
       }
@@ -446,8 +485,10 @@ function AnalyticsPage() {
 
   const summaryReportLoading = summaryReportQuery.isLoading
   const summaryReport = summaryReportQuery.data
+  const questionsReportLoading = questionsReportQuery.isLoading
 
-  const loadError = reportQuery.error || questionsQuery.error || summaryReportQuery.error
+  const loadError =
+    reportQuery.error || questionsQuery.error || summaryReportQuery.error || questionsReportQuery.error
 
   if (!activeSessionId || !sessionMeta) {
     return (
@@ -594,7 +635,7 @@ function AnalyticsPage() {
           <div>
             <p className="text-sm font-semibold text-navy-900">Per-question breakdown</p>
             <p className="text-xs text-slate-600">
-              {perQuestion.length} question{perQuestion.length === 1 ? '' : 's'} • select a question to view its chart
+              {perQuestion.length} question{perQuestion.length === 1 ? '' : 's'} • select a question for charts and report metrics
             </p>
           </div>
         </div>
@@ -608,6 +649,8 @@ function AnalyticsPage() {
             <div className="max-h-[min(520px,70vh)] space-y-2 overflow-y-auto pr-1">
               {perQuestion.map((q) => {
                 const isSelected = selectedQuestion?.id === q.id
+                const questionReport = questionsReportById[Number(q.id)]
+                const responseRate = questionReport?.response_rate_percent
                 return (
                   <button
                     key={q.id}
@@ -638,6 +681,7 @@ function AnalyticsPage() {
                       </div>
                       <span className={`text-xs font-semibold ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
                         {q.responseCount} resp.
+                        {responseRate != null ? ` · ${responseRate}%` : ''}
                       </span>
                     </div>
                     <p
@@ -680,6 +724,12 @@ function AnalyticsPage() {
                   chartView={chartView}
                   onChartViewChange={setChartView}
                 />
+
+                <PerQuestionReportDetails questionReport={selectedQuestionReport} />
+
+                {questionsReportLoading && !selectedQuestionReport ? (
+                  <p className="mt-4 text-sm text-slate-600">Loading per-question report metrics…</p>
+                ) : null}
 
                 <AnalyticsQuestionInsights question={selectedQuestion} />
               </div>

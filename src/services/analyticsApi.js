@@ -14,6 +14,11 @@ export async function getSessionSummaryReportApi(accessToken, sessionId) {
   return data?.report || null
 }
 
+export async function getSessionQuestionsReportApi(accessToken, sessionId) {
+  const data = await authRequest(`/sessions/${sessionId}/report/questions`, accessToken)
+  return data?.report || null
+}
+
 export async function getDepartmentOverviewApi(accessToken, deptId) {
   const data = await authRequest(`/analytics/dept/${deptId}/overview`, accessToken)
   return data?.overview || null
