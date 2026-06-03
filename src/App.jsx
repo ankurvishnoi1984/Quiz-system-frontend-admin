@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AdminOnlyRoute } from './components/auth/AdminOnlyRoute'
+import { SuperAdminOnlyRoute } from './components/auth/SuperAdminOnlyRoute'
 import DepartmentAnalyticsPage from './pages/DepartmentAnalyticsPage'
+import ClientAnalyticsPage from './pages/ClientAnalyticsPage'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import BuilderPage from './pages/BuilderPage'
@@ -69,6 +71,14 @@ function App() {
               <AdminOnlyRoute>
                 <DepartmentAnalyticsPage />
               </AdminOnlyRoute>
+            }
+          />
+          <Route
+            path="/client-analytics"
+            element={
+              <SuperAdminOnlyRoute>
+                <ClientAnalyticsPage />
+              </SuperAdminOnlyRoute>
             }
           />
           <Route path="/reports" element={<ReportsPage />} />

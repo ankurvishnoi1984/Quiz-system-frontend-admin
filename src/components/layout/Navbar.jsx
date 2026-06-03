@@ -10,6 +10,7 @@ const pageTitles = {
   '/live': 'Live Present Mode',
   '/analytics': 'Session Analytics',
   '/department-analytics': 'Department Analytics',
+  '/client-analytics': 'Client Analytics',
   '/reports': 'Reports',
 }
 

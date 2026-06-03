@@ -7,6 +7,7 @@ import {
   FileBarChart2,
   FileQuestion,
   LayoutDashboard,
+  Layers,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react'
@@ -20,6 +21,7 @@ const staticNavigationItems = [
   { kind: 'live', label: 'Live Present Mode', icon: CirclePlay, live: true },
   { to: '/analytics', label: 'Session Analytics', icon: ChartColumnBig, kind: 'static' },
   { to: '/department-analytics', label: 'Department Analytics', icon: Building2, kind: 'static', adminOnly: true },
+  { to: '/client-analytics', label: 'Client Analytics', icon: Layers, kind: 'static', superAdminOnly: true },
   { to: '/reports', label: 'Reports', icon: FileBarChart2, kind: 'static' },
 ]
 
@@ -34,7 +36,11 @@ function Sidebar({ collapsed, onToggle }) {
   const navigationItems = useMemo(
     () =>
       staticNavigationItems
-        .filter((item) => !item.adminOnly || isAdminRole(user?.role))
+        .filter((item) => {
+          if (item.superAdminOnly && user?.role !== 'super_admin') return false
+          if (item.adminOnly && !isAdminRole(user?.role)) return false
+          return true
+        })
         .map((item) => {
           if (item.kind === 'builder') return { ...item, to: builderTo }
           if (item.kind === 'live') return { ...item, to: liveTo }
