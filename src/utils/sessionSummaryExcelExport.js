@@ -87,8 +87,56 @@ export async function exportSessionSummaryExcel(report) {
     nextRow += 1
   }
 
-  const breakdownSheet = workbook.addWorksheet('Question Breakdown')
-  breakdownSheet.columns = [
+  function addBreakdownSection(sheet, title, questions, startRow) {
+    sheet.getRow(startRow).getCell(1).value = title
+    sheet.getRow(startRow).getCell(1).font = { bold: true, size: 12 }
+    let row = startRow + 1
+    const header = sheet.getRow(row)
+    header.getCell(1).value = 'Question #'
+    header.getCell(2).value = 'Format'
+    header.getCell(3).value = 'Question'
+    header.getCell(4).value = 'Item'
+    header.getCell(5).value = 'Count'
+    header.getCell(6).value = 'Percent'
+    styleHeaderRow(sheet, row, 6)
+    row += 1
+
+    for (const question of questions || []) {
+      const options = question.options?.length
+        ? question.options
+        : [{ option_text: '—', count: 0, percent: 0 }]
+      options.forEach((option, index) => {
+        const dataRow = sheet.getRow(row)
+        dataRow.getCell(1).value = index === 0 ? question.question_index : ''
+        dataRow.getCell(2).value = index === 0 ? question.type_label || question.chart_type : ''
+        dataRow.getCell(3).value = index === 0 ? question.question_text : ''
+        dataRow.getCell(4).value = option.option_text
+        dataRow.getCell(5).value = option.count
+        dataRow.getCell(6).value = option.percent != null ? `${option.percent}%` : '—'
+        row += 1
+      })
+    }
+    return row + 1
+  }
+
+  const surveySheet = workbook.addWorksheet('Survey Responses')
+  surveySheet.columns = [
+    { width: 10 },
+    { width: 18 },
+    { width: 42 },
+    { width: 28 },
+    { width: 10 },
+    { width: 10 },
+  ]
+  addBreakdownSection(
+    surveySheet,
+    'Survey Responses',
+    report.survey_question_breakdowns || [],
+    1,
+  )
+
+  const standaloneSheet = workbook.addWorksheet('Quiz Poll Other')
+  standaloneSheet.columns = [
     { width: 10 },
     { width: 14 },
     { width: 42 },
@@ -96,32 +144,12 @@ export async function exportSessionSummaryExcel(report) {
     { width: 10 },
     { width: 10 },
   ]
-  const breakdownHeader = breakdownSheet.addRow([
-    'Question #',
-    'Type',
-    'Question',
-    'Option',
-    'Count',
-    'Percent',
-  ])
-  styleHeaderRow(breakdownSheet, breakdownHeader.number, 6)
-
-  for (const question of report.question_breakdowns || []) {
-    const options = question.options?.length
-      ? question.options
-      : [{ option_text: '—', count: 0, percent: 0 }]
-
-    options.forEach((option, index) => {
-      breakdownSheet.addRow([
-        index === 0 ? question.question_index : '',
-        index === 0 ? question.question_type : '',
-        index === 0 ? question.question_text : '',
-        option.option_text,
-        option.count,
-        option.percent != null ? `${option.percent}%` : '—',
-      ])
-    })
-  }
+  addBreakdownSection(
+    standaloneSheet,
+    'Quiz, Poll & Other Questions',
+    report.standalone_question_breakdowns || [],
+    1,
+  )
 
   const qaSheet = workbook.addWorksheet('Q&A Log')
   qaSheet.columns = [{ width: 48 }, { width: 10 }, { width: 14 }, { width: 22 }, { width: 22 }]

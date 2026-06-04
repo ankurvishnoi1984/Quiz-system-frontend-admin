@@ -51,55 +51,74 @@ export async function exportPerQuestionBreakdownExcel(report) {
   const summaryHeader = summarySheet.addRow([
     '#',
     'Type',
+    'Format',
     'Question',
     'Responses',
     'Response rate %',
     'Correct rate %',
+    'Avg rating',
     'Avg time (s)',
   ])
-  styleHeaderRow(summarySheet, summaryHeader.number, 7)
+  styleHeaderRow(summarySheet, summaryHeader.number, 9)
 
   for (const row of report.summary_rows || []) {
     summarySheet.addRow([
       row.question_index,
       row.question_type,
+      row.type_label || row.chart_type || '—',
       row.question_text,
       row.response_count,
       row.response_rate_percent,
-      row.correct_rate_percent != null ? row.correct_rate_percent : '—',
+      row.is_survey ? '—' : row.correct_rate_percent != null ? row.correct_rate_percent : '—',
+      row.average_rating ?? '—',
       row.avg_response_time_seconds != null ? row.avg_response_time_seconds : '—',
     ])
   }
 
   for (const question of report.questions || []) {
-    const sheet = workbook.addWorksheet(questionSheetName(question.question_index, question.question_type))
+    const label = question.type_label || question.chart_type || question.question_type
+    const sheet = workbook.addWorksheet(questionSheetName(question.question_index, label))
     sheet.columns = [{ width: 24 }, { width: 36 }, { width: 12 }, { width: 16 }, { width: 22 }]
 
     sheet.addRow(['Question', question.question_text])
     sheet.addRow(['Type', question.question_type])
+    sheet.addRow(['Format', label])
+    if (question.survey_subtype) {
+      sheet.addRow(['Survey sub-type', question.survey_subtype])
+    }
     sheet.addRow(['Responses', question.response_count])
     sheet.addRow(['Response rate %', question.response_rate_percent])
-    sheet.addRow(['Correct rate %', question.correct_rate_percent ?? '—'])
+    if (!question.is_survey) {
+      sheet.addRow(['Correct rate %', question.correct_rate_percent ?? '—'])
+    }
+    if (question.average_rating != null) {
+      sheet.addRow(['Average rating', question.average_rating])
+    }
     sheet.addRow(['Avg response time (s)', question.avg_response_time_seconds ?? '—'])
     sheet.addRow([])
 
-    const header = sheet.addRow([
-      'Participant nickname',
-      'Answer',
-      'Correct (T/F)',
-      'Response time (ms)',
-      'Submitted at',
-    ])
-    styleHeaderRow(sheet, header.number, 5)
+    const responseColumns = question.is_survey
+      ? ['Participant nickname', 'Answer', 'Response time (ms)', 'Submitted at']
+      : ['Participant nickname', 'Answer', 'Correct (T/F)', 'Response time (ms)', 'Submitted at']
+    const header = sheet.addRow(responseColumns)
+    styleHeaderRow(sheet, header.number, responseColumns.length)
 
     for (const response of question.responses || []) {
-      sheet.addRow([
-        response.nickname,
-        response.answer,
-        formatCorrect(response.is_correct),
-        response.response_time_ms ?? '—',
-        formatDateTime(response.submitted_at),
-      ])
+      const row = question.is_survey
+        ? [
+            response.nickname,
+            response.answer,
+            response.response_time_ms ?? '—',
+            formatDateTime(response.submitted_at),
+          ]
+        : [
+            response.nickname,
+            response.answer,
+            formatCorrect(response.is_correct),
+            response.response_time_ms ?? '—',
+            formatDateTime(response.submitted_at),
+          ]
+      sheet.addRow(row)
     }
   }
 

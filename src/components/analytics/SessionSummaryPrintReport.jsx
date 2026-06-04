@@ -65,6 +65,74 @@ export function SessionSummaryPrintReport({ report }) {
         </section>
       ) : null}
 
+      {report.survey_question_breakdowns?.length ? (
+        <section className="mt-6">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Survey Responses</h2>
+          <table className="mt-3 w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-slate-300 text-left">
+                <th className="py-2 pr-3 font-semibold">Q#</th>
+                <th className="py-2 pr-3 font-semibold">Format</th>
+                <th className="py-2 pr-3 font-semibold">Question</th>
+                <th className="py-2 pr-3 font-semibold">Item</th>
+                <th className="py-2 pr-3 font-semibold">Count</th>
+                <th className="py-2 font-semibold">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.survey_question_breakdowns.map((question) =>
+                (question.options?.length ? question.options : [{ option_text: '—', count: 0, percent: 0 }]).map(
+                  (option, index) => (
+                    <tr key={`${question.question_id}-${option.option_text}-${index}`} className="border-b border-slate-100">
+                      <td className="py-2 pr-3">{index === 0 ? question.question_index : ''}</td>
+                      <td className="py-2 pr-3">{index === 0 ? question.type_label || question.chart_type : ''}</td>
+                      <td className="py-2 pr-3">{index === 0 ? question.question_text : ''}</td>
+                      <td className="py-2 pr-3">{option.option_text}</td>
+                      <td className="py-2 pr-3">{option.count}</td>
+                      <td className="py-2">{option.percent}%</td>
+                    </tr>
+                  ),
+                ),
+              )}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
+      {report.standalone_question_breakdowns?.length ? (
+        <section className="mt-6">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Quiz, Poll & Other Questions</h2>
+          <table className="mt-3 w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-slate-300 text-left">
+                <th className="py-2 pr-3 font-semibold">Q#</th>
+                <th className="py-2 pr-3 font-semibold">Type</th>
+                <th className="py-2 pr-3 font-semibold">Question</th>
+                <th className="py-2 pr-3 font-semibold">Option</th>
+                <th className="py-2 pr-3 font-semibold">Count</th>
+                <th className="py-2 font-semibold">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.standalone_question_breakdowns.map((question) =>
+                (question.options?.length ? question.options : [{ option_text: '—', count: 0, percent: 0 }]).map(
+                  (option, index) => (
+                    <tr key={`${question.question_id}-${option.option_text}-${index}`} className="border-b border-slate-100">
+                      <td className="py-2 pr-3">{index === 0 ? question.question_index : ''}</td>
+                      <td className="py-2 pr-3">{index === 0 ? question.type_label || question.chart_type : ''}</td>
+                      <td className="py-2 pr-3">{index === 0 ? question.question_text : ''}</td>
+                      <td className="py-2 pr-3">{option.option_text}</td>
+                      <td className="py-2 pr-3">{option.count}</td>
+                      <td className="py-2">{option.percent}%</td>
+                    </tr>
+                  ),
+                ),
+              )}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
       <section className="mt-6">
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Response timeline</h2>
         {timeline?.length ? (

@@ -15,13 +15,16 @@ import WordCloudChart from '../charts/WordCloudChart'
 import { renderPieLabel } from '../charts/renderPieLabel'
 import { LiveChartViewToggle } from '../live/LiveChartViewToggle'
 import { RankingLiveChartPanel } from '../live/RankingLiveChartPanel'
+import { OpenTextResponsesList } from './OpenTextResponsesList'
 import { CHART_TOOLTIP_STYLE, getChartColor, RESPONSE_RATE_PIE_COLORS } from '../../utils/chartColors'
+import { questionUsesOptionChart } from '../../utils/livePresentation'
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n))
 }
 
 function McqAnalyticsBarChart({ question }) {
+  const chartType = question.chartRawType || question.rawType
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={question.chart} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
@@ -35,7 +38,30 @@ function McqAnalyticsBarChart({ question }) {
         />
         <Bar dataKey="value" radius={[10, 10, 0, 0]} maxBarSize={56}>
           {question.chart.map((entry, idx) => (
-            <Cell key={entry.name} fill={getChartColor(entry.name, idx, question.rawType)} />
+            <Cell key={entry.name} fill={getChartColor(entry.name, idx, chartType)} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+function RatingAnalyticsBarChart({ question }) {
+  const chartType = question.chartRawType || question.rawType
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={question.chart} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+        <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" vertical={false} />
+        <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+        <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+        <Tooltip
+          cursor={{ fill: 'rgba(79, 70, 229, 0.06)' }}
+          contentStyle={CHART_TOOLTIP_STYLE}
+          formatter={(value, _name, props) => [`${props.payload.count} responses`, 'Count']}
+        />
+        <Bar dataKey="count" radius={[10, 10, 0, 0]} maxBarSize={56}>
+          {question.chart.map((entry, idx) => (
+            <Cell key={entry.name} fill={getChartColor(entry.name, idx, chartType)} />
           ))}
         </Bar>
       </BarChart>
@@ -85,13 +111,19 @@ function ResponseRatePieChart({ question, participantsJoined }) {
 function QuestionChartBody({ question, participantsJoined, chartView }) {
   if (!question) return null
 
-  if (question.rawType === 'word_cloud') {
+  const chartType = question.chartRawType || question.rawType
+
+  if (chartType === 'word_cloud') {
     return (
       <WordCloudChart words={question.wordCloud} className="h-full" emptyLabel="No words submitted yet" />
     )
   }
 
-  if (question.rawType === 'ranking') {
+  if (chartType === 'open_text') {
+    return <OpenTextResponsesList responses={question.openTextResponses} />
+  }
+
+  if (chartType === 'ranking') {
     const rankings = question.rankingAnalytics?.rankings
     if (!rankings?.length) {
       return (
@@ -103,9 +135,11 @@ function QuestionChartBody({ question, participantsJoined, chartView }) {
     return <RankingLiveChartPanel rankings={rankings} chartView={chartView} />
   }
 
-  const hasOptionChart =
-    question.chart.length > 0 &&
-    (question.rawType === 'mcq' || question.rawType === 'poll' || question.rawType === 'true_false')
+  if (chartType === 'rating' && question.chart.length > 0) {
+    return <RatingAnalyticsBarChart question={question} />
+  }
+
+  const hasOptionChart = question.chart.length > 0 && questionUsesOptionChart(chartType)
 
   if (hasOptionChart) {
     return <McqAnalyticsBarChart question={question} />
@@ -120,23 +154,33 @@ export function AnalyticsQuestionChartSection({
   chartView,
   onChartViewChange,
 }) {
+  const chartType = question?.chartRawType || question?.rawType
   const showRankingBreakdown =
-    question?.rawType === 'ranking' &&
+    chartType === 'ranking' &&
     Array.isArray(question.rankingAnalytics?.rankings) &&
     question.rankingAnalytics.rankings.length > 0
 
   const rankingTotalResponses = question?.rankingAnalytics?.totalResponses ?? 0
+  const showRatingAvg = chartType === 'rating' && question?.averageRating != null
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
+          {showRatingAvg ? (
+            <p className="text-sm font-semibold text-navy-900">
+              Average rating: <span className="text-lg">{question.averageRating}</span>
+              <span className="ml-1 text-xs font-normal text-slate-500">
+                (scale {question.ratingMin}–{question.ratingMax})
+              </span>
+            </p>
+          ) : null}
           {showRankingBreakdown ? (
             <p className="text-xs text-slate-500">
               {rankingTotalResponses} ranked submission{rankingTotalResponses === 1 ? '' : 's'} · chart
               uses average score per option
             </p>
-          ) : question?.rawType === 'ranking' ? (
+          ) : chartType === 'ranking' ? (
             <p className="text-xs text-slate-500">Waiting for ranking submissions…</p>
           ) : null}
         </div>

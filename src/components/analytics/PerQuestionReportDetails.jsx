@@ -55,9 +55,14 @@ export function PerQuestionReportDetails({ questionReport }) {
     fastest_responders: fastestResponders,
     rating_distribution: ratingDistribution,
     word_frequency: wordFrequency,
-    question_type: questionType,
+    chart_type: chartType,
+    is_survey: isSurvey,
     is_quiz_mode: isQuizMode,
+    average_rating: averageRating,
+    open_text_responses: openTextResponses,
   } = questionReport
+
+  const showCorrectRate = !isSurvey && isQuizMode
 
   return (
     <div className="mt-4 space-y-4 rounded-2xl border border-blue-200/70 bg-white p-4">
@@ -70,24 +75,34 @@ export function PerQuestionReportDetails({ questionReport }) {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={`grid gap-3 sm:grid-cols-2 ${showCorrectRate ? 'xl:grid-cols-4' : 'xl:grid-cols-3'}`}>
         <StatBlock
           label="Responses"
           value={responseCount}
           hint={`${responseRate}% of ${questionReport.total_participants ?? '—'} joined`}
         />
         <StatBlock label="Response rate" value={`${responseRate}%`} hint="Responses / total joined" />
-        <StatBlock
-          label="Correct rate"
-          value={isQuizMode && correctRate != null ? `${correctRate}%` : '—'}
-          hint={isQuizMode ? 'Quiz mode question' : 'Not a scored question'}
-        />
+        {showCorrectRate ? (
+          <StatBlock
+            label="Correct rate"
+            value={correctRate != null ? `${correctRate}%` : '—'}
+            hint="Quiz mode question"
+          />
+        ) : null}
         <StatBlock
           label="Avg response time"
           value={avgTime != null ? `${avgTime}s` : '—'}
           hint="Average among timed responses"
         />
       </div>
+
+      {chartType === 'rating' && averageRating != null ? (
+        <StatBlock
+          label="Average rating"
+          value={averageRating}
+          hint="Mean score across all rating responses"
+        />
+      ) : null}
 
       <div>
         <p className="text-sm font-semibold text-navy-900">Top 3 fastest responders</p>
@@ -115,7 +130,7 @@ export function PerQuestionReportDetails({ questionReport }) {
         )}
       </div>
 
-      {questionType === 'rating' ? (
+      {chartType === 'rating' ? (
         <DistributionTable
           title="Rating distribution"
           columns={[
@@ -133,7 +148,7 @@ export function PerQuestionReportDetails({ questionReport }) {
         />
       ) : null}
 
-      {questionType === 'word_cloud' ? (
+      {chartType === 'word_cloud' ? (
         <DistributionTable
           title="Word frequency"
           columns={[
@@ -149,6 +164,45 @@ export function PerQuestionReportDetails({ questionReport }) {
           }))}
           emptyMessage="No words submitted yet."
         />
+      ) : null}
+
+      {chartType === 'open_text' ? (
+        <div className="mt-4">
+          <p className="text-sm font-semibold text-navy-900">Open text responses</p>
+          <div className="mt-2 rounded-2xl border border-blue-200/70 bg-white p-3">
+            {(openTextResponses?.length
+              ? openTextResponses
+              : (questionReport.responses || [])
+                  .filter((row) => row.answer)
+                  .map((row) => ({
+                    id: row.participant_id,
+                    participant: row.nickname,
+                    text: row.answer,
+                  }))
+            ).length ? (
+              <ul className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                {(openTextResponses?.length
+                  ? openTextResponses
+                  : (questionReport.responses || []).map((row) => ({
+                      id: row.participant_id,
+                      participant: row.nickname,
+                      text: row.answer,
+                    }))
+                ).map((row) => (
+                  <li
+                    key={`${row.id}-${row.text}`}
+                    className="rounded-xl border border-blue-100 bg-blue-50/40 px-3 py-2"
+                  >
+                    <p className="text-xs font-semibold text-navy-700">{row.participant}</p>
+                    <p className="mt-1 text-sm leading-snug text-slate-800">{row.text}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-600">No text responses yet.</p>
+            )}
+          </div>
+        </div>
       ) : null}
     </div>
   )

@@ -12,7 +12,7 @@ import { QaAnalyticsReportCard } from '../components/analytics/QaAnalyticsReport
 import { ParticipantLeaderboardTable } from '../components/analytics/ParticipantLeaderboardTable'
 import { PerQuestionReportDetails } from '../components/analytics/PerQuestionReportDetails'
 import { SESSION_REPORT_VIEWS } from '../constants/sessionReportTypes'
-import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
+import { buildAnalyticsCsvRows, mapAnalyticsPerQuestion } from '../utils/analyticsQuestions'
 import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
 import { exportPerParticipantExcel } from '../utils/perParticipantExcelExport'
 import { exportPerQuestionBreakdownExcel } from '../utils/perQuestionBreakdownExcelExport'
@@ -56,20 +56,6 @@ function formatStatus(status) {
   return map[status] || status || '—'
 }
 
-function apiQuestionTypeToUi(type) {
-  const mapping = {
-    mcq: 'MCQ',
-    poll: 'Poll',
-    word_cloud: 'Word Cloud',
-    rating: 'Rating',
-    open_text: 'Text',
-    true_false: 'True/False',
-    ranking: 'Ranking',
-    fill_blank: 'Text',
-  }
-  return mapping[type] || type || 'Text'
-}
-
 function formatSessionDuration(startedAt, endedAt) {
   if (!startedAt) return '—'
   const start = new Date(startedAt).getTime()
@@ -90,39 +76,6 @@ function buildLeaderboard(responses) {
     byParticipant.set(id, entry)
   }
   return [...byParticipant.values()].sort((a, b) => b.score - a.score).slice(0, 10)
-}
-
-function chartFromQuestionResults(results, question) {
-  const type = question.question_type
-  const total = results?.total_responses || 0
-  const options = question.question_options || []
-
-  if ((type === 'mcq' || type === 'poll' || type === 'true_false') && options.length) {
-    const byOption = results?.by_option || {}
-    return options.map((opt) => {
-      const count = Number(byOption[String(opt.option_id)] || 0)
-      return {
-        name: opt.option_text,
-        value: total > 0 ? Math.round((count / total) * 100) : 0,
-        count,
-      }
-    })
-  }
-
-  if (type === 'rating' && results?.average_rating != null) {
-    return [{ name: `Avg ${results.average_rating}`, value: 100, count: total }]
-  }
-
-  return []
-}
-
-function correctRateForQuestion(question, responses) {
-  if (!question?.is_quiz_mode) return null
-  const qid = Number(question.question_id)
-  const qResponses = (responses || []).filter((r) => Number(r.question_id) === qid)
-  if (!qResponses.length) return null
-  const correct = qResponses.filter((r) => r.is_correct).length
-  return Math.round((correct / qResponses.length) * 100)
 }
 
 function AnalyticsPage() {
@@ -300,33 +253,7 @@ function AnalyticsPage() {
     return sortedQuestions.map((q, idx) => {
       const breakdown = breakdownByQuestionId[q.question_id]
       const results = resultsByQuestionId[q.question_id]
-      const uiType = apiQuestionTypeToUi(q.question_type)
-      const responseCount = breakdown?.response_count ?? results?.total_responses ?? 0
-      const chart = chartFromQuestionResults(results, q)
-      const correctRate = correctRateForQuestion(q, allResponses)
-      const questionResponses = (allResponses || []).filter(
-        (r) => Number(r.question_id) === Number(q.question_id),
-      )
-      const apiWordCounts = wordCountsFromApiResults(results)
-      const wordCloud =
-        q.question_type === 'word_cloud'
-          ? apiWordCounts.length
-            ? apiWordCounts
-            : wordCountsFromResponses(questionResponses)
-          : []
-
-      return {
-        id: String(q.question_id),
-        index: idx + 1,
-        type: uiType,
-        text: q.question_text || breakdown?.question_text || '',
-        responseCount,
-        correctRate,
-        chart,
-        wordCloud,
-        rawType: q.question_type,
-        rankingAnalytics: results?.ranking_analytics || null,
-      }
+      return mapAnalyticsPerQuestion(q, idx, breakdown, results, allResponses)
     })
   }, [sortedQuestions, breakdownByQuestionId, resultsByQuestionId, allResponses])
 
@@ -413,37 +340,33 @@ function AnalyticsPage() {
       'sessionTitle',
       'questionIndex',
       'questionType',
+      'survey_sub_type',
       'questionText',
       'participant',
       'response',
       'points',
       'isCorrect',
     ]
-    const questionOrder = new Map(sortedQuestions.map((q, i) => [Number(q.question_id), i + 1]))
 
-    const rows = allResponses.map((r) => {
-      const qIdx = questionOrder.get(Number(r.question_id)) ?? ''
-      const responseText =
-        r.question_option?.option_text ||
-        r.text_response ||
-        (r.rating_value != null ? String(r.rating_value) : '')
-      return [
-        sessionMeta.id,
-        sessionMeta.title,
-        String(qIdx),
-        apiQuestionTypeToUi(r.question?.question_type),
-        (r.question?.question_text ?? '').replaceAll('"', '""'),
-        r.participant?.nickname ?? '',
-        responseText,
-        String(r.points_earned ?? 0),
-        r.is_correct == null ? '' : r.is_correct ? 'yes' : 'no',
-      ]
+    let rows = buildAnalyticsCsvRows({
+      sessionMeta,
+      sortedQuestions,
+      allResponses,
     })
 
     if (!rows.length) {
-      perQuestion.forEach((q) => {
-        rows.push([sessionMeta.id, sessionMeta.title, String(q.index), q.type, q.text?.replaceAll('"', '""') ?? '', '', '', '', ''])
-      })
+      rows = perQuestion.map((q) => [
+        sessionMeta.id,
+        sessionMeta.title,
+        String(q.index),
+        q.type,
+        q.surveySubType || '',
+        q.text?.replaceAll('"', '""') ?? '',
+        '',
+        '',
+        '',
+        '',
+      ])
     }
 
     const csv = [headers.join(','), ...rows.map((r) => r.map((x) => `"${String(x ?? '').replaceAll('"', '""')}"`).join(','))].join('\n')
@@ -719,7 +642,7 @@ function AnalyticsPage() {
                             isSelected ? 'bg-white/15 text-white' : 'bg-blue-50 text-navy-700'
                           }`}
                         >
-                          {q.type}
+                          {q.typeLabel || q.type}
                         </span>
                       </div>
                       <span className={`text-xs font-semibold ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
@@ -748,7 +671,7 @@ function AnalyticsPage() {
                         Q{selectedQuestion.index}
                       </span>
                       <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-navy-700">
-                        {selectedQuestion.type}
+                        {selectedQuestion.typeLabel || selectedQuestion.type}
                       </span>
                     </div>
                     <p className="mt-2 text-lg font-semibold text-navy-900">

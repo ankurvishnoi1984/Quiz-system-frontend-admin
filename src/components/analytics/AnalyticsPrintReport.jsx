@@ -52,15 +52,17 @@ export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leader
             {perQuestion.map((q) => (
               <tr key={q.id} className="border-b border-slate-100 align-top">
                 <td className="py-2 pr-3 font-semibold">Q{q.index}</td>
-                <td className="py-2 pr-3">{q.type}</td>
+                <td className="py-2 pr-3">{q.typeLabel || q.type}</td>
                 <td className="py-2 pr-3">{q.text || 'Untitled'}</td>
                 <td className="py-2 pr-3">{q.responseCount}</td>
                 <td className="py-2">
-                  {q.rawType === 'ranking'
+                  {(q.chartRawType || q.rawType) === 'ranking'
                     ? formatRankingTopOption(q)
-                    : q.correctRate != null
-                      ? `${q.correctRate}% correct`
-                      : '—'}
+                    : (q.chartRawType || q.rawType) === 'rating' && q.averageRating != null
+                      ? `Avg ${q.averageRating}`
+                      : q.isSurvey || q.correctRate == null
+                        ? '—'
+                        : `${q.correctRate}% correct`}
                 </td>
               </tr>
             ))}

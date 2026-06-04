@@ -1,4 +1,5 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { QuestionBreakdownTables } from './QuestionBreakdownTables'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -131,6 +132,11 @@ export function SessionSummaryReportCard({ report, isLoading }) {
           </div>
         )}
       </div>
+
+      <QuestionBreakdownTables
+        surveyQuestions={report.survey_question_breakdowns}
+        standaloneQuestions={report.standalone_question_breakdowns}
+      />
     </div>
   )
 }
