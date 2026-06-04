@@ -59,6 +59,7 @@ function formatStatus(status) {
 function apiQuestionTypeToUi(type) {
   const mapping = {
     mcq: 'MCQ',
+    poll: 'Poll',
     word_cloud: 'Word Cloud',
     rating: 'Rating',
     open_text: 'Text',
@@ -96,7 +97,7 @@ function chartFromQuestionResults(results, question) {
   const total = results?.total_responses || 0
   const options = question.question_options || []
 
-  if ((type === 'mcq' || type === 'true_false') && options.length) {
+  if ((type === 'mcq' || type === 'poll' || type === 'true_false') && options.length) {
     const byOption = results?.by_option || {}
     return options.map((opt) => {
       const count = Number(byOption[String(opt.option_id)] || 0)

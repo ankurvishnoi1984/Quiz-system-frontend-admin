@@ -130,6 +130,7 @@ export function ActiveQuestionPanel({
 
       {isAnswerRevealed &&
         !hasSubmittedQuestion &&
+        question.type !== 'Poll' &&
         (question.type === 'MCQ' || question.type === 'True/False') && (
           <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-slate-600">
             {hasCountdown && timer === 0
@@ -138,13 +139,13 @@ export function ActiveQuestionPanel({
           </p>
         )}
 
-      {question.type === 'MCQ' && (
+      {(question.type === 'MCQ' || question.type === 'Poll') && (
         <McqOptions
           options={question.options}
           currentResponse={currentResponse}
           inputsLocked={inputsLocked}
           answerRevealMeta={answerRevealMeta}
-          canSeeAnswerReveal={canSeeAnswerReveal}
+          canSeeAnswerReveal={question.type === 'Poll' ? false : canSeeAnswerReveal}
           onSelectOption={(optionText) => onSelectOption(question.id, optionText)}
         />
       )}
@@ -293,6 +294,12 @@ export function ActiveQuestionPanel({
             This session was ended by the host. You can review your answers but cannot submit new
             responses.
           </p>
+        </div>
+      )}
+
+      {question.type === 'Poll' && hasSubmittedQuestion && (
+        <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-center">
+          <p className="text-sm font-semibold text-violet-800">Thanks for your response!</p>
         </div>
       )}
 

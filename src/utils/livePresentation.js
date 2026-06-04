@@ -25,6 +25,7 @@ export function getPresentOptionColor(name, index, rawType) {
 export function mapLiveQuestionType(type) {
   const map = {
     mcq: 'MCQ',
+    poll: 'Poll',
     word_cloud: 'Word Cloud',
     rating: 'Rating',
     open_text: 'Text',
@@ -35,7 +36,7 @@ export function mapLiveQuestionType(type) {
 }
 
 export function questionUsesOptionChart(rawType) {
-  return rawType === 'mcq' || rawType === 'true_false'
+  return rawType === 'mcq' || rawType === 'poll' || rawType === 'true_false'
 }
 
 export function sortTrueFalseOptionData(data) {
@@ -78,7 +79,7 @@ export function mapLiveQuestions(questions) {
       isLive: Boolean(q.is_live),
       timeLimit: Number(q.time_limit_seconds) || 0,
       submissionsClosed: Boolean(q.submissions_closed),
-      isQuizMode: Boolean(q.is_quiz_mode),
+      isQuizMode: q.question_type === 'poll' ? false : Boolean(q.is_quiz_mode),
       answerRevealed,
       showLeaderboard: Boolean(q.show_leaderboard),
       correctOptionIds: resolveCorrectOptionIds({ ...q, answerRevealed }, options),

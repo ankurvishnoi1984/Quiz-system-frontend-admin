@@ -11,6 +11,7 @@ export function isLiveActiveQuestion(question) {
 export function mapQuestionType(type) {
   const map = {
     mcq: 'MCQ',
+    poll: 'Poll',
     word_cloud: 'Word Cloud',
     rating: 'Rating',
     open_text: 'Text',
@@ -42,7 +43,7 @@ export function buildResponsePayloadForQuestion(q, res) {
 
   const payload = { question_id: q.id }
 
-  if (q.type === 'MCQ' || q.type === 'True/False') {
+  if (q.type === 'MCQ' || q.type === 'Poll' || q.type === 'True/False') {
     const opt = findOptionForSelection(q.options, res.selectedOption)
     if (!opt?.option_id) return null
     payload.option_id = opt.option_id
@@ -170,7 +171,7 @@ export function shouldIncludeQuestionInFinalize(
 
 export function participantQuestionHasAnswer(question, response = {}) {
   if (!question) return false
-  if (question.type === 'MCQ' || question.type === 'True/False') {
+  if (question.type === 'MCQ' || question.type === 'Poll' || question.type === 'True/False') {
     return Boolean(String(response.selectedOption || '').trim())
   }
   if (question.type === 'Rating') {

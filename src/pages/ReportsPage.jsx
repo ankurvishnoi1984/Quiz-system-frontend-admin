@@ -65,7 +65,7 @@ function sortApiQuestions(questions) {
 function sampleResponseFromApiQuestion(q) {
   const opts = q.question_options || []
   const t = q.question_type
-  if (t === 'mcq' || t === 'true_false') {
+  if (t === 'mcq' || t === 'poll' || t === 'true_false') {
     return opts[0]?.option_text ?? ''
   }
   if (t === 'rating') {

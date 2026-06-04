@@ -104,7 +104,8 @@ function QuestionChartBody({ question, participantsJoined, chartView }) {
   }
 
   const hasOptionChart =
-    question.chart.length > 0 && (question.rawType === 'mcq' || question.rawType === 'true_false')
+    question.chart.length > 0 &&
+    (question.rawType === 'mcq' || question.rawType === 'poll' || question.rawType === 'true_false')
 
   if (hasOptionChart) {
     return <McqAnalyticsBarChart question={question} />

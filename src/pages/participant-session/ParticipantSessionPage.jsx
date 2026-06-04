@@ -176,6 +176,7 @@ function ParticipantSessionPage() {
         text: q.question_text,
         type: mapQuestionType(q.question_type),
         rawType: q.question_type,
+        isQuizMode: q.question_type === 'poll' ? false : Boolean(q.is_quiz_mode),
         isLive: q.is_live === true || q.is_live === 1 || q.is_live === '1',
         answerRevealed: Boolean(q.answer_revealed),
         correctOptionIds: (q.correct_option_ids || []).map(Number),
@@ -227,6 +228,11 @@ function ParticipantSessionPage() {
   const isSessionEnded =
     session?.status === 'completed' || session?.status === 'archived'
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
+  const sessionHasPollQuestions = useMemo(
+    () => mappedQuestions.some((q) => q.rawType === 'poll'),
+    [mappedQuestions],
+  )
+  const showLeaderboardInQa = showOverallLeaderboard && !sessionHasPollQuestions
   const navigationEnabled = session?.participant_navigation_enabled !== false
   const allLiveQuestionsClosed = useMemo(() => {
     if (!navigationEnabled) return false
@@ -814,10 +820,10 @@ function ParticipantSessionPage() {
   ])
 
   useEffect(() => {
-    if (step === 'qa' && showOverallLeaderboard && dbSessionId) {
+    if (step === 'qa' && showLeaderboardInQa && dbSessionId) {
       queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
     }
-  }, [step, showOverallLeaderboard, dbSessionId, queryClient])
+  }, [step, showLeaderboardInQa, dbSessionId, queryClient])
 
   useEffect(() => {
     if (!activeQuestions.length) {
@@ -1069,7 +1075,7 @@ function ParticipantSessionPage() {
     enabled: Boolean(
       participantToken &&
         dbSessionId &&
-        showOverallLeaderboard &&
+        showLeaderboardInQa &&
         (step === 'qa' || hasAnyQuestionSaved || session?.status === 'completed'),
     ),
     staleTime: 5000,
@@ -1086,7 +1092,8 @@ function ParticipantSessionPage() {
   const isAnswerRevealedByHost = Boolean(
     answerRevealByQuestion[String(question?.id)]?.revealed ?? question?.answerRevealed,
   )
-  const canSeeAnswerReveal = isAnswerRevealedByHost && hasSubmittedQuestion
+  const canSeeAnswerReveal =
+    question?.type !== 'Poll' && question?.isQuizMode !== false && isAnswerRevealedByHost && hasSubmittedQuestion
   const answerRevealMeta = canSeeAnswerReveal
     ? {
         revealed: true,
@@ -1711,7 +1718,7 @@ function ParticipantSessionPage() {
 
         {step === 'qa' && (
           <QaPanel
-            showOverallLeaderboard={showOverallLeaderboard}
+            showOverallLeaderboard={showLeaderboardInQa}
             hasAnyQuestionSaved={hasAnyQuestionSaved}
             sessionStatus={session?.status}
             leaderboard={leaderboard}

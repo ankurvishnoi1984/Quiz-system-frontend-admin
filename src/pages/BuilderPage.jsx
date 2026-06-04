@@ -16,9 +16,8 @@ import {
   Plus,
   Star,
   Trophy,
-  ToggleLeft,
-  ToggleRight,
   Trash2,
+  Vote,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -115,6 +114,7 @@ function InlineEditableSessionTitle({ title, onSave, isSaving }) {
 
 const QUESTION_TYPES = [
   { type: 'MCQ', icon: ListChecks, description: 'Multiple choice with options' },
+  { type: 'Poll', icon: Vote, description: 'Opinion poll — no right or wrong answers' },
   { type: 'Word Cloud', icon: Cloud, description: 'Collect words, show cloud' },
   { type: 'Rating', icon: Star, description: '1–5 rating' },
   { type: 'Text', icon: MessageSquareText, description: 'Open-ended response' },
@@ -158,15 +158,19 @@ function normalizeTrueFalseOptions(apiOptions = []) {
 }
 
 function questionTypeUsesOptions(type) {
-  return type === 'MCQ' || type === 'True/False' || type === 'Ranking'
+  return type === 'MCQ' || type === 'Poll' || type === 'True/False' || type === 'Ranking'
+}
+
+function isPollQuestionType(type) {
+  return type === 'Poll'
 }
 
 function buildOptionsPayload(question) {
-  if (question.type === 'MCQ') {
+  if (question.type === 'MCQ' || question.type === 'Poll') {
     return (question.options || []).map((option, optionIndex) => ({
       ...(option.optionId != null ? { option_id: option.optionId } : {}),
       option_text: option.text || `Option ${optionIndex + 1}`,
-      is_correct: Boolean(option.isCorrect),
+      is_correct: question.type === 'Poll' ? false : Boolean(option.isCorrect),
       display_order: optionIndex + 1,
     }))
   }
@@ -592,6 +596,20 @@ function ParticipantPreview({ question, quizMode }) {
         </div>
       )}
 
+      {question.type === 'Poll' && (
+        <div className="grid gap-2">
+          {question.options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              className="rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+            >
+              {o.text}
+            </button>
+          ))}
+        </div>
+      )}
+
       {question.type === 'Ranking' && (
         <div className="grid gap-2">
           {question.options.map((o, idx) => (
@@ -711,6 +729,7 @@ function BuilderPage() {
   const apiToUiType = (apiType) => {
     const mapping = {
       mcq: 'MCQ',
+      poll: 'Poll',
       word_cloud: 'Word Cloud',
       rating: 'Rating',
       open_text: 'Text',
@@ -724,6 +743,7 @@ function BuilderPage() {
   const uiToApiType = (uiType) => {
     const mapping = {
       MCQ: 'mcq',
+      Poll: 'poll',
       'Word Cloud': 'word_cloud',
       Rating: 'rating',
       Text: 'open_text',
@@ -924,7 +944,6 @@ function BuilderPage() {
 
   const isDraftSession = session?.rawStatus === 'draft'
 
-  const quizMode = true
   const timeLimitSeconds = 30
   const [timeLimitMode, setTimeLimitMode] = useState('30s')
   const [customTime, setCustomTime] = useState(45)
@@ -947,6 +966,7 @@ function BuilderPage() {
     () => questions.find((q) => q.id === selectedId) ?? questions[0],
     [questions, selectedId],
   )
+  const quizMode = selected?.type !== 'Poll'
   const sessionQuestionType = questions[0]?.type ?? null
   const hasMixedQuestionTypes = useMemo(() => {
     if (questions.length <= 1) return false
@@ -982,7 +1002,7 @@ function BuilderPage() {
       media: null,
       points: 10,
       options:
-        type === 'MCQ'
+        type === 'MCQ' || type === 'Poll'
           ? [
               { id: uid('opt'), optionId: null, text: 'Option 1', isCorrect: false },
               { id: uid('opt'), optionId: null, text: 'Option 2', isCorrect: false },
@@ -1048,19 +1068,32 @@ function BuilderPage() {
       }
 
       for (const question of questions) {
-        if (question.type === 'MCQ' || question.type === 'True/False') {
-          const opts =
-            question.type === 'True/False'
-              ? normalizeTrueFalseOptions(
-                  (question.options || []).map((o) => ({
-                    option_id: o.optionId,
-                    option_text: o.text,
-                    is_correct: o.isCorrect,
-                  })),
-                )
-              : question.options || []
+        if (question.type === 'Poll') {
+          if ((question.options || []).length < 2) {
+            throw new Error(
+              `Question "${question.text || 'Untitled'}" must have at least 2 poll options.`,
+            )
+          }
+        }
+        if (question.type === 'MCQ') {
+          const opts = question.options || []
           const correctCount = opts.filter((opt) => opt.isCorrect).length
-          if (quizMode && correctCount !== 1) {
+          if (correctCount !== 1) {
+            throw new Error(
+              `Question "${question.text || 'Untitled'}" must have exactly one correct answer.`,
+            )
+          }
+        }
+        if (question.type === 'True/False') {
+          const opts = normalizeTrueFalseOptions(
+            (question.options || []).map((o) => ({
+              option_id: o.optionId,
+              option_text: o.text,
+              is_correct: o.isCorrect,
+            })),
+          )
+          const correctCount = opts.filter((opt) => opt.isCorrect).length
+          if (correctCount !== 1) {
             throw new Error(
               `Question "${question.text || 'Untitled'}" must have exactly one correct answer (True or False).`,
             )
@@ -1097,11 +1130,12 @@ function BuilderPage() {
           throw new Error('Cannot add new questions while the session is live.')
         }
 
+        const isPoll = isPollQuestionType(question.type)
         const payload = {
           question_type: uiToApiType(question.type),
           question_text: question.text || 'Untitled question',
-          is_quiz_mode: quizMode,
-          points_value: Number(question.points || 0),
+          is_quiz_mode: isPoll ? false : true,
+          points_value: isPoll ? 0 : Number(question.points || 0),
           time_limit_seconds: effectiveTimeLimitSeconds || null,
           allow_multiple_select: false,
           options: questionTypeUsesOptions(question.type) ? buildOptionsPayload(question) : [],
@@ -1497,18 +1531,6 @@ function BuilderPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  disabled={!isDraftSession}
-                  onClick={() => {
-                    setDirty(true)
-                  }}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  title={!isDraftSession ? 'Quiz mode is locked while the session is live' : undefined}
-                >
-                  {quizMode ? <ToggleRight className="size-4 text-emerald-600" /> : <ToggleLeft className="size-4 text-slate-500" />}
-                  Quiz mode
-                </button>
                 {!isDraftSession && quizMode && selected.questionId ? (
                   <HostQuestionActionButton
                     disabled={questionLeaderboardMutation.isPending}
@@ -1552,21 +1574,27 @@ function BuilderPage() {
                     tone="violet"
                   />
                 ) : null}
-                <div className="flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-3 py-2">
-                  <p className="text-sm font-semibold text-slate-700">Points</p>
-                  <input
-                    type="number"
-                    min={0}
-                    disabled={!quizMode || !isDraftSession}
-                    value={selected.points ?? 0}
-                    onChange={(e) => updateQuestion({ ...selected, points: Number(e.target.value || 0) })}
-                    className={`h-9 w-20 rounded-xl border px-2 text-sm outline-none ${
-                      quizMode && isDraftSession
-                        ? 'border-blue-200/70 bg-white text-slate-700 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15'
-                        : 'border-slate-200 bg-slate-50 text-slate-500'
-                    }`}
-                  />
-                </div>
+                {quizMode ? (
+                  <div className="flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-3 py-2">
+                    <p className="text-sm font-semibold text-slate-700">Points</p>
+                    <input
+                      type="number"
+                      min={0}
+                      disabled={!isDraftSession}
+                      value={selected.points ?? 0}
+                      onChange={(e) => updateQuestion({ ...selected, points: Number(e.target.value || 0) })}
+                      className={`h-9 w-20 rounded-xl border px-2 text-sm outline-none ${
+                        isDraftSession
+                          ? 'border-blue-200/70 bg-white text-slate-700 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15'
+                          : 'border-slate-200 bg-slate-50 text-slate-500'
+                      }`}
+                    />
+                  </div>
+                ) : (
+                  <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800">
+                    Poll — no points or correct answer
+                  </span>
+                )}
               </div>
             </div>
 
@@ -1587,7 +1615,7 @@ function BuilderPage() {
                 disabled={!isDraftSession}
               />
 
-              {(selected.type === 'MCQ' || selected.type === 'Ranking') && (
+              {(selected.type === 'MCQ' || selected.type === 'Poll' || selected.type === 'Ranking') && (
                 <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
                   <OptionsEditor
                     question={selected}

@@ -68,6 +68,7 @@ import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 function mapQuestionType(type) {
   const map = {
     mcq: 'MCQ',
+    poll: 'Poll',
     word_cloud: 'Word Cloud',
     rating: 'Rating',
     open_text: 'Text',
@@ -78,7 +79,7 @@ function mapQuestionType(type) {
 }
 
 function questionUsesOptionChart(rawType) {
-  return rawType === 'mcq' || rawType === 'true_false'
+  return rawType === 'mcq' || rawType === 'poll' || rawType === 'true_false'
 }
 
 function sortTrueFalseOptionData(data) {
@@ -174,7 +175,7 @@ function LivePage() {
         type: mapQuestionType(q.question_type),
         rawType: q.question_type,
         isLive: Boolean(q.is_live),
-        isQuizMode: Boolean(q.is_quiz_mode),
+        isQuizMode: q.question_type === 'poll' ? false : Boolean(q.is_quiz_mode),
         answerRevealed: Boolean(q.answer_revealed),
         showLeaderboard: Boolean(q.show_leaderboard),
         timeLimit: Number(q.time_limit_seconds) || 0,
