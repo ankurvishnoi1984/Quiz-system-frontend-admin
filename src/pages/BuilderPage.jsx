@@ -667,40 +667,46 @@ function SurveySelectModeToggle({ value, onChange, disabled }) {
   )
 }
 
+function applySurveySubTypeChange(question, nextSubType) {
+  return {
+    ...question,
+    surveySubType: nextSubType,
+    allowMultipleSelect: false,
+    options: defaultOptionsForSurveySubType(nextSubType),
+    ...(nextSubType === 'Rating'
+      ? { ratingMin: 1, ratingMax: 5, ratingMinLabel: '', ratingMaxLabel: '' }
+      : {}),
+  }
+}
+
+function SurveyQuestionFormatSelect({ question, onChange, structureLocked }) {
+  const subType = question.surveySubType || 'MCQ'
+
+  return (
+    <div>
+      <label className="text-sm font-semibold text-slate-700">Question Format</label>
+      <select
+        value={subType}
+        disabled={structureLocked}
+        onChange={(e) => onChange(applySurveySubTypeChange(question, e.target.value))}
+        className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50"
+      >
+        {SURVEY_SUB_TYPES.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 function SurveyQuestionConfig({ question, onChange, structureLocked }) {
   const subType = question.surveySubType || 'MCQ'
   const editorQuestion = { ...question, type: subType }
 
-  const setSubType = (nextSubType) => {
-    onChange({
-      ...question,
-      surveySubType: nextSubType,
-      allowMultipleSelect: false,
-      options: defaultOptionsForSurveySubType(nextSubType),
-      ...(nextSubType === 'Rating'
-        ? { ratingMin: 1, ratingMax: 5, ratingMinLabel: '', ratingMaxLabel: '' }
-        : {}),
-    })
-  }
-
   return (
     <div className="space-y-4">
-      <div>
-        <label className="text-sm font-semibold text-slate-700">Question Format</label>
-        <select
-          value={subType}
-          disabled={structureLocked}
-          onChange={(e) => setSubType(e.target.value)}
-          className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50"
-        >
-          {SURVEY_SUB_TYPES.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {subType === 'Rating' && (
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -752,13 +758,7 @@ function SurveyQuestionConfig({ question, onChange, structureLocked }) {
 
       {(subType === 'MCQ' || subType === 'Poll') && (
         <div className="space-y-3 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
-          <OptionsEditor
-            question={editorQuestion}
-            quizMode={false}
-            onChange={(next) => onChange({ ...question, options: next.options })}
-            structureLocked={structureLocked}
-          />
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 pb-3">
             <p className="text-sm font-semibold text-slate-700">Selection mode</p>
             <SurveySelectModeToggle
               value={Boolean(question.allowMultipleSelect)}
@@ -766,6 +766,12 @@ function SurveyQuestionConfig({ question, onChange, structureLocked }) {
               onChange={(allowMultipleSelect) => onChange({ ...question, allowMultipleSelect })}
             />
           </div>
+          <OptionsEditor
+            question={editorQuestion}
+            quizMode={false}
+            onChange={(next) => onChange({ ...question, options: next.options })}
+            structureLocked={structureLocked}
+          />
         </div>
       )}
 
@@ -1672,8 +1678,8 @@ function BuilderPage() {
         {/* Left: Question list */}
         <div className="space-y-4">
           <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-navy-900">Add question</p>
                 <p className="mt-1 text-xs text-slate-600">
                   {sessionQuestionType
@@ -1692,7 +1698,7 @@ function BuilderPage() {
                       ? 'Add your first question by choosing a type below.'
                       : `Add another ${sessionQuestionType} question`
                 }
-                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex shrink-0 items-center gap-2 self-center rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Plus className="size-4" />
                 Add question
@@ -1983,6 +1989,14 @@ function BuilderPage() {
             </div>
 
             <div className="mt-4 grid gap-4">
+              {selected.type === 'Survey' && (
+                <SurveyQuestionFormatSelect
+                  question={selected}
+                  onChange={updateQuestion}
+                  structureLocked={!isDraftSession}
+                />
+              )}
+
               <div>
                 <label className="text-sm font-semibold text-slate-700">Question text</label>
                 <textarea
