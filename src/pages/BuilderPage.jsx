@@ -1014,11 +1014,18 @@ function BuilderPage() {
                   { id: uid('opt'), optionId: null, text: 'Option 1', isCorrect: false },
                   { id: uid('opt'), optionId: null, text: 'Option 2', isCorrect: false },
                 ]
-            : [],
+              : [],
     }
     setQuestions((prev) => [q, ...prev])
     setSelectedId(q.id)
   }
+
+  const handleQuickAddQuestion = () => {
+    if (!sessionQuestionType) return
+    addQuestion(sessionQuestionType)
+  }
+
+  const canQuickAddQuestion = isDraftSession && Boolean(sessionQuestionType)
 
   const deleteQuestion = (id) => {
     if (!session || session.rawStatus !== 'draft') return
@@ -1340,10 +1347,32 @@ function BuilderPage() {
         {/* Left: Question list */}
         <div className="space-y-4">
           <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
-            <p className="text-sm font-semibold text-navy-900">Add question</p>
-            <p className="mt-1 text-xs text-slate-600">
-              {sessionQuestionType ? `Session type locked to: ${sessionQuestionType}` : 'Choose a type to lock this session.'}
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-navy-900">Add question</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  {sessionQuestionType
+                    ? `Session type locked to ${sessionQuestionType}. Use the button or pick the type again.`
+                    : 'Choose a type below to start, or use Add question after the first one.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleQuickAddQuestion}
+                disabled={!canQuickAddQuestion}
+                title={
+                  !isDraftSession
+                    ? 'Add questions is available only while the session is in draft.'
+                    : !sessionQuestionType
+                      ? 'Add your first question by choosing a type below.'
+                      : `Add another ${sessionQuestionType} question`
+                }
+                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Plus className="size-4" />
+                Add question
+              </button>
+            </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
               {QUESTION_TYPES.map((t) => {
                 const Icon = t.icon
