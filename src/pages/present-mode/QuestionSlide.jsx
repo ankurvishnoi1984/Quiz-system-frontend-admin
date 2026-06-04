@@ -14,6 +14,7 @@ import {
   enrichRatingChartDataWithColors,
   filterResponsesForQuestion,
   getCorrectOptionsForQuestion,
+  getQuestionChartRawType,
   questionUsesOptionChart,
 } from '../../utils/livePresentation'
 import {
@@ -78,7 +79,7 @@ export function QuestionSlide({
     currentResponses,
   )
   const optionData = enrichOptionChartDataWithReveal(optionDataRaw, question)
-  const ratingData = enrichRatingChartDataWithColors(buildRatingChartData(currentResponses))
+  const ratingData = enrichRatingChartDataWithColors(buildRatingChartData(currentResponses, question))
   const showRevealUi = shouldShowAnswerRevealUi(question)
   const wordCloudWords = buildWordCloudData(question, questionResultsQuery.data, currentResponses)
   const responseRows = buildResponseRows(currentResponses)
@@ -87,15 +88,16 @@ export function QuestionSlide({
     [allResponses, question.id],
   )
 
-  const usesOptionChart = questionUsesOptionChart(question.rawType)
-  const showWordCloud = question.rawType === 'word_cloud'
-  const showRating = question.rawType === 'rating'
+  const chartRawType = question.chartRawType ?? getQuestionChartRawType(question)
+  const usesOptionChart = questionUsesOptionChart(chartRawType)
+  const showWordCloud = chartRawType === 'word_cloud'
+  const showRating = chartRawType === 'rating'
   const rankingAnalytics = questionResultsQuery.data?.ranking_analytics || null
   const showRanking =
-    question.rawType === 'ranking' &&
+    chartRawType === 'ranking' &&
     Array.isArray(rankingAnalytics?.rankings) &&
     rankingAnalytics.rankings.length > 0
-  const showTextList = question.rawType === 'open_text'
+  const showTextList = chartRawType === 'open_text'
   const showQuestionLeaderboard = Boolean(question.isQuizMode && question.showLeaderboard)
 
   const chartData = showRating ? ratingData : optionData
@@ -186,7 +188,7 @@ export function QuestionSlide({
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col rounded-3xl border border-blue-200/70 bg-white/90 p-4 shadow-xl shadow-navy-900/10">
           <PresentBarChart
             data={usesOptionChart ? optionData : chartData}
-            rawType={question.rawType}
+            rawType={chartRawType}
             answerRevealed={showRevealUi}
           />
           {showRevealUi ? <PresentOptionsKey question={question} chartData={optionData} /> : null}

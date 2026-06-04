@@ -47,7 +47,6 @@ import {
   buildQuestionLeaderboardForQuestion,
   buildSessionLeaderboardFromResponses,
 } from '../utils/leaderboard'
-import { wordCountsFromApiResults, wordCountsFromResponses } from '../utils/wordCloud'
 import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
 import { getSessionQaReportApi } from '../services/analyticsApi'
 import { useAuthStore } from '../store/authStore'
@@ -63,31 +62,13 @@ import {
 } from '../services/liveApi'
 import { formatQuizSubmitTimeCompact } from '../utils/quizResponseTime'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
-
-
-function mapQuestionType(type) {
-  const map = {
-    mcq: 'MCQ',
-    poll: 'Poll',
-    word_cloud: 'Word Cloud',
-    rating: 'Rating',
-    open_text: 'Text',
-    true_false: 'True/False',
-    ranking: 'Ranking',
-  }
-  return map[type] || type
-}
-
-function questionUsesOptionChart(rawType) {
-  return rawType === 'mcq' || rawType === 'poll' || rawType === 'true_false'
-}
-
-function sortTrueFalseOptionData(data) {
-  return [...data].sort((a, b) => {
-    const rank = (name) => (String(name).trim().toLowerCase() === 'true' ? 0 : 1)
-    return rank(a.name) - rank(b.name)
-  })
-}
+import {
+  buildOptionChartData,
+  buildRatingChartData,
+  buildWordCloudData,
+  mapLiveQuestions,
+  questionUsesOptionChart,
+} from '../utils/livePresentation'
 
 function buildRankingResponseLabel(row, optionsById) {
   const order = Array.isArray(row?.ranking_order) ? row.ranking_order.map(Number).filter(Boolean) : []
@@ -168,20 +149,7 @@ function LivePage() {
 
 
   const mappedQuestions = useMemo(
-    () =>
-      (questionsQuery.data || []).map((q) => ({
-        id: q.question_id,
-        text: q.question_text,
-        type: mapQuestionType(q.question_type),
-        rawType: q.question_type,
-        isLive: Boolean(q.is_live),
-        isQuizMode: q.question_type === 'poll' ? false : Boolean(q.is_quiz_mode),
-        answerRevealed: Boolean(q.answer_revealed),
-        showLeaderboard: Boolean(q.show_leaderboard),
-        timeLimit: Number(q.time_limit_seconds) || 0,
-        submissionsClosed: Boolean(q.submissions_closed),
-        options: q.question_options || q.QuestionOptions || [],
-      })),
+    () => mapLiveQuestions(questionsQuery.data),
     [questionsQuery.data],
   )
 
@@ -419,54 +387,35 @@ function LivePage() {
   const responseRate = participants ? Math.round((responded / participants) * 100) : 0
 
 
-  const optionData = useMemo(() => {
-    if (!activeQuestion) return []
-    const byOption = questionResultsQuery.data?.by_option || {}
-    const opts = activeQuestion.options || []
+  const chartRawType = activeQuestion?.chartRawType ?? activeQuestion?.rawType
 
-    if (opts.length > 0) {
-      let rows = opts.map((option) => ({
-        name: option.option_text,
-        value: Number(byOption[String(option.option_id)] || 0),
-      }))
-      if (activeQuestion.rawType === 'true_false') {
-        rows = sortTrueFalseOptionData(rows)
-      }
-      return rows
-    }
+  const optionData = useMemo(
+    () => buildOptionChartData(activeQuestion, questionResultsQuery.data, currentResponses),
+    [activeQuestion, questionResultsQuery.data, currentResponses],
+  )
 
-    if (activeQuestion.rawType === 'true_false') {
-      const counts = { True: 0, False: 0 }
-      currentResponses.forEach((row) => {
-        const label = (row.question_option?.option_text || '').trim()
-        if (label.toLowerCase() === 'true') counts.True += 1
-        else if (label.toLowerCase() === 'false') counts.False += 1
-      })
-      return [
-        { name: 'True', value: counts.True },
-        { name: 'False', value: counts.False },
-      ]
-    }
+  const ratingData = useMemo(
+    () => buildRatingChartData(currentResponses, activeQuestion),
+    [currentResponses, activeQuestion],
+  )
 
-    return []
-  }, [questionResultsQuery.data, activeQuestion, currentResponses])
+  const wordCloudWords = useMemo(
+    () => buildWordCloudData(activeQuestion, questionResultsQuery.data, currentResponses),
+    [activeQuestion, questionResultsQuery.data, currentResponses],
+  )
 
-  const wordCloudWords = useMemo(() => {
-    if (activeQuestion?.rawType !== 'word_cloud') return []
-    const fromApi = wordCountsFromApiResults(questionResultsQuery.data)
-    if (fromApi.length) return fromApi
-    return wordCountsFromResponses(currentResponses)
-  }, [activeQuestion?.rawType, questionResultsQuery.data, currentResponses])
-
-  const usesOptionChart = questionUsesOptionChart(activeQuestion?.rawType)
+  const usesOptionChart = questionUsesOptionChart(chartRawType)
   const rankingAnalytics = questionResultsQuery.data?.ranking_analytics || null
   const showRankingBreakdown =
-    activeQuestion?.rawType === 'ranking' &&
+    chartRawType === 'ranking' &&
     Array.isArray(rankingAnalytics?.rankings) &&
     rankingAnalytics.rankings.length > 0
-  const showWordCloud = activeQuestion?.rawType === 'word_cloud'
+  const showWordCloud = chartRawType === 'word_cloud'
+  const showRating = chartRawType === 'rating'
   const showOptionBreakdown = usesOptionChart && optionData.length > 0
-  const optionTotal = optionData.reduce((sum, row) => sum + row.value, 0)
+  const showRatingBreakdown = showRating && ratingData.length > 0
+  const chartBreakdownData = showRatingBreakdown ? ratingData : optionData
+  const optionTotal = chartBreakdownData.reduce((sum, row) => sum + row.value, 0)
   const wordCloudTotal = wordCloudWords.reduce((sum, row) => sum + row.count, 0)
 
 
@@ -479,7 +428,7 @@ function LivePage() {
         participant: row.participant?.nickname || `Participant ${row.participant_id}`,
         response:
           row.question_option?.option_text ||
-          (activeQuestion?.rawType === 'ranking'
+          (chartRawType === 'ranking'
             ? buildRankingResponseLabel(
                 row,
                 new Map((activeQuestion?.options || []).map((opt) => [Number(opt.option_id), opt.option_text])),
@@ -913,9 +862,10 @@ function LivePage() {
                     {wordCloudTotal} submission{wordCloudTotal === 1 ? '' : 's'}
                   </p>
                 )}
-                {showOptionBreakdown && (
+                {(showOptionBreakdown || showRatingBreakdown) && (
                   <p className="mt-0.5 text-xs text-slate-500">
-                    {optionTotal} response{optionTotal === 1 ? '' : 's'} by answer
+                    {optionTotal} response{optionTotal === 1 ? '' : 's'}
+                    {showRatingBreakdown ? ' by rating' : ' by answer'}
                   </p>
                 )}
                 {showRankingBreakdown && (
@@ -925,7 +875,7 @@ function LivePage() {
                   </p>
                 )}
               </div>
-              {(showOptionBreakdown || showRankingBreakdown) && (
+              {(showOptionBreakdown || showRatingBreakdown || showRankingBreakdown) && (
                 <LiveChartViewToggle
                   view={chartView}
                   onChange={setChartView}
@@ -944,9 +894,9 @@ function LivePage() {
                   />
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    {showOptionBreakdown ? (
+                    {showOptionBreakdown || showRatingBreakdown ? (
                     chartView === 'bar' ? (
-                      <BarChart data={optionData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                      <BarChart data={chartBreakdownData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" vertical={false} />
                         <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                         <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
@@ -956,10 +906,10 @@ function LivePage() {
                           formatter={(value) => [`${value} responses`, 'Count']}
                         />
                         <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={56}>
-                          {optionData.map((entry, idx) => (
+                          {chartBreakdownData.map((entry, idx) => (
                             <Cell
                               key={entry.name}
-                              fill={getChartColor(entry.name, idx, activeQuestion?.rawType)}
+                              fill={getChartColor(entry.name, idx, chartRawType)}
                             />
                           ))}
                         </Bar>
@@ -979,21 +929,21 @@ function LivePage() {
                           formatter={(value) => <span className="text-xs font-medium text-slate-600">{value}</span>}
                         />
                         <Pie
-                          data={optionData}
+                          data={chartBreakdownData}
                           dataKey="value"
                           nameKey="name"
                           outerRadius={92}
-                          innerRadius={activeQuestion?.rawType === 'true_false' ? 44 : 0}
+                          innerRadius={chartRawType === 'true_false' ? 44 : 0}
                           paddingAngle={2}
                           stroke="#ffffff"
                           strokeWidth={2}
                           label={renderPieLabel}
                           labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
                         >
-                          {optionData.map((entry, idx) => (
+                          {chartBreakdownData.map((entry, idx) => (
                             <Cell
                               key={entry.name}
-                              fill={getChartColor(entry.name, idx, activeQuestion?.rawType)}
+                              fill={getChartColor(entry.name, idx, chartRawType)}
                             />
                           ))}
                         </Pie>
@@ -1020,10 +970,10 @@ function LivePage() {
             {showWordCloud && !wordCloudWords.length && (
               <p className="mt-2 text-center text-xs text-slate-500">Waiting for participants to submit words…</p>
             )}
-            {showOptionBreakdown && !optionTotal && (
+            {(showOptionBreakdown || showRatingBreakdown) && !optionTotal && (
               <p className="mt-2 text-center text-xs text-slate-500">Waiting for participants to answer…</p>
             )}
-            {activeQuestion?.rawType === 'ranking' && !showRankingBreakdown && (
+            {chartRawType === 'ranking' && !showRankingBreakdown && (
               <p className="mt-2 text-center text-xs text-slate-500">
                 Waiting for participants to submit rankings…
               </p>

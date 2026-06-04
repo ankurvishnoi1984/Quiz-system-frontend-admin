@@ -124,12 +124,13 @@ export function ActiveQuestionPanel({
       )}
       <h2 className="text-2xl font-bold text-navy-900">{question.text || 'Untitled question'}</h2>
 
-      {hasCountdown && (
+      {hasCountdown && !question.isSurvey && (
         <QuestionTimer timer={timer} timeLimit={timeLimit} submittedAtSeconds={submittedAtSeconds} />
       )}
 
       {isAnswerRevealed &&
         !hasSubmittedQuestion &&
+        !question.isSurvey &&
         question.type !== 'Poll' &&
         (question.type === 'MCQ' || question.type === 'True/False') && (
           <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-slate-600">
@@ -145,13 +146,17 @@ export function ActiveQuestionPanel({
           currentResponse={currentResponse}
           inputsLocked={inputsLocked}
           answerRevealMeta={answerRevealMeta}
-          canSeeAnswerReveal={question.type === 'Poll' ? false : canSeeAnswerReveal}
+          canSeeAnswerReveal={
+            question.isSurvey || question.type === 'Poll' ? false : canSeeAnswerReveal
+          }
+          allowMultipleSelect={Boolean(question.allowMultipleSelect)}
           onSelectOption={(optionText) => onSelectOption(question.id, optionText)}
         />
       )}
 
       {question.type === 'Rating' && (
         <RatingOptions
+          question={question}
           currentResponse={currentResponse}
           inputsLocked={inputsLocked}
           onSelectRating={(rating) => onSelectRating(question.id, rating)}
@@ -227,24 +232,26 @@ export function ActiveQuestionPanel({
           <button
             type="button"
             aria-label={
-              navigationEnabled && !isLastDisplayedQuestion ? 'Next question' : 'Submit answer'
+              navigationEnabled && !question.isSurvey && !isLastDisplayedQuestion
+                ? 'Next question'
+                : 'Submit answer'
             }
             disabled={
               sessionEnded ||
               isSubmitting ||
-              (navigationEnabled && !isLastDisplayedQuestion
+              (navigationEnabled && !question.isSurvey && !isLastDisplayedQuestion
                 ? hasCountdown && !canGoToNextQuestion
                 : (submissionsClosed && !question?.openForReattempt) ||
                   (allQuestionsClosedByHost && !question?.openForReattempt) ||
                   inputsLocked ||
-                  (navigationEnabled
+                  (navigationEnabled && !question.isSurvey
                     ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
                     : !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)))
             }
             title={
               sessionEnded
                 ? 'Session has ended'
-                : navigationEnabled && !isLastDisplayedQuestion
+                : navigationEnabled && !question.isSurvey && !isLastDisplayedQuestion
                   ? hasCountdown && !canGoToNextQuestion
                     ? 'Answer this question or wait for the timer'
                     : undefined
@@ -260,14 +267,17 @@ export function ActiveQuestionPanel({
             }
             onClick={onNextOrSubmit}
             className={`h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
-              highlightNextButton && navigationEnabled && !isLastDisplayedQuestion
+              highlightNextButton &&
+              navigationEnabled &&
+              !question.isSurvey &&
+              !isLastDisplayedQuestion
                 ? 'participant-next-highlight'
                 : ''
             }`}
           >
             {isSubmitting
               ? 'Submitting...'
-              : navigationEnabled && !isLastDisplayedQuestion
+              : navigationEnabled && !question.isSurvey && !isLastDisplayedQuestion
                 ? 'Next'
                 : 'Submit'}
           </button>
@@ -297,13 +307,14 @@ export function ActiveQuestionPanel({
         </div>
       )}
 
-      {question.type === 'Poll' && hasSubmittedQuestion && (
+      {(question.type === 'Poll' || question.isSurvey) && hasSubmittedQuestion && (
         <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-center">
           <p className="text-sm font-semibold text-violet-800">Thanks for your response!</p>
         </div>
       )}
 
       {canSeeAnswerReveal &&
+        !question.isSurvey &&
         (question.type === 'MCQ' || question.type === 'True/False') &&
         participantAnswerIsCorrect !== null && (
           <div

@@ -26,6 +26,7 @@ export function mapLiveQuestionType(type) {
   const map = {
     mcq: 'MCQ',
     poll: 'Poll',
+    survey: 'Survey',
     word_cloud: 'Word Cloud',
     rating: 'Rating',
     open_text: 'Text',
@@ -35,8 +36,17 @@ export function mapLiveQuestionType(type) {
   return map[type] || type
 }
 
-export function questionUsesOptionChart(rawType) {
-  return rawType === 'mcq' || rawType === 'poll' || rawType === 'true_false'
+/** Chart/analytics type: survey questions use survey_subtype. */
+export function getQuestionChartRawType(question) {
+  const rawType = question?.question_type ?? question?.rawType
+  if (rawType === 'survey') {
+    return question?.survey_subtype || 'mcq'
+  }
+  return rawType
+}
+
+export function questionUsesOptionChart(chartRawType) {
+  return chartRawType === 'mcq' || chartRawType === 'poll' || chartRawType === 'true_false'
 }
 
 export function sortTrueFalseOptionData(data) {
@@ -71,17 +81,27 @@ export function mapLiveQuestions(questions) {
   return (questions || []).map((q) => {
     const options = normalizeQuestionOptions(q)
     const answerRevealed = Boolean(q.answer_revealed)
+    const rawType = q.question_type
+    const chartRawType = getQuestionChartRawType(q)
+    const isSurvey = rawType === 'survey'
     return {
       id: q.question_id,
       text: q.question_text,
-      type: mapLiveQuestionType(q.question_type),
-      rawType: q.question_type,
+      type: isSurvey ? mapLiveQuestionType(chartRawType) : mapLiveQuestionType(rawType),
+      rawType,
+      chartRawType,
+      isSurvey,
+      surveySubType: isSurvey ? q.survey_subtype : null,
       isLive: Boolean(q.is_live),
-      timeLimit: Number(q.time_limit_seconds) || 0,
+      timeLimit: isSurvey ? 0 : Number(q.time_limit_seconds) || 0,
       submissionsClosed: Boolean(q.submissions_closed),
-      isQuizMode: q.question_type === 'poll' ? false : Boolean(q.is_quiz_mode),
+      isQuizMode: rawType === 'poll' || isSurvey ? false : Boolean(q.is_quiz_mode),
       answerRevealed,
       showLeaderboard: Boolean(q.show_leaderboard),
+      ratingMin: Number(q.rating_min ?? 1),
+      ratingMax: Number(q.rating_max ?? 5),
+      ratingMinLabel: q.rating_min_label || '',
+      ratingMaxLabel: q.rating_max_label || '',
       correctOptionIds: resolveCorrectOptionIds({ ...q, answerRevealed }, options),
       options,
     }
@@ -97,7 +117,7 @@ export function getCorrectOptionsForQuestion(question) {
 export function enrichOptionChartDataWithReveal(optionData, question) {
   const correctIds = new Set((question?.correctOptionIds || []).map(Number))
   const revealed = Boolean(question?.answerRevealed)
-  const rawType = question?.rawType
+  const rawType = question?.chartRawType ?? question?.rawType
 
   return optionData.map((row, idx) => {
     const matched = (question?.options || []).find(
@@ -184,6 +204,7 @@ export function filterResponsesForQuestion(responses, questionId) {
 
 export function buildOptionChartData(question, questionResults, currentResponses) {
   if (!question) return []
+  const chartType = question.chartRawType ?? getQuestionChartRawType(question)
   const byOption = questionResults?.by_option || {}
   const opts = question.options || []
 
@@ -192,13 +213,13 @@ export function buildOptionChartData(question, questionResults, currentResponses
       name: option.option_text,
       value: Number(byOption[String(option.option_id)] || 0),
     }))
-    if (question.rawType === 'true_false') {
+    if (chartType === 'true_false') {
       rows = sortTrueFalseOptionData(rows)
     }
     return rows
   }
 
-  if (question.rawType === 'true_false') {
+  if (chartType === 'true_false') {
     const counts = { True: 0, False: 0 }
     currentResponses.forEach((row) => {
       const label = (row.question_option?.option_text || '').trim()
@@ -214,17 +235,21 @@ export function buildOptionChartData(question, questionResults, currentResponses
   return []
 }
 
-export function buildRatingChartData(currentResponses) {
-  const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+export function buildRatingChartData(currentResponses, question) {
+  const min = Number(question?.rating_min ?? question?.ratingMin ?? 1)
+  const max = Number(question?.rating_max ?? question?.ratingMax ?? 5)
+  const counts = {}
+  for (let v = min; v <= max; v += 1) counts[v] = 0
   currentResponses.forEach((row) => {
     const v = Number(row.rating_value)
-    if (v >= 1 && v <= 5) counts[v] += 1
+    if (v >= min && v <= max) counts[v] += 1
   })
   return Object.entries(counts).map(([name, value]) => ({ name: `★ ${name}`, value }))
 }
 
 export function buildWordCloudData(question, questionResults, currentResponses) {
-  if (question?.rawType !== 'word_cloud') return []
+  const chartType = question?.chartRawType ?? getQuestionChartRawType(question)
+  if (chartType !== 'word_cloud') return []
   const fromApi = wordCountsFromApiResults(questionResults)
   if (fromApi.length) return fromApi
   return wordCountsFromResponses(currentResponses)

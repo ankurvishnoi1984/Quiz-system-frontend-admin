@@ -42,7 +42,7 @@ import {
   findNextUnsubmittedActiveQuestion,
   getLockedNavigationQuestion,
   isParticipantAttemptingQuestion,
-  mapQuestionType,
+  mapParticipantQuestion,
   participantCanUpdateSubmittedResponse,
   participantQuestionHasAnswer,
   shouldIncludeQuestionInFinalize,
@@ -170,29 +170,7 @@ function ParticipantSessionPage() {
   })
 
   const mappedQuestions = useMemo(
-    () =>
-      (questionsQuery.data || []).map((q) => ({
-        id: q.question_id,
-        text: q.question_text,
-        type: mapQuestionType(q.question_type),
-        rawType: q.question_type,
-        isQuizMode: q.question_type === 'poll' ? false : Boolean(q.is_quiz_mode),
-        isLive: q.is_live === true || q.is_live === 1 || q.is_live === '1',
-        answerRevealed: Boolean(q.answer_revealed),
-        correctOptionIds: (q.correct_option_ids || []).map(Number),
-        showLeaderboard: Boolean(q.show_leaderboard),
-        options: q.question_options || [],
-        timeLimit: q.time_limit_seconds || 0,
-        liveActivatedAt: q.live_activated_at || null,
-        openForReattempt:
-          q.open_for_reattempt === true ||
-          q.open_for_reattempt === 1 ||
-          q.open_for_reattempt === '1',
-        submissionsClosed:
-          q.submissions_closed === true ||
-          q.submissions_closed === 1 ||
-          q.submissions_closed === '1',
-      })),
+    () => (questionsQuery.data || []).map(mapParticipantQuestion),
     [questionsQuery.data],
   )
 
@@ -1093,7 +1071,11 @@ function ParticipantSessionPage() {
     answerRevealByQuestion[String(question?.id)]?.revealed ?? question?.answerRevealed,
   )
   const canSeeAnswerReveal =
-    question?.type !== 'Poll' && question?.isQuizMode !== false && isAnswerRevealedByHost && hasSubmittedQuestion
+    !question?.isSurvey &&
+    question?.type !== 'Poll' &&
+    question?.isQuizMode !== false &&
+    isAnswerRevealedByHost &&
+    hasSubmittedQuestion
   const answerRevealMeta = canSeeAnswerReveal
     ? {
         revealed: true,
@@ -1117,6 +1099,7 @@ function ParticipantSessionPage() {
     ? Boolean(questionLbVisibleByQuestion[String(question.id)])
     : false
   const showCurrentQuestionLeaderboard =
+    !question?.isSurvey &&
     isCurrentQuestionLeaderboardVisible &&
     step === 'active' &&
     Boolean(questionLockedBySubmission || submitted)
@@ -1343,7 +1326,11 @@ function ParticipantSessionPage() {
 
   const handleNextOrSubmit = async () => {
     if (isSessionEnded) return
-    if (!navigationEnabled) {
+    if (!navigationEnabled || question?.isSurvey) {
+      if (navigationEnabled && question?.isSurvey && isLastDisplayedQuestion) {
+        await handleSubmit()
+        return
+      }
       await handleSubmitCurrentQuestion()
       return
     }
@@ -1552,6 +1539,34 @@ function ParticipantSessionPage() {
     [isSessionEnded, setResponses],
   )
 
+  const handleSelectOption = useCallback(
+    (questionId, optionText) => {
+      if (isSessionEnded) return
+      const q = activeQuestions.find((item) => item.id === questionId)
+      if (!q) return
+      if (q.allowMultipleSelect) {
+        setResponses((prev) => {
+          const current = prev[questionId] || {}
+          const list = Array.isArray(current.selectedOptions) ? [...current.selectedOptions] : []
+          const idx = list.indexOf(optionText)
+          if (idx >= 0) list.splice(idx, 1)
+          else list.push(optionText)
+          return {
+            ...prev,
+            [questionId]: {
+              ...current,
+              selectedOptions: list,
+              selectedOption: list[0] || '',
+            },
+          }
+        })
+        return
+      }
+      updateResponse(questionId, { selectedOption: optionText, selectedOptions: [optionText] })
+    },
+    [isSessionEnded, activeQuestions, setResponses, updateResponse],
+  )
+
   const handleAddWordCloudTag = useCallback(
     (questionId) => {
       if (isSessionEnded) return
@@ -1702,9 +1717,7 @@ function ParticipantSessionPage() {
             currentQuestionLeaderboard={currentQuestionLeaderboard}
             onTagsInputChange={setTagsInput}
             onAddTag={handleAddWordCloudTag}
-            onSelectOption={(questionId, optionText) =>
-              updateResponse(questionId, { selectedOption: optionText })
-            }
+            onSelectOption={handleSelectOption}
             onSelectRating={(questionId, rating) => updateResponse(questionId, { rating })}
             onTextChange={(questionId, text) => updateResponse(questionId, { textResponse: text })}
             onRankingChange={(questionId, rankingOrder) =>

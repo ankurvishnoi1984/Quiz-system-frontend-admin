@@ -17,8 +17,58 @@ export function mapQuestionType(type) {
     open_text: 'Text',
     true_false: 'True/False',
     ranking: 'Ranking',
+    survey: 'Survey',
   }
   return map[type] || type
+}
+
+export function mapSurveySubTypeToUi(subType) {
+  const map = {
+    mcq: 'MCQ',
+    poll: 'Poll',
+    rating: 'Rating',
+    open_text: 'Text',
+    word_cloud: 'Word Cloud',
+    ranking: 'Ranking',
+  }
+  return map[subType] || 'MCQ'
+}
+
+/** Normalize API question row for participant UI (survey → effective format type). */
+export function mapParticipantQuestion(q) {
+  const rawType = q.question_type
+  const isSurvey = rawType === 'survey'
+  const type = isSurvey ? mapSurveySubTypeToUi(q.survey_subtype) : mapQuestionType(rawType)
+
+  return {
+    id: q.question_id,
+    text: q.question_text,
+    type,
+    rawType,
+    isSurvey,
+    surveySubType: isSurvey ? q.survey_subtype : null,
+    isQuizMode: rawType === 'poll' || isSurvey ? false : Boolean(q.is_quiz_mode),
+    allowMultipleSelect: Boolean(q.allow_multiple_select),
+    ratingMin: Number(q.rating_min ?? 1),
+    ratingMax: Number(q.rating_max ?? 5),
+    ratingMinLabel: q.rating_min_label || '',
+    ratingMaxLabel: q.rating_max_label || '',
+    isLive: q.is_live === true || q.is_live === 1 || q.is_live === '1',
+    answerRevealed: Boolean(q.answer_revealed),
+    correctOptionIds: (q.correct_option_ids || []).map(Number),
+    showLeaderboard: Boolean(q.show_leaderboard),
+    options: q.question_options || [],
+    timeLimit: isSurvey ? 0 : Number(q.time_limit_seconds || 0),
+    liveActivatedAt: q.live_activated_at || null,
+    openForReattempt:
+      q.open_for_reattempt === true ||
+      q.open_for_reattempt === 1 ||
+      q.open_for_reattempt === '1',
+    submissionsClosed:
+      q.submissions_closed === true ||
+      q.submissions_closed === 1 ||
+      q.submissions_closed === '1',
+  }
 }
 
 export function findOptionForSelection(options, selected) {
@@ -44,12 +94,27 @@ export function buildResponsePayloadForQuestion(q, res) {
   const payload = { question_id: q.id }
 
   if (q.type === 'MCQ' || q.type === 'Poll' || q.type === 'True/False') {
-    const opt = findOptionForSelection(q.options, res.selectedOption)
-    if (!opt?.option_id) return null
-    payload.option_id = opt.option_id
+    if (q.allowMultipleSelect) {
+      const selected = Array.isArray(res.selectedOptions) ? res.selectedOptions : []
+      const optionIds = selected
+        .map((text) => findOptionForSelection(q.options, text)?.option_id)
+        .filter((id) => id != null)
+      if (!optionIds.length) return null
+      payload.option_ids = optionIds
+    } else {
+      const opt = findOptionForSelection(q.options, res.selectedOption)
+      if (!opt?.option_id) return null
+      payload.option_id = opt.option_id
+    }
   }
 
-  if (q.type === 'Rating') payload.rating_value = res.rating
+  if (q.type === 'Rating') {
+    const rating = Number(res.rating)
+    const min = Number(q.ratingMin ?? 1)
+    const max = Number(q.ratingMax ?? 5)
+    if (!Number.isFinite(rating) || rating < min || rating > max) return null
+    payload.rating_value = rating
+  }
 
   if (q.type === 'Text') {
     const text = res.textResponse?.trim()
@@ -172,10 +237,16 @@ export function shouldIncludeQuestionInFinalize(
 export function participantQuestionHasAnswer(question, response = {}) {
   if (!question) return false
   if (question.type === 'MCQ' || question.type === 'Poll' || question.type === 'True/False') {
+    if (question.allowMultipleSelect) {
+      return Array.isArray(response.selectedOptions) && response.selectedOptions.length > 0
+    }
     return Boolean(String(response.selectedOption || '').trim())
   }
   if (question.type === 'Rating') {
-    return Number(response.rating) > 0
+    const rating = Number(response.rating)
+    const min = Number(question.ratingMin ?? 1)
+    const max = Number(question.ratingMax ?? 5)
+    return Number.isFinite(rating) && rating >= min && rating <= max
   }
   if (question.type === 'Text') {
     return Boolean(String(response.textResponse || '').trim())

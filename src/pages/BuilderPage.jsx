@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   BarChart3,
   CheckCircle2,
+  ClipboardList,
   Cloud,
   Eye,
   EyeOff,
@@ -115,12 +116,68 @@ function InlineEditableSessionTitle({ title, onSave, isSaving }) {
 const QUESTION_TYPES = [
   { type: 'MCQ', icon: ListChecks, description: 'Multiple choice with options' },
   { type: 'Poll', icon: Vote, description: 'Opinion poll — no right or wrong answers' },
+  { type: 'Survey', icon: ClipboardList, description: 'Multi-question survey — mix formats, no timer' },
   { type: 'Word Cloud', icon: Cloud, description: 'Collect words, show cloud' },
   { type: 'Rating', icon: Star, description: '1–5 rating' },
   { type: 'Text', icon: MessageSquareText, description: 'Open-ended response' },
   { type: 'True/False', icon: BadgeCheck, description: 'Binary choice' },
   { type: 'Ranking', icon: BarChart3, description: 'Rank items by preference' },
 ]
+
+const SURVEY_SUB_TYPES = [
+  { id: 'MCQ', label: 'Multiple Choice (MCQ)' },
+  { id: 'Poll', label: 'Poll' },
+  { id: 'Rating', label: 'Rating' },
+  { id: 'Word Cloud', label: 'Word Cloud' },
+  { id: 'Text', label: 'Open Text' },
+  { id: 'Ranking', label: 'Ranking' },
+]
+
+function surveySubTypeLabel(subType) {
+  return SURVEY_SUB_TYPES.find((item) => item.id === subType)?.label || subType || 'Multiple Choice (MCQ)'
+}
+
+function isSurveyQuestionType(type) {
+  return type === 'Survey'
+}
+
+function surveySubTypeUsesOptions(subType) {
+  return subType === 'MCQ' || subType === 'Poll' || subType === 'Ranking'
+}
+
+function defaultOptionsForSurveySubType(subType) {
+  if (subType === 'MCQ' || subType === 'Poll' || subType === 'Ranking') {
+    return [
+      { id: uid('opt'), optionId: null, text: 'Option 1', isCorrect: false },
+      { id: uid('opt'), optionId: null, text: 'Option 2', isCorrect: false },
+    ]
+  }
+  return []
+}
+
+function createSurveyQuestionDefaults(surveySubType = 'MCQ') {
+  return {
+    surveySubType,
+    allowMultipleSelect: false,
+    ratingMin: 1,
+    ratingMax: 5,
+    ratingMinLabel: '',
+    ratingMaxLabel: '',
+    options: defaultOptionsForSurveySubType(surveySubType),
+  }
+}
+
+function apiSurveySubTypeToUi(subType) {
+  const mapping = {
+    mcq: 'MCQ',
+    poll: 'Poll',
+    rating: 'Rating',
+    open_text: 'Text',
+    word_cloud: 'Word Cloud',
+    ranking: 'Ranking',
+  }
+  return mapping[subType] || 'MCQ'
+}
 
 function uid(prefix = 'id') {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`
@@ -163,6 +220,20 @@ function questionTypeUsesOptions(type) {
 
 function isPollQuestionType(type) {
   return type === 'Poll'
+}
+
+function buildSurveyOptionsPayload(question) {
+  if (!surveySubTypeUsesOptions(question.surveySubType)) return []
+  const subType = question.surveySubType
+  if (subType === 'Poll') {
+    return (question.options || []).map((option, optionIndex) => ({
+      ...(option.optionId != null ? { option_id: option.optionId } : {}),
+      option_text: option.text || `Option ${optionIndex + 1}`,
+      is_correct: false,
+      display_order: optionIndex + 1,
+    }))
+  }
+  return buildOptionsPayload({ ...question, type: subType })
 }
 
 function buildOptionsPayload(question) {
@@ -569,36 +640,187 @@ function OptionsEditor({ question, quizMode, onChange, structureLocked }) {
   )
 }
 
+function SurveySelectModeToggle({ value, onChange, disabled }) {
+  return (
+    <div className="inline-flex rounded-xl border border-blue-200/70 bg-slate-100 p-1">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(false)}
+        className={`rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+          !value ? 'bg-white text-navy-900 shadow-sm' : 'text-slate-600 hover:text-navy-900'
+        }`}
+      >
+        Single select
+      </button>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(true)}
+        className={`rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+          value ? 'bg-white text-navy-900 shadow-sm' : 'text-slate-600 hover:text-navy-900'
+        }`}
+      >
+        Multi select
+      </button>
+    </div>
+  )
+}
+
+function SurveyQuestionConfig({ question, onChange, structureLocked }) {
+  const subType = question.surveySubType || 'MCQ'
+  const editorQuestion = { ...question, type: subType }
+
+  const setSubType = (nextSubType) => {
+    onChange({
+      ...question,
+      surveySubType: nextSubType,
+      allowMultipleSelect: false,
+      options: defaultOptionsForSurveySubType(nextSubType),
+      ...(nextSubType === 'Rating'
+        ? { ratingMin: 1, ratingMax: 5, ratingMinLabel: '', ratingMaxLabel: '' }
+        : {}),
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-sm font-semibold text-slate-700">Question Format</label>
+        <select
+          value={subType}
+          disabled={structureLocked}
+          onChange={(e) => setSubType(e.target.value)}
+          className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50"
+        >
+          {SURVEY_SUB_TYPES.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {subType === 'Rating' && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-700">Min value</label>
+            <input
+              type="number"
+              min={1}
+              disabled={structureLocked}
+              value={question.ratingMin ?? 1}
+              onChange={(e) => onChange({ ...question, ratingMin: Number(e.target.value || 1) })}
+              className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700">Max value</label>
+            <input
+              type="number"
+              min={2}
+              disabled={structureLocked}
+              value={question.ratingMax ?? 5}
+              onChange={(e) => onChange({ ...question, ratingMax: Number(e.target.value || 5) })}
+              className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700">Min label (optional)</label>
+            <input
+              type="text"
+              disabled={structureLocked}
+              value={question.ratingMinLabel || ''}
+              onChange={(e) => onChange({ ...question, ratingMinLabel: e.target.value })}
+              placeholder="e.g. Not satisfied"
+              className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700">Max label (optional)</label>
+            <input
+              type="text"
+              disabled={structureLocked}
+              value={question.ratingMaxLabel || ''}
+              onChange={(e) => onChange({ ...question, ratingMaxLabel: e.target.value })}
+              placeholder="e.g. Very satisfied"
+              className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
+            />
+          </div>
+        </div>
+      )}
+
+      {(subType === 'MCQ' || subType === 'Poll') && (
+        <div className="space-y-3 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
+          <OptionsEditor
+            question={editorQuestion}
+            quizMode={false}
+            onChange={(next) => onChange({ ...question, options: next.options })}
+            structureLocked={structureLocked}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
+            <p className="text-sm font-semibold text-slate-700">Selection mode</p>
+            <SurveySelectModeToggle
+              value={Boolean(question.allowMultipleSelect)}
+              disabled={structureLocked}
+              onChange={(allowMultipleSelect) => onChange({ ...question, allowMultipleSelect })}
+            />
+          </div>
+        </div>
+      )}
+
+      {subType === 'Ranking' && (
+        <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
+          <OptionsEditor
+            question={editorQuestion}
+            quizMode={false}
+            onChange={(next) => onChange({ ...question, options: next.options })}
+            structureLocked={structureLocked}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ParticipantPreview({ question, quizMode }) {
+  const previewQuestion =
+    question.type === 'Survey'
+      ? { ...question, type: question.surveySubType || 'MCQ' }
+      : question
+  const previewQuizMode = question.type === 'Survey' ? false : quizMode
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Participant View</p>
-        <h3 className="mt-2 text-lg font-bold text-navy-900">{question.text || 'Untitled question'}</h3>
-        <p className="mt-1 text-sm text-slate-600">Type: {question.type}</p>
-        {question.media?.url && question.media.kind === 'image' && (
-          <img src={question.media.url} alt="Preview" className="mt-3 max-h-72 w-full rounded-xl border border-blue-100 object-contain" />
+        <h3 className="mt-2 text-lg font-bold text-navy-900">{previewQuestion.text || 'Untitled question'}</h3>
+        <p className="mt-1 text-sm text-slate-600">
+          Type: {question.type === 'Survey' ? `Survey · ${surveySubTypeLabel(question.surveySubType)}` : previewQuestion.type}
+        </p>
+        {previewQuestion.media?.url && previewQuestion.media.kind === 'image' && (
+          <img src={previewQuestion.media.url} alt="Preview" className="mt-3 max-h-72 w-full rounded-xl border border-blue-100 object-contain" />
         )}
       </div>
 
-      {question.type === 'MCQ' && (
+      {previewQuestion.type === 'MCQ' && (
         <div className="grid gap-2">
-          {question.options.map((o) => (
+          {previewQuestion.options.map((o) => (
             <button
               key={o.id}
               type="button"
               className="flex items-center justify-between rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
             >
               {o.text}
-              {quizMode && o.isCorrect && <span className="text-xs font-bold text-emerald-700">Correct</span>}
+              {previewQuizMode && o.isCorrect && <span className="text-xs font-bold text-emerald-700">Correct</span>}
             </button>
           ))}
         </div>
       )}
 
-      {question.type === 'Poll' && (
+      {previewQuestion.type === 'Poll' && (
         <div className="grid gap-2">
-          {question.options.map((o) => (
+          {previewQuestion.options.map((o) => (
             <button
               key={o.id}
               type="button"
@@ -610,9 +832,9 @@ function ParticipantPreview({ question, quizMode }) {
         </div>
       )}
 
-      {question.type === 'Ranking' && (
+      {previewQuestion.type === 'Ranking' && (
         <div className="grid gap-2">
-          {question.options.map((o, idx) => (
+          {previewQuestion.options.map((o, idx) => (
             <div
               key={o.id}
               className="flex items-center rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
@@ -624,7 +846,7 @@ function ParticipantPreview({ question, quizMode }) {
         </div>
       )}
 
-      {question.type === 'Text' && (
+      {previewQuestion.type === 'Text' && (
         <textarea
           className="h-28 w-full resize-none rounded-2xl border border-blue-200/70 bg-white p-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
           placeholder="Type your answer..."
@@ -632,24 +854,37 @@ function ParticipantPreview({ question, quizMode }) {
         />
       )}
 
-      {question.type === 'Rating' && (
-        <div className="flex flex-wrap gap-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              className="inline-flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
-            >
-              <Star className="size-4 text-amber-500" /> {i + 1}
-            </button>
-          ))}
+      {previewQuestion.type === 'Rating' && (
+        <div className="space-y-2">
+          {(previewQuestion.ratingMinLabel || previewQuestion.ratingMaxLabel) && (
+            <div className="flex justify-between text-xs text-slate-600">
+              <span>{previewQuestion.ratingMinLabel || String(previewQuestion.ratingMin ?? 1)}</span>
+              <span>{previewQuestion.ratingMaxLabel || String(previewQuestion.ratingMax ?? 5)}</span>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {Array.from({
+              length: Math.max(1, (previewQuestion.ratingMax ?? 5) - (previewQuestion.ratingMin ?? 1) + 1),
+            }).map((_, i) => {
+              const value = (previewQuestion.ratingMin ?? 1) + i
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
+                >
+                  <Star className="size-4 text-amber-500" /> {value}
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {question.type === 'True/False' && (
+      {previewQuestion.type === 'True/False' && (
         <div className="grid gap-2 sm:grid-cols-2">
           {normalizeTrueFalseOptions(
-            (question.options || []).map((o) => ({
+            (previewQuestion.options || []).map((o) => ({
               option_id: o.optionId,
               option_text: o.text,
               is_correct: o.isCorrect,
@@ -661,7 +896,7 @@ function ParticipantPreview({ question, quizMode }) {
               className="rounded-2xl border border-blue-200/70 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
             >
               {o.text}
-              {quizMode && o.isCorrect && (
+              {previewQuizMode && o.isCorrect && (
                 <span className="ml-2 text-xs font-bold text-emerald-700">Correct</span>
               )}
             </button>
@@ -669,9 +904,9 @@ function ParticipantPreview({ question, quizMode }) {
         </div>
       )}
 
-      {question.type === 'Word Cloud' && (
+      {previewQuestion.type === 'Word Cloud' && (
         <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-8 text-center text-sm text-slate-600">
-          Preview for <strong>{question.type}</strong> will be implemented next.
+          Participants submit words or short phrases for the word cloud.
         </div>
       )}
     </div>
@@ -730,6 +965,7 @@ function BuilderPage() {
     const mapping = {
       mcq: 'MCQ',
       poll: 'Poll',
+      survey: 'Survey',
       word_cloud: 'Word Cloud',
       rating: 'Rating',
       open_text: 'Text',
@@ -744,6 +980,7 @@ function BuilderPage() {
     const mapping = {
       MCQ: 'mcq',
       Poll: 'poll',
+      Survey: 'survey',
       'Word Cloud': 'word_cloud',
       Rating: 'rating',
       Text: 'open_text',
@@ -754,6 +991,41 @@ function BuilderPage() {
   }
 
   const mapQuestionFromApi = (question) => {
+    if (question.question_type === 'survey') {
+      const surveySubType = apiSurveySubTypeToUi(question.survey_subtype)
+      const apiOptions = question.question_options || []
+      const options = apiOptions.map((option) => ({
+        id: String(option.option_id),
+        optionId: option.option_id,
+        text: option.option_text,
+        isCorrect: false,
+      }))
+
+      return {
+        id: String(question.question_id),
+        questionId: question.question_id,
+        type: 'Survey',
+        surveySubType,
+        allowMultipleSelect: Boolean(question.allow_multiple_select),
+        text: question.question_text || '',
+        media: question.media_url
+          ? {
+              url: question.media_url,
+              kind: question.media_type?.includes('video') ? 'video' : 'image',
+              file: null,
+            }
+          : null,
+        points: 0,
+        ratingMin: question.rating_min ?? 1,
+        ratingMax: question.rating_max ?? 5,
+        ratingMinLabel: question.rating_min_label || '',
+        ratingMaxLabel: question.rating_max_label || '',
+        answerRevealed: Boolean(question.answer_revealed),
+        showLeaderboard: Boolean(question.show_leaderboard),
+        options,
+      }
+    }
+
     const uiType = apiToUiType(question.question_type)
     const apiOptions = question.question_options || []
     const options =
@@ -966,13 +1238,14 @@ function BuilderPage() {
     () => questions.find((q) => q.id === selectedId) ?? questions[0],
     [questions, selectedId],
   )
-  const quizMode = selected?.type !== 'Poll'
+  const quizMode = selected?.type !== 'Poll' && selected?.type !== 'Survey'
   const sessionQuestionType = questions[0]?.type ?? null
   const hasMixedQuestionTypes = useMemo(() => {
     if (questions.length <= 1) return false
+    if (sessionQuestionType === 'Survey') return false
     const firstType = questions[0]?.type
     return questions.some((q) => q.type !== firstType)
-  }, [questions])
+  }, [questions, sessionQuestionType])
 
   useEffect(() => {
     if (!selected || !sessionQuestionType) return
@@ -1000,7 +1273,8 @@ function BuilderPage() {
       type,
       text: '',
       media: null,
-      points: 10,
+      points: type === 'Survey' || type === 'Poll' ? 0 : 10,
+      ...(type === 'Survey' ? createSurveyQuestionDefaults('MCQ') : {}),
       options:
         type === 'MCQ' || type === 'Poll'
           ? [
@@ -1082,6 +1356,38 @@ function BuilderPage() {
             )
           }
         }
+        if (question.type === 'Survey') {
+          const st = question.surveySubType || 'MCQ'
+          if (st === 'MCQ' || st === 'Poll') {
+            if ((question.options || []).length < 2) {
+              throw new Error(
+                `Survey item "${question.text || 'Untitled'}" must have at least 2 options.`,
+              )
+            }
+          }
+          if (st === 'Rating') {
+            const min = Number(question.ratingMin ?? 1)
+            const max = Number(question.ratingMax ?? 5)
+            if (min >= max) {
+              throw new Error(
+                `Survey item "${question.text || 'Untitled'}" rating scale max must be greater than min.`,
+              )
+            }
+          }
+          if (st === 'Ranking') {
+            const opts = question.options || []
+            if (opts.length < 2) {
+              throw new Error(
+                `Survey item "${question.text || 'Untitled'}" must have at least 2 ranking options.`,
+              )
+            }
+            if (opts.length > 10) {
+              throw new Error(
+                `Survey item "${question.text || 'Untitled'}" cannot have more than 10 ranking options.`,
+              )
+            }
+          }
+        }
         if (question.type === 'MCQ') {
           const opts = question.options || []
           const correctCount = opts.filter((opt) => opt.isCorrect).length
@@ -1138,15 +1444,34 @@ function BuilderPage() {
         }
 
         const isPoll = isPollQuestionType(question.type)
+        const isSurvey = isSurveyQuestionType(question.type)
+        const surveySubType = question.surveySubType || 'MCQ'
         const payload = {
           question_type: uiToApiType(question.type),
           question_text: question.text || 'Untitled question',
-          is_quiz_mode: isPoll ? false : true,
-          points_value: isPoll ? 0 : Number(question.points || 0),
-          time_limit_seconds: effectiveTimeLimitSeconds || null,
-          allow_multiple_select: false,
-          options: questionTypeUsesOptions(question.type) ? buildOptionsPayload(question) : [],
+          is_quiz_mode: isPoll || isSurvey ? false : true,
+          points_value: isPoll || isSurvey ? 0 : Number(question.points || 0),
+          time_limit_seconds: isSurvey ? null : effectiveTimeLimitSeconds || null,
+          allow_multiple_select:
+            isSurvey && (surveySubType === 'MCQ' || surveySubType === 'Poll')
+              ? Boolean(question.allowMultipleSelect)
+              : false,
+          options:
+            isSurvey
+              ? buildSurveyOptionsPayload(question)
+              : questionTypeUsesOptions(question.type)
+                ? buildOptionsPayload(question)
+                : [],
           display_order: index + 1,
+          ...(isSurvey
+            ? {
+                survey_subtype: uiToApiType(surveySubType),
+                rating_min: question.ratingMin ?? 1,
+                rating_max: question.ratingMax ?? 5,
+                rating_min_label: question.ratingMinLabel || null,
+                rating_max_label: question.ratingMaxLabel || null,
+              }
+            : {}),
         }
 
         if (question.questionId) {
@@ -1454,13 +1779,24 @@ function BuilderPage() {
                                 <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-navy-700">
                                   {q.type}
                                 </span>
+                                {q.type === 'Survey' && q.surveySubType ? (
+                                  <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-900">
+                                    {surveySubTypeLabel(q.surveySubType)}
+                                  </span>
+                                ) : null}
                               </div>
                               <p className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug text-navy-900">
                                 {q.text?.trim() ? q.text : `Untitled ${q.type}`}
                               </p>
                               <p className="mt-1 text-xs text-slate-600">
                                 {q.media?.url ? 'Has media • ' : ''}
-                                {questionTypeUsesOptions(q.type) ? `${q.options?.length ?? 0} options` : 'No options'}
+                                {q.type === 'Survey'
+                                  ? surveySubTypeUsesOptions(q.surveySubType)
+                                    ? `${q.options?.length ?? 0} options`
+                                    : 'No options'
+                                  : questionTypeUsesOptions(q.type)
+                                    ? `${q.options?.length ?? 0} options`
+                                    : 'No options'}
                               </p>
                             </div>
                             <button
@@ -1515,13 +1851,24 @@ function BuilderPage() {
                               <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-navy-700">
                                 {q.type}
                               </span>
+                              {q.type === 'Survey' && q.surveySubType ? (
+                                <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-900">
+                                  {surveySubTypeLabel(q.surveySubType)}
+                                </span>
+                              ) : null}
                             </div>
                             <p className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug text-navy-900">
                               {q.text?.trim() ? q.text : `Untitled ${q.type}`}
                             </p>
                             <p className="mt-1 text-xs text-slate-600">
                               {q.media?.url ? 'Has media • ' : ''}
-                              {questionTypeUsesOptions(q.type) ? `${q.options?.length ?? 0} options` : 'No options'}
+                              {q.type === 'Survey'
+                                ? surveySubTypeUsesOptions(q.surveySubType)
+                                  ? `${q.options?.length ?? 0} options`
+                                  : 'No options'
+                                : questionTypeUsesOptions(q.type)
+                                  ? `${q.options?.length ?? 0} options`
+                                  : 'No options'}
                             </p>
                           </button>
                           <button
@@ -1556,7 +1903,11 @@ function BuilderPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Editing</p>
-                <h3 className="mt-1 text-lg font-bold text-navy-900">{selected.type}</h3>
+                <h3 className="mt-1 text-lg font-bold text-navy-900">
+                  {selected.type === 'Survey' && selected.surveySubType
+                    ? `Survey · ${surveySubTypeLabel(selected.surveySubType)}`
+                    : selected.type}
+                </h3>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -1619,6 +1970,10 @@ function BuilderPage() {
                       }`}
                     />
                   </div>
+                ) : selected?.type === 'Survey' ? (
+                  <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900">
+                    Survey — no timer or scoring
+                  </span>
                 ) : (
                   <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800">
                     Poll — no points or correct answer
@@ -1637,6 +1992,14 @@ function BuilderPage() {
                   className="mt-1 h-24 w-full resize-none rounded-2xl border border-blue-200/70 bg-white p-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
                 />
               </div>
+
+              {selected.type === 'Survey' && (
+                <SurveyQuestionConfig
+                  question={selected}
+                  onChange={updateQuestion}
+                  structureLocked={!isDraftSession}
+                />
+              )}
 
               <MediaUpload
                 media={selected.media}
@@ -1666,6 +2029,7 @@ function BuilderPage() {
                 </div>
               )}
 
+              {selected.type !== 'Survey' && (
               <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -1702,6 +2066,7 @@ function BuilderPage() {
                   <span className="font-semibold text-navy-900">{effectiveTimeLimitSeconds === 0 ? 'Off' : `${effectiveTimeLimitSeconds}s`}</span>
                 </p>
               </div>
+              )}
             </div>
               </>
             )}
