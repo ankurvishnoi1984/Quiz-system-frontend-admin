@@ -118,7 +118,7 @@ const QUESTION_TYPES = [
   { type: 'Poll', icon: Vote, description: 'Opinion poll — no right or wrong answers' },
   { type: 'Survey', icon: ClipboardList, description: 'Multi-question survey — mix formats, no timer' },
   { type: 'Word Cloud', icon: Cloud, description: 'Collect words, show cloud' },
-  { type: 'Rating', icon: Star, description: '1–5 rating' },
+  { type: 'Rating', icon: Star, description: '1–10 rating scale' },
   { type: 'Text', icon: MessageSquareText, description: 'Open-ended response' },
   { type: 'True/False', icon: BadgeCheck, description: 'Binary choice' },
   { type: 'Ranking', icon: BarChart3, description: 'Rank items by preference' },
@@ -155,12 +155,15 @@ function defaultOptionsForSurveySubType(subType) {
   return []
 }
 
+const DEFAULT_RATING_MIN = 1
+const DEFAULT_RATING_MAX = 10
+
 function createSurveyQuestionDefaults(surveySubType = 'MCQ') {
   return {
     surveySubType,
     allowMultipleSelect: false,
-    ratingMin: 1,
-    ratingMax: 5,
+    ratingMin: DEFAULT_RATING_MIN,
+    ratingMax: DEFAULT_RATING_MAX,
     ratingMinLabel: '',
     ratingMaxLabel: '',
     options: defaultOptionsForSurveySubType(surveySubType),
@@ -667,6 +670,65 @@ function SurveySelectModeToggle({ value, onChange, disabled }) {
   )
 }
 
+function clampRatingValue(value, min, max) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function RatingNumberInput({ value, fallback, min, max, disabled, onChange, className }) {
+  const [draft, setDraft] = useState(() => String(value ?? fallback))
+
+  useEffect(() => {
+    setDraft(String(value ?? fallback))
+  }, [value, fallback])
+
+  const handleDraftChange = (next) => {
+    if (next === '') {
+      setDraft('')
+      return
+    }
+    if (!/^\d+$/.test(next)) return
+    const parsed = Number(next)
+    if (parsed < min || parsed > max) return
+    setDraft(next)
+  }
+
+  const commit = () => {
+    const trimmed = draft.trim()
+    if (trimmed === '') {
+      const next = clampRatingValue(value ?? fallback, min, max)
+      setDraft(String(next))
+      onChange(next)
+      return
+    }
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed)) {
+      const next = clampRatingValue(value ?? fallback, min, max)
+      setDraft(String(next))
+      onChange(next)
+      return
+    }
+    const clamped = clampRatingValue(parsed, min, max)
+    onChange(clamped)
+    setDraft(String(clamped))
+  }
+
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      disabled={disabled}
+      value={draft}
+      onChange={(e) => handleDraftChange(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+      }}
+      className={className}
+    />
+  )
+}
+
 function applySurveySubTypeChange(question, nextSubType) {
   return {
     ...question,
@@ -674,7 +736,12 @@ function applySurveySubTypeChange(question, nextSubType) {
     allowMultipleSelect: false,
     options: defaultOptionsForSurveySubType(nextSubType),
     ...(nextSubType === 'Rating'
-      ? { ratingMin: 1, ratingMax: 5, ratingMinLabel: '', ratingMaxLabel: '' }
+      ? {
+          ratingMin: DEFAULT_RATING_MIN,
+          ratingMax: DEFAULT_RATING_MAX,
+          ratingMinLabel: '',
+          ratingMaxLabel: '',
+        }
       : {}),
   }
 }
@@ -701,6 +768,47 @@ function SurveyQuestionFormatSelect({ question, onChange, structureLocked }) {
   )
 }
 
+function RatingScaleInfoBanner({ ratingMin, ratingMax, minLabel, maxLabel }) {
+  const min = Number(ratingMin ?? DEFAULT_RATING_MIN)
+  const max = Number(ratingMax ?? DEFAULT_RATING_MAX)
+  const isValidScale = Number.isFinite(min) && Number.isFinite(max) && min < max
+  const choiceCount = isValidScale ? max - min + 1 : 0
+
+  return (
+    <div className="rounded-2xl border border-sky-200/80 bg-linear-to-r from-sky-50/90 to-blue-50/60 px-4 py-3">
+      <div className="flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white shadow-sm shadow-sky-900/5">
+          <Star className="size-4 text-amber-500" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-navy-900">Rating scale</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-600">
+            Participants choose one number between your minimum and maximum (allowed range{' '}
+            <strong>{DEFAULT_RATING_MIN}–{DEFAULT_RATING_MAX}</strong>). Defaults are{' '}
+            <strong>{DEFAULT_RATING_MIN}</strong> (lowest) and <strong>{DEFAULT_RATING_MAX}</strong> (highest).
+            Optional end labels help clarify what each extreme means.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-navy-800 shadow-sm shadow-sky-900/5">
+              {isValidScale ? `${min} → ${max}` : 'Set min below max'}
+            </span>
+            {isValidScale ? (
+              <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-900">
+                {choiceCount} choice{choiceCount === 1 ? '' : 's'}
+              </span>
+            ) : null}
+            {minLabel || maxLabel ? (
+              <span className="text-xs text-slate-500">
+                {minLabel ? `"${minLabel}"` : min} … {maxLabel ? `"${maxLabel}"` : max}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SurveyQuestionConfig({ question, onChange, structureLocked }) {
   const subType = question.surveySubType || 'MCQ'
   const editorQuestion = { ...question, type: subType }
@@ -708,26 +816,35 @@ function SurveyQuestionConfig({ question, onChange, structureLocked }) {
   return (
     <div className="space-y-4">
       {subType === 'Rating' && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <>
+          <RatingScaleInfoBanner
+            ratingMin={question.ratingMin}
+            ratingMax={question.ratingMax}
+            minLabel={question.ratingMinLabel}
+            maxLabel={question.ratingMaxLabel}
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="text-xs font-semibold text-slate-700">Min value</label>
-            <input
-              type="number"
-              min={1}
+            <RatingNumberInput
+              min={DEFAULT_RATING_MIN}
+              max={DEFAULT_RATING_MAX}
+              fallback={DEFAULT_RATING_MIN}
+              value={question.ratingMin}
               disabled={structureLocked}
-              value={question.ratingMin ?? 1}
-              onChange={(e) => onChange({ ...question, ratingMin: Number(e.target.value || 1) })}
+              onChange={(ratingMin) => onChange({ ...question, ratingMin })}
               className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
             />
           </div>
           <div>
             <label className="text-xs font-semibold text-slate-700">Max value</label>
-            <input
-              type="number"
-              min={2}
+            <RatingNumberInput
+              min={DEFAULT_RATING_MIN}
+              max={DEFAULT_RATING_MAX}
+              fallback={DEFAULT_RATING_MAX}
+              value={question.ratingMax}
               disabled={structureLocked}
-              value={question.ratingMax ?? 5}
-              onChange={(e) => onChange({ ...question, ratingMax: Number(e.target.value || 5) })}
+              onChange={(ratingMax) => onChange({ ...question, ratingMax })}
               className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
             />
           </div>
@@ -754,6 +871,7 @@ function SurveyQuestionConfig({ question, onChange, structureLocked }) {
             />
           </div>
         </div>
+        </>
       )}
 
       {(subType === 'MCQ' || subType === 'Poll') && (
@@ -864,15 +982,20 @@ function ParticipantPreview({ question, quizMode }) {
         <div className="space-y-2">
           {(previewQuestion.ratingMinLabel || previewQuestion.ratingMaxLabel) && (
             <div className="flex justify-between text-xs text-slate-600">
-              <span>{previewQuestion.ratingMinLabel || String(previewQuestion.ratingMin ?? 1)}</span>
-              <span>{previewQuestion.ratingMaxLabel || String(previewQuestion.ratingMax ?? 5)}</span>
+              <span>{previewQuestion.ratingMinLabel || String(previewQuestion.ratingMin ?? DEFAULT_RATING_MIN)}</span>
+              <span>{previewQuestion.ratingMaxLabel || String(previewQuestion.ratingMax ?? DEFAULT_RATING_MAX)}</span>
             </div>
           )}
           <div className="flex flex-wrap gap-2">
             {Array.from({
-              length: Math.max(1, (previewQuestion.ratingMax ?? 5) - (previewQuestion.ratingMin ?? 1) + 1),
+              length: Math.max(
+                1,
+                (previewQuestion.ratingMax ?? DEFAULT_RATING_MAX) -
+                  (previewQuestion.ratingMin ?? DEFAULT_RATING_MIN) +
+                  1,
+              ),
             }).map((_, i) => {
-              const value = (previewQuestion.ratingMin ?? 1) + i
+              const value = (previewQuestion.ratingMin ?? DEFAULT_RATING_MIN) + i
               return (
                 <button
                   key={value}
@@ -1022,8 +1145,8 @@ function BuilderPage() {
             }
           : null,
         points: 0,
-        ratingMin: question.rating_min ?? 1,
-        ratingMax: question.rating_max ?? 5,
+        ratingMin: question.rating_min ?? DEFAULT_RATING_MIN,
+        ratingMax: question.rating_max ?? DEFAULT_RATING_MAX,
         ratingMinLabel: question.rating_min_label || '',
         ratingMaxLabel: question.rating_max_label || '',
         answerRevealed: Boolean(question.answer_revealed),
@@ -1372,8 +1495,13 @@ function BuilderPage() {
             }
           }
           if (st === 'Rating') {
-            const min = Number(question.ratingMin ?? 1)
-            const max = Number(question.ratingMax ?? 5)
+            const min = Number(question.ratingMin ?? DEFAULT_RATING_MIN)
+            const max = Number(question.ratingMax ?? DEFAULT_RATING_MAX)
+            if (min < DEFAULT_RATING_MIN || max > DEFAULT_RATING_MAX) {
+              throw new Error(
+                `Survey item "${question.text || 'Untitled'}" rating values must stay between ${DEFAULT_RATING_MIN} and ${DEFAULT_RATING_MAX}.`,
+              )
+            }
             if (min >= max) {
               throw new Error(
                 `Survey item "${question.text || 'Untitled'}" rating scale max must be greater than min.`,
@@ -1472,8 +1600,8 @@ function BuilderPage() {
           ...(isSurvey
             ? {
                 survey_subtype: uiToApiType(surveySubType),
-                rating_min: question.ratingMin ?? 1,
-                rating_max: question.ratingMax ?? 5,
+                rating_min: question.ratingMin ?? DEFAULT_RATING_MIN,
+                rating_max: question.ratingMax ?? DEFAULT_RATING_MAX,
                 rating_min_label: question.ratingMinLabel || null,
                 rating_max_label: question.ratingMaxLabel || null,
               }
