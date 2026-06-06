@@ -211,11 +211,11 @@ function ParticipantSessionPage() {
   const isSessionEnded =
     session?.status === 'completed' || session?.status === 'archived'
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
-  const sessionHasPollQuestions = useMemo(
-    () => mappedQuestions.some((q) => q.rawType === 'poll'),
-    [mappedQuestions],
-  )
-  const showLeaderboardInQa = showOverallLeaderboard && !sessionHasPollQuestions
+  const isPollOrSurveySession = useMemo(() => {
+    if (!mappedQuestions.length) return false
+    return mappedQuestions.every((q) => q.rawType === 'poll' || q.isSurvey)
+  }, [mappedQuestions])
+  const showLeaderboardInQa = showOverallLeaderboard && !isPollOrSurveySession
   const navigationEnabled = session?.participant_navigation_enabled !== false
   const allLiveQuestionsClosed = useMemo(() => {
     if (!navigationEnabled) return false
@@ -1698,8 +1698,9 @@ function ParticipantSessionPage() {
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
             <h2 className="text-xl font-bold text-navy-900">Session ended</h2>
             <p className="text-sm text-slate-600">
-              The host has ended this session. Switch to Q&amp;A to see the leaderboard or review
-              past activity.
+              The host has ended this session. Switch to Q&amp;A to{' '}
+              {showLeaderboardInQa ? 'see the leaderboard or ' : ''}
+              review past activity.
             </p>
           </section>
         )}
