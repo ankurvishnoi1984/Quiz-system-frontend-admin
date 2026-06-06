@@ -4,6 +4,8 @@ import Modal from '../ui/Modal'
 const defaultInitial = {
   title: '',
   description: '',
+  scheduledDate: '',
+  scheduledTime: '',
   departmentId: '',
   joinRequirement: 'name',
   enableNavigation: false,
@@ -41,6 +43,8 @@ function SessionFormModal({
     onSubmit({
       title: String(form.get('title') ?? '').trim(),
       description: String(form.get('description') ?? '').trim(),
+      scheduledDate: String(form.get('scheduledDate') ?? '').trim(),
+      scheduledTime: String(form.get('scheduledTime') ?? '').trim(),
       departmentId: String(form.get('department') || defaultDepartmentId || ''),
       joinRequirement,
       enableNavigation,
@@ -63,37 +67,53 @@ function SessionFormModal({
           />
         </div>
         {!liveSettingsOnly ? (
-          <div>
-            <label className="text-sm font-semibold text-slate-700">Description</label>
-            <input
-              name="description"
-              key={`description-${initialValues.description}-${open}`}
-              defaultValue={initialValues.description ?? ''}
-              className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-              placeholder="e.g., Friday live polling session"
-            />
-          </div>
+          <>
+            <div>
+              <label className="text-sm font-semibold text-slate-700">Session date</label>
+              <input
+                type="date"
+                name="scheduledDate"
+                key={`scheduledDate-${initialValues.scheduledDate}-${open}`}
+                defaultValue={initialValues.scheduledDate ?? ''}
+                className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Planned session date shown to participants before the session goes live.
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700">Session time</label>
+              <input
+                type="time"
+                name="scheduledTime"
+                key={`scheduledTime-${initialValues.scheduledTime}-${open}`}
+                defaultValue={initialValues.scheduledTime ?? ''}
+                className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Planned start time for participants waiting to join.
+              </p>
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-sm font-semibold text-slate-700">Description</label>
+              <input
+                name="description"
+                key={`description-${initialValues.description}-${open}`}
+                defaultValue={initialValues.description ?? ''}
+                className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                placeholder="e.g., Friday live polling session"
+              />
+            </div>
+          </>
         ) : null}
-        <div className={liveSettingsOnly ? 'md:col-span-2' : ''}>
-          <label className="text-sm font-semibold text-slate-700">Department</label>
-          {mode === 'edit' || !allowDepartmentSelection ? (
+        {mode === 'edit' ? (
+          <div className={liveSettingsOnly ? 'md:col-span-2' : ''}>
+            <label className="text-sm font-semibold text-slate-700">Department</label>
             <p className="mt-1 flex h-11 items-center rounded-xl border border-blue-200/70 bg-slate-50 px-3 text-sm text-slate-700">
               {departmentLabel || '—'}
             </p>
-          ) : (
-            <select
-              name="department"
-              defaultValue={initialValues.departmentId || defaultDepartmentId}
-              className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-            >
-              {departments.map((dept) => (
-                <option key={dept.dept_id} value={dept.dept_id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
+          </div>
+        ) : null}
         {!liveSettingsOnly ? (
           <>
             <div className="md:col-span-2">

@@ -23,6 +23,7 @@ import {
 } from '../../utils/questionTimer'
 import { ActiveQuestionPanel } from './components/ActiveQuestionPanel'
 import { JoinFormView } from './components/JoinFormView'
+import { SessionNotLiveView } from './components/SessionNotLiveView'
 import { LeaderboardModal } from './components/LeaderboardModal'
 import { PageCenteredShell } from './components/PageCenteredShell'
 import { ParticipantAlertModal } from './components/ParticipantAlertModal'
@@ -47,7 +48,10 @@ import {
   participantQuestionHasAnswer,
   shouldIncludeQuestionInFinalize,
 } from './utils/questionUtils'
-import { canReuseStoredParticipantSession } from './utils/joinFlow'
+import {
+  canReuseStoredParticipantSession,
+  isSessionOpenForNewJoin,
+} from './utils/joinFlow'
 
 function ParticipantSessionPage() {
   const { sessionId } = useParams()
@@ -148,6 +152,7 @@ function ParticipantSessionPage() {
     refetchInterval: (query) => {
       const status = query.state.data?.status
       const onJoinStep = step === 'join' && !participantToken
+      if (onJoinStep && !isSessionOpenForNewJoin(status)) return 3000
       if (onJoinStep && status === 'live') return 5000
       if (step === 'waiting' || status === 'draft') return 3000
       if (participantToken && (status === 'live' || status === 'paused')) return 5000
@@ -1600,6 +1605,27 @@ function ParticipantSessionPage() {
   })
 
   const showJoinForm = !canUseStoredJoin && step === 'join'
+  const showSessionNotLive =
+    showJoinForm &&
+    Boolean(session) &&
+    !isSessionOpenForNewJoin(session.status)
+
+  const handleUseDifferentSessionCode = () => {
+    setSessionCodeInput('')
+    setJoinError('')
+    queryClient.removeQueries({ queryKey: ['participant-session', effectiveSessionCode] })
+  }
+
+  if (showSessionNotLive) {
+    return (
+      <SessionNotLiveView
+        session={session}
+        hasSessionCodeInUrl={hasSessionCodeInUrl}
+        isRefreshing={sessionQuery.isFetching}
+        onUseDifferentCode={hasSessionCodeInUrl ? undefined : handleUseDifferentSessionCode}
+      />
+    )
+  }
 
   if (showJoinForm) {
     const joinBlocked = Boolean(session?.join_blocked)

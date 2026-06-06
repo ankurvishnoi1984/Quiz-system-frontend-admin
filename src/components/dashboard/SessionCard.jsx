@@ -59,7 +59,7 @@ function SessionCard({ session, onAction }) {
       { id: 'analytics', label: 'Analytics', icon: BarChart3, onClick: () => onAction('analytics', session) },
       { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onAction('duplicate', session) },
     ]
-    if (isLive) {
+    if (!isCompleted) {
       items.unshift({
         id: 'share',
         label: 'Share',
@@ -77,7 +77,7 @@ function SessionCard({ session, onAction }) {
       })
     }
     return items
-  }, [isLive, onAction, session])
+  }, [isCompleted, onAction, session])
 
   return (
     <div

@@ -21,6 +21,7 @@ import {
   transitionSessionApi,
   updateSessionApi,
 } from '../services/dashboardApi'
+import { toDateInputValue, toTimeInputValue } from '../utils/sessionSchedule'
 
 const tabItems = ['All', 'Draft', 'Live', 'Completed']
 
@@ -360,6 +361,8 @@ function DashboardPage() {
         host_id: user?.user_id,
         title: values.title,
         description: values.description || null,
+        scheduled_date: values.scheduledDate || null,
+        scheduled_time: values.scheduledTime || null,
         is_anonymous_default: values.joinRequirement === 'anonymous',
         show_results_to_participants: true,
         leaderboard_enabled: values.overallLeaderboard,
@@ -375,6 +378,8 @@ function DashboardPage() {
     return {
       title: editSession.title ?? '',
       description: editSession.description ?? '',
+      scheduledDate: toDateInputValue(editSession.scheduled_date),
+      scheduledTime: toTimeInputValue(editSession.scheduled_time),
       departmentId: String(editSession.dept_id ?? ''),
       joinRequirement: joinType,
       enableNavigation: editSession.participant_navigation_enabled !== false,
@@ -418,6 +423,8 @@ function DashboardPage() {
     if (!editSessionLiveSettingsOnly) {
       Object.assign(payload, {
         description: values.description || null,
+        scheduled_date: values.scheduledDate || null,
+        scheduled_time: values.scheduledTime || null,
         show_results_to_participants: true,
         participant_navigation_enabled: values.enableNavigation,
         join_type: values.joinRequirement || 'name',

@@ -476,6 +476,8 @@ function LivePage() {
   const canEditLive = session?.status === 'live'
   const canLaunchSession =
     session?.status === 'draft' || session?.status === 'paused'
+  const canShareSession =
+    Boolean(session) && session.status !== 'completed' && session.status !== 'archived'
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
   const showSessionControls = session?.status === 'live' || session?.status === 'paused'
   const showCloseAllQuestionsButton = useMemo(
@@ -630,12 +632,10 @@ function LivePage() {
             <Presentation className="size-4" />
             Present
           </button>
-          {session.status === 'live' ? (
+          {canShareSession ? (
             <button
               type="button"
-              onClick={() => {
-                setShareOpen(true)
-              }}
+              onClick={() => setShareOpen(true)}
               className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50"
             >
               <Share2 className="size-4" />
