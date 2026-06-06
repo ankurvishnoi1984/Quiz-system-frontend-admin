@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/shallow'
 import {
   askQaQuestionApi,
   getSessionLeaderboardApi,
+  getParticipantSurveyQuestionResultsApi,
   joinSessionApi,
   listQaQuestionsApi,
   listSessionQuestionsApi,
@@ -722,6 +723,7 @@ function ParticipantSessionPage() {
 
     const offResp = client.on('response_received', () => {
       queryClient.invalidateQueries({ queryKey: ['participant-qa', dbSessionId] })
+      queryClient.invalidateQueries({ queryKey: ['participant-survey-results'] })
     })
 
     const offLeaderboard = client.on(RealtimeEvent.LEADERBOARD_UPDATE, (data) => {
@@ -767,6 +769,7 @@ function ParticipantSessionPage() {
             return next
           })
         }
+        queryClient.invalidateQueries({ queryKey: ['participant-survey-results'] })
         queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
       },
     )
@@ -1108,6 +1111,19 @@ function ParticipantSessionPage() {
     isCurrentQuestionLeaderboardVisible &&
     step === 'active' &&
     Boolean(questionLockedBySubmission || submitted)
+
+  const showCurrentSurveyResults =
+    question?.isSurvey &&
+    isCurrentQuestionLeaderboardVisible &&
+    step === 'active' &&
+    Boolean(questionLockedBySubmission || submitted)
+
+  const surveyResultsQuery = useQuery({
+    queryKey: ['participant-survey-results', question?.id, participantToken],
+    queryFn: () => getParticipantSurveyQuestionResultsApi(participantToken, question.id),
+    enabled: Boolean(showCurrentSurveyResults && participantToken && question?.id),
+    refetchInterval: showCurrentSurveyResults ? 5000 : false,
+  })
 
   const buildFinalPayload = useCallback(() => {
     const { quizCountdownByQuestion: countdowns, quizQuestionOpenedAt: openedAt } =
@@ -1738,6 +1754,9 @@ function ParticipantSessionPage() {
             hasFinalizePayload={navigationEnabled ? hasFinalizePayload : canSubmitCurrentQuestion}
             showCurrentQuestionLeaderboard={showCurrentQuestionLeaderboard}
             currentQuestionLeaderboard={currentQuestionLeaderboard}
+            showCurrentSurveyResults={showCurrentSurveyResults}
+            surveyResults={surveyResultsQuery.data}
+            surveyResultsLoading={surveyResultsQuery.isLoading}
             onTagsInputChange={setTagsInput}
             onAddTag={handleAddWordCloudTag}
             onSelectOption={handleSelectOption}

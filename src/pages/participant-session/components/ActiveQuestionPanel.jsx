@@ -1,6 +1,7 @@
 import { Pencil } from 'lucide-react'
 import { McqOptions } from './question/McqOptions'
 import { QuestionLeaderboard } from './question/QuestionLeaderboard'
+import { QuestionSurveyResults } from './question/QuestionSurveyResults'
 import { QuestionTimer } from './question/QuestionTimer'
 import { RatingOptions } from './question/RatingOptions'
 import { RankingOptions } from './question/RankingOptions'
@@ -40,6 +41,9 @@ export function ActiveQuestionPanel({
   hasFinalizePayload,
   showCurrentQuestionLeaderboard,
   currentQuestionLeaderboard,
+  showCurrentSurveyResults,
+  surveyResults,
+  surveyResultsLoading,
   onTagsInputChange,
   onAddTag,
   onSelectOption,
@@ -326,6 +330,14 @@ export function ActiveQuestionPanel({
 
       {showCurrentQuestionLeaderboard && (
         <QuestionLeaderboard entries={currentQuestionLeaderboard} />
+      )}
+
+      {showCurrentSurveyResults && (
+        <QuestionSurveyResults
+          question={question}
+          results={surveyResults}
+          isLoading={surveyResultsLoading}
+        />
       )}
     </section>
   )

@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Lock, Play, RotateCcw, Square, Trophy } from 'lucide-react'
+import { BarChart3, Eye, EyeOff, Lock, Play, RotateCcw, Square, Trophy } from 'lucide-react'
 import { questionSupportsAnswerReveal } from '../../utils/answerReveal'
 import { canHostCloseQuestion } from '../../utils/hostQuestionControls'
 import { HostQuestionActionButton } from './HostQuestionActionButton'
@@ -57,6 +57,7 @@ export function HostQuestionControls({
               showLeaderboard: question.showLeaderboard,
               supportsReveal,
               isQuizMode: question.isQuizMode,
+              isSurvey: Boolean(question.isSurvey),
             })
           }
           icon={question.isLive ? Square : Play}
@@ -113,6 +114,29 @@ export function HostQuestionControls({
             }
             active={question.showLeaderboard}
             tone="amber"
+            size={size}
+          />
+        ) : null}
+        {canEditLive && question.isSurvey ? (
+          <HostQuestionActionButton
+            disabled={!isActiveQuestion || questionLeaderboardMutation.isPending}
+            onClick={() =>
+              questionLeaderboardMutation.mutate({
+                questionId: question.id,
+                visible: !question.showLeaderboard,
+              })
+            }
+            icon={BarChart3}
+            label={question.showLeaderboard ? 'Hide results' : 'Show results'}
+            title={
+              !isActiveQuestion
+                ? 'Activate this question before showing results to participants'
+                : question.showLeaderboard
+                  ? 'Hide anonymous survey results on participant screens'
+                  : 'Show anonymous survey results on participant screens'
+            }
+            active={question.showLeaderboard}
+            tone="sky"
             size={size}
           />
         ) : null}

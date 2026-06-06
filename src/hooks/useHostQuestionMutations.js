@@ -39,6 +39,7 @@ export function useHostQuestionMutations(
       showLeaderboard = false,
       supportsReveal = false,
       isQuizMode = false,
+      isSurvey = false,
     }) => {
       const updated = await setQuestionLiveStateApi(accessToken, questionId, isLive)
       if (isLive) return updated
@@ -47,7 +48,7 @@ export function useHostQuestionMutations(
       if (supportsReveal && answerRevealed) {
         resetCalls.push(setQuestionAnswerRevealedApi(accessToken, questionId, false))
       }
-      if (isQuizMode && showLeaderboard) {
+      if ((isQuizMode || isSurvey) && showLeaderboard) {
         resetCalls.push(setQuestionLeaderboardVisibleApi(accessToken, questionId, false))
       }
       if (resetCalls.length) {

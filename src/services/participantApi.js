@@ -110,9 +110,13 @@ export async function listSessionQuestionsApi(participantToken, sessionId) {
   return data?.questions || []
 }
 
-export async function getQuestionResultsApi(participantToken, questionId) {
-  const data = await authRequest(`/responses/question/${questionId}`, participantToken)
+export async function getParticipantSurveyQuestionResultsApi(participantToken, questionId) {
+  const data = await authRequest(`/questions/${questionId}/survey-results`, participantToken)
   return data?.results || null
+}
+
+export async function getQuestionResultsApi(participantToken, questionId) {
+  return getParticipantSurveyQuestionResultsApi(participantToken, questionId)
 }
 
 export async function getSessionLeaderboardApi(participantToken, sessionId) {

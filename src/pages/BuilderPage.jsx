@@ -2069,6 +2069,27 @@ function BuilderPage() {
                   />
                 ) : null}
 
+                {!isDraftSession && selected.type === 'Survey' && selected.questionId ? (
+                  <HostQuestionActionButton
+                    disabled={questionLeaderboardMutation.isPending}
+                    onClick={() =>
+                      questionLeaderboardMutation.mutate({
+                        questionId: selected.questionId,
+                        visible: !selected.showLeaderboard,
+                      })
+                    }
+                    icon={BarChart3}
+                    label={selected.showLeaderboard ? 'Hide results' : 'Show results'}
+                    title={
+                      selected.showLeaderboard
+                        ? 'Hide anonymous survey results on participant screens'
+                        : 'Show anonymous survey results on participant screens'
+                    }
+                    active={selected.showLeaderboard}
+                    tone="sky"
+                  />
+                ) : null}
+
                 {questionSupportsAnswerReveal(selected.type, quizMode) ? (
                   <HostQuestionActionButton
                     disabled={isDraftSession || !selected.questionId || answerRevealMutation.isPending}
