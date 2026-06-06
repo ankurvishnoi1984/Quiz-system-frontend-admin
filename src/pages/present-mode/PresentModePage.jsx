@@ -9,6 +9,7 @@ import { useLiveSession } from '../../hooks/useLiveSession'
 import { LeaderboardSlide } from './LeaderboardSlide'
 import { ParticipantsSlide } from './ParticipantsSlide'
 import { PresentNavButton, PresentShell } from './PresentShell'
+import { PresentParticipantsModal } from './PresentParticipantsModal'
 import { QuestionSlide } from './QuestionSlide'
 
 function PresentModePage() {
@@ -22,6 +23,9 @@ function PresentModePage() {
   const [slideIndex, setSlideIndex] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [hostAlert, setHostAlert] = useState(null)
+  const [participantsModalOpen, setParticipantsModalOpen] = useState(false)
+
+  const openParticipantsModal = useCallback(() => setParticipantsModalOpen(true), [])
 
   const canEditLive = session?.status === 'live'
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
@@ -154,6 +158,8 @@ function PresentModePage() {
   }
 
   const sessionTitle = session.title || 'Live session'
+  const participantCount = participants.length
+  const isSessionLive = session.status === 'live'
 
   return (
     <PresentShell
@@ -220,10 +226,10 @@ function PresentModePage() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {currentSlide?.type === 'participants' ? (
           <ParticipantsSlide
-            sessionTitle={sessionTitle}
-            participants={participants}
-            slideIndex={slideIndex + 1}
-            slideTotal={slideTotal}
+            session={session}
+            participantCount={participantCount}
+            isSessionLive={isSessionLive}
+            onParticipantsClick={openParticipantsModal}
           />
         ) : null}
 
@@ -235,8 +241,9 @@ function PresentModePage() {
             question={currentSlide.question}
             questionNumber={currentSlide.questionNumber}
             allResponses={responses}
-            slideIndex={slideIndex + 1}
-            slideTotal={slideTotal}
+            participantCount={participantCount}
+            isSessionLive={isSessionLive}
+            onParticipantsClick={openParticipantsModal}
           />
         ) : null}
 
@@ -244,11 +251,19 @@ function PresentModePage() {
           <LeaderboardSlide
             sessionTitle={sessionTitle}
             leaderboard={leaderboard}
-            slideIndex={slideIndex + 1}
-            slideTotal={slideTotal}
+            participantCount={participantCount}
+            isSessionLive={isSessionLive}
+            onParticipantsClick={openParticipantsModal}
           />
         ) : null}
       </div>
+
+      <PresentParticipantsModal
+        open={participantsModalOpen}
+        onClose={() => setParticipantsModalOpen(false)}
+        participants={participants}
+        isSessionLive={isSessionLive}
+      />
 
       <HostAlertModal
         open={Boolean(hostAlert)}

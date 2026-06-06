@@ -1,3 +1,5 @@
+import { Info } from 'lucide-react'
+
 export function PresentShell({ children, footer }) {
   return (
     <div className="present-mode relative flex min-h-dvh flex-col overflow-hidden bg-linear-to-br from-slate-50 via-blue-50/80 to-indigo-100/60 text-navy-900">
@@ -17,7 +19,41 @@ export function PresentShell({ children, footer }) {
   )
 }
 
-export function PresentSlideHeader({ sessionTitle, label, index, total }) {
+export function PresentSlideHeader({
+  sessionTitle,
+  participantCount = 0,
+  isSessionLive = false,
+  onParticipantsClick,
+}) {
+  const participantControl = (
+    <>
+      <div className="flex items-center justify-end gap-2">
+        {isSessionLive ? (
+          <span className="relative flex size-2.5 shrink-0" aria-hidden>
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
+          </span>
+        ) : (
+          <span className="inline-flex size-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden />
+        )}
+        <p className="text-[clamp(0.7rem,1.3vw,0.85rem)] font-semibold uppercase tracking-wider text-slate-500">
+          Participants
+        </p>
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <p className="text-[clamp(1.25rem,2.4vw,1.75rem)] font-bold tabular-nums text-navy-700">
+          {participantCount}
+        </p>
+        {onParticipantsClick ? (
+          <Info
+            className="size-[clamp(0.9rem,1.6vw,1.1rem)] shrink-0 text-sky-600 transition group-hover:text-sky-700"
+            aria-hidden
+          />
+        ) : null}
+      </div>
+    </>
+  )
+
   return (
     <header className="mb-[clamp(1rem,3vh,2rem)] flex shrink-0 flex-wrap items-end justify-between gap-4">
       <div>
@@ -26,14 +62,18 @@ export function PresentSlideHeader({ sessionTitle, label, index, total }) {
         </p>
         <h1 className="mt-1 text-[clamp(1.1rem,2.5vw,1.75rem)] font-bold text-navy-900">{sessionTitle}</h1>
       </div>
-      <div className="text-right">
-        <p className="text-[clamp(0.7rem,1.3vw,0.85rem)] font-semibold uppercase tracking-wider text-slate-500">
-          {label}
-        </p>
-        <p className="text-[clamp(1rem,2vw,1.35rem)] font-bold tabular-nums text-navy-700">
-          {index} <span className="font-medium text-slate-400">/</span> {total}
-        </p>
-      </div>
+      {onParticipantsClick ? (
+        <button
+          type="button"
+          onClick={onParticipantsClick}
+          className="group cursor-pointer rounded-2xl border border-blue-200/80 bg-white/90 px-4 py-2.5 text-right shadow-sm transition hover:border-sky-300 hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+          aria-label={`${participantCount} participants joined. View participant list.`}
+        >
+          {participantControl}
+        </button>
+      ) : (
+        <div className="text-right">{participantControl}</div>
+      )}
     </header>
   )
 }

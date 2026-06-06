@@ -1,50 +1,63 @@
-import { Users } from 'lucide-react'
+import { Calendar, Clock3 } from 'lucide-react'
+import {
+  formatScheduledDateForDisplay,
+  formatScheduledTimeForDisplay,
+} from '../../utils/sessionSchedule'
 import { PresentSlideHeader } from './PresentShell'
 
-export function ParticipantsSlide({ sessionTitle, participants, slideIndex, slideTotal }) {
+function SessionInfoRow({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-start gap-4 rounded-3xl border border-blue-200/70 bg-white/95 px-[clamp(1.25rem,3vw,2rem)] py-[clamp(1rem,2.5vh,1.5rem)] shadow-md shadow-navy-900/5">
+      <span className="grid size-[clamp(3rem,6vw,4rem)] shrink-0 place-items-center rounded-2xl bg-linear-to-br from-sky-100 to-blue-100 text-sky-800">
+        <Icon className="size-[clamp(1.25rem,2.5vw,1.75rem)]" strokeWidth={2} />
+      </span>
+      <div className="min-w-0 pt-1">
+        <p className="text-[clamp(0.7rem,1.3vw,0.85rem)] font-semibold uppercase tracking-wider text-slate-500">
+          {label}
+        </p>
+        <p className="mt-1 text-[clamp(1.25rem,3vw,2rem)] font-bold leading-snug text-navy-900">
+          {value}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+export function ParticipantsSlide({ session, participantCount, isSessionLive, onParticipantsClick }) {
+  const sessionTitle = session?.title || 'Live session'
+  const dateLabel =
+    formatScheduledDateForDisplay(session?.scheduled_date) ||
+    (session?.created_at
+      ? formatScheduledDateForDisplay(String(session.created_at).slice(0, 10))
+      : null) ||
+    'Not scheduled'
+  const timeLabel = formatScheduledTimeForDisplay(session?.scheduled_time) || '—'
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PresentSlideHeader
         sessionTitle={sessionTitle}
-        label="Participants"
-        index={slideIndex}
-        total={slideTotal}
+        participantCount={participantCount}
+        isSessionLive={isSessionLive}
+        onParticipantsClick={onParticipantsClick}
       />
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
-        <div className="mb-[clamp(1.5rem,4vh,3rem)] flex items-center gap-4">
-          <span className="grid size-[clamp(3.5rem,8vw,5rem)] place-items-center rounded-3xl bg-linear-to-br from-navy-800 to-navy-600 text-white shadow-xl shadow-navy-900/25">
-            <Users className="size-[clamp(1.75rem,4vw,2.5rem)]" strokeWidth={2} />
-          </span>
-          <div>
-            <p className="text-[clamp(3rem,10vw,6rem)] font-bold leading-none tabular-nums text-navy-900">
-              {participants.length}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-[clamp(0.5rem,2vw,1.5rem)]">
+        <div className="w-full max-w-3xl space-y-[clamp(1rem,3vh,1.75rem)]">
+          <div className="text-center">
+            <p className="text-[clamp(0.75rem,1.4vw,0.95rem)] font-semibold uppercase tracking-[0.3em] text-navy-600/80">
+              Session
             </p>
-            <p className="text-[clamp(1rem,2.5vw,1.5rem)] font-semibold text-slate-600">
-              {participants.length === 1 ? 'participant' : 'participants'} joined
-            </p>
+            <h2 className="mt-3 text-[clamp(2rem,6vw,4rem)] font-bold leading-tight text-navy-900">
+              {sessionTitle}
+            </h2>
+          </div>
+
+          <div className="grid gap-[clamp(0.75rem,2vh,1.25rem)]">
+            <SessionInfoRow icon={Calendar} label="Date" value={dateLabel} />
+            <SessionInfoRow icon={Clock3} label="Time" value={timeLabel} />
           </div>
         </div>
-
-        {participants.length > 0 ? (
-          <div className="grid w-full max-w-6xl grid-cols-[repeat(auto-fill,minmax(clamp(9rem,18vw,14rem),1fr))] gap-[clamp(0.75rem,2vw,1.25rem)] overflow-y-auto pb-4">
-            {participants.map((p, idx) => (
-              <div
-                key={p.id}
-                className="present-lb-row flex min-h-[clamp(3.5rem,8vh,5rem)] items-center justify-center rounded-2xl border border-blue-200/70 bg-white/95 px-4 py-3 text-center shadow-md shadow-navy-900/5 transition hover:border-navy-300 hover:shadow-lg"
-                style={{ animationDelay: `${Math.min(idx, 20) * 35}ms` }}
-              >
-                <span className="line-clamp-2 text-[clamp(1rem,2.2vw,1.5rem)] font-semibold text-navy-900">
-                  {p.name}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-center text-[clamp(1.1rem,2.5vw,1.75rem)] text-slate-500">
-            Waiting for participants to join…
-          </p>
-        )}
       </div>
     </div>
   )

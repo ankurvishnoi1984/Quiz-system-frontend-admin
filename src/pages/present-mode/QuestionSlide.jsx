@@ -59,8 +59,9 @@ export function QuestionSlide({
   question,
   questionNumber,
   allResponses,
-  slideIndex,
-  slideTotal,
+  participantCount,
+  isSessionLive,
+  onParticipantsClick,
 }) {
   const [viewMode, setViewMode] = useState('results')
 
@@ -213,9 +214,9 @@ export function QuestionSlide({
     <div className="flex min-h-0 flex-1 flex-col">
       <PresentSlideHeader
         sessionTitle={sessionTitle}
-        label={`Question ${questionNumber}`}
-        index={slideIndex}
-        total={slideTotal}
+        participantCount={participantCount}
+        isSessionLive={isSessionLive}
+        onParticipantsClick={onParticipantsClick}
       />
 
       <div className="mb-[clamp(0.75rem,2vh,1.25rem)] shrink-0">

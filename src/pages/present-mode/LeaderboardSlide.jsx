@@ -2,14 +2,20 @@ import { Trophy } from 'lucide-react'
 import { PresentLeaderboardList } from './PresentLeaderboardList'
 import { PresentSlideHeader } from './PresentShell'
 
-export function LeaderboardSlide({ sessionTitle, leaderboard, slideIndex, slideTotal }) {
+export function LeaderboardSlide({
+  sessionTitle,
+  leaderboard,
+  participantCount,
+  isSessionLive,
+  onParticipantsClick,
+}) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PresentSlideHeader
         sessionTitle={sessionTitle}
-        label="Leaderboard"
-        index={slideIndex}
-        total={slideTotal}
+        participantCount={participantCount}
+        isSessionLive={isSessionLive}
+        onParticipantsClick={onParticipantsClick}
       />
 
       <div className="mb-[clamp(0.75rem,2vh,1.25rem)] flex shrink-0 items-center justify-center gap-3">
