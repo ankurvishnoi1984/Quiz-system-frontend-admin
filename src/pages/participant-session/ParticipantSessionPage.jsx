@@ -1331,11 +1331,7 @@ function ParticipantSessionPage() {
 
   const handleNextOrSubmit = async () => {
     if (isSessionEnded) return
-    if (!navigationEnabled || question?.isSurvey) {
-      if (navigationEnabled && question?.isSurvey && isLastDisplayedQuestion) {
-        await handleSubmit()
-        return
-      }
+    if (!navigationEnabled) {
       await handleSubmitCurrentQuestion()
       return
     }

@@ -50,6 +50,8 @@ export function ActiveQuestionPanel({
   onNextOrSubmit,
   onGoToQa,
 }) {
+  const useNextNav = navigationEnabled && !isLastDisplayedQuestion
+
   return (
     <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -231,27 +233,22 @@ export function ActiveQuestionPanel({
           )}
           <button
             type="button"
-            aria-label={
-              navigationEnabled && !question.isSurvey && !isLastDisplayedQuestion
-                ? 'Next question'
-                : 'Submit answer'
-            }
+            aria-label={useNextNav ? 'Next question' : 'Submit answer'}
             disabled={
               sessionEnded ||
               isSubmitting ||
-              (navigationEnabled && !question.isSurvey && !isLastDisplayedQuestion
+              (useNextNav
                 ? hasCountdown && !canGoToNextQuestion
                 : (submissionsClosed && !question?.openForReattempt) ||
                   (allQuestionsClosedByHost && !question?.openForReattempt) ||
                   inputsLocked ||
-                  (navigationEnabled && !question.isSurvey
-                    ? !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)
-                    : !hasFinalizePayload || (hasCountdown && !canGoToNextQuestion)))
+                  !hasFinalizePayload ||
+                  (hasCountdown && !canGoToNextQuestion))
             }
             title={
               sessionEnded
                 ? 'Session has ended'
-                : navigationEnabled && !question.isSurvey && !isLastDisplayedQuestion
+                : useNextNav
                   ? hasCountdown && !canGoToNextQuestion
                     ? 'Answer this question or wait for the timer'
                     : undefined
@@ -267,19 +264,10 @@ export function ActiveQuestionPanel({
             }
             onClick={onNextOrSubmit}
             className={`h-11 rounded-xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
-              highlightNextButton &&
-              navigationEnabled &&
-              !question.isSurvey &&
-              !isLastDisplayedQuestion
-                ? 'participant-next-highlight'
-                : ''
+              highlightNextButton && useNextNav ? 'participant-next-highlight' : ''
             }`}
           >
-            {isSubmitting
-              ? 'Submitting...'
-              : navigationEnabled && !question.isSurvey && !isLastDisplayedQuestion
-                ? 'Next'
-                : 'Submit'}
+            {isSubmitting ? 'Submitting...' : useNextNav ? 'Next' : 'Submit'}
           </button>
         </div>
       </div>
@@ -307,7 +295,9 @@ export function ActiveQuestionPanel({
         </div>
       )}
 
-      {(question.type === 'Poll' || question.isSurvey) && hasSubmittedQuestion && (
+      {(question.type === 'Poll' || question.isSurvey) &&
+        hasSubmittedQuestion &&
+        (!navigationEnabled || isLastDisplayedQuestion) && (
         <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-center">
           <p className="text-sm font-semibold text-violet-800">Thanks for your response!</p>
         </div>

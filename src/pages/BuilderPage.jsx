@@ -2143,12 +2143,6 @@ function BuilderPage() {
                 />
               )}
 
-              <MediaUpload
-                media={selected.media}
-                onChange={(media) => updateQuestion({ ...selected, media })}
-                disabled={!isDraftSession}
-              />
-
               {(selected.type === 'MCQ' || selected.type === 'Poll' || selected.type === 'Ranking') && (
                 <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
                   <OptionsEditor
