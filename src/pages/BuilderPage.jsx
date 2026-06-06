@@ -1125,7 +1125,7 @@ function BuilderPage() {
   const mapQuestionFromApi = (question) => {
     if (question.question_type === 'survey') {
       const surveySubType = apiSurveySubTypeToUi(question.survey_subtype)
-      const apiOptions = question.question_options || []
+      const apiOptions = question.question_options || question.QuestionOptions || []
       const options = apiOptions.map((option) => ({
         id: String(option.option_id),
         optionId: option.option_id,
@@ -1159,7 +1159,7 @@ function BuilderPage() {
     }
 
     const uiType = apiToUiType(question.question_type)
-    const apiOptions = question.question_options || []
+    const apiOptions = question.question_options || question.QuestionOptions || []
     const options =
       uiType === 'True/False'
         ? normalizeTrueFalseOptions(apiOptions)
