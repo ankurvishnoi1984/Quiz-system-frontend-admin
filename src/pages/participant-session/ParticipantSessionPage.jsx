@@ -1459,7 +1459,7 @@ function ParticipantSessionPage() {
       let nickname, checkEmail, isAnonymous
 
       if (joinRequirement === 'anonymous') {
-        nickname = 'Anonymous'
+        nickname = null
         checkEmail = null
         isAnonymous = true
       } else if (joinRequirement === 'name') {
@@ -1484,11 +1484,13 @@ function ParticipantSessionPage() {
         isAnonymous = false
       }
 
-      const result = await joinSessionApi(effectiveSessionCode, {
-        nickname,
+      const joinPayload = {
         email: checkEmail,
         is_anonymous: isAnonymous,
-      })
+      }
+      if (nickname) joinPayload.nickname = nickname
+
+      const result = await joinSessionApi(effectiveSessionCode, joinPayload)
       resetQuizProgress()
       setParticipant({
         token: result.token,

@@ -60,9 +60,10 @@ export function JoinFormView({
           <div>
             <label className="text-sm font-semibold text-slate-700">Name</label>
             <input
-              value="Anonymous"
+              value=""
               disabled
-              className="mt-1 h-11 w-full cursor-not-allowed rounded-xl border border-blue-200/70 bg-slate-50 px-3 text-sm text-slate-500"
+              placeholder="Assigned on join (e.g. Anonymous1)"
+              className="mt-1 h-11 w-full cursor-not-allowed rounded-xl border border-blue-200/70 bg-slate-50 px-3 text-sm text-slate-500 placeholder:text-slate-400"
             />
           </div>
         ) : !joinBlocked && showJoinDetails ? (

@@ -4,9 +4,11 @@ export function SessionHeader({ session, joinedUser, step, onStepChange }) {
       <div>
         <h1 className="text-xl font-bold text-navy-900">{session.title}</h1>
         <p className="text-sm text-slate-600">
-          {joinedUser?.anonymous
-            ? 'Anonymous participant'
-            : `${joinedUser?.name}${joinedUser?.email ? ` • ${joinedUser.email}` : ''}`}
+          {joinedUser?.name
+            ? `${joinedUser.name}${!joinedUser.anonymous && joinedUser.email ? ` • ${joinedUser.email}` : ''}`
+            : joinedUser?.anonymous
+              ? 'Anonymous participant'
+              : ''}
         </p>
       </div>
       <div className="flex items-center gap-2">
