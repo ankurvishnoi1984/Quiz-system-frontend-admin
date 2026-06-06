@@ -1419,7 +1419,7 @@ function BuilderPage() {
                 ]
               : [],
     }
-    setQuestions((prev) => [q, ...prev])
+    setQuestions((prev) => [...prev, q])
     setSelectedId(q.id)
   }
 
