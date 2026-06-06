@@ -876,14 +876,16 @@ function SurveyQuestionConfig({ question, onChange, structureLocked }) {
 
       {(subType === 'MCQ' || subType === 'Poll') && (
         <div className="space-y-3 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 pb-3">
-            <p className="text-sm font-semibold text-slate-700">Selection mode</p>
-            <SurveySelectModeToggle
-              value={Boolean(question.allowMultipleSelect)}
-              disabled={structureLocked}
-              onChange={(allowMultipleSelect) => onChange({ ...question, allowMultipleSelect })}
-            />
-          </div>
+          {subType === 'MCQ' ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 pb-3">
+              <p className="text-sm font-semibold text-slate-700">Selection mode</p>
+              <SurveySelectModeToggle
+                value={Boolean(question.allowMultipleSelect)}
+                disabled={structureLocked}
+                onChange={(allowMultipleSelect) => onChange({ ...question, allowMultipleSelect })}
+              />
+            </div>
+          ) : null}
           <OptionsEditor
             question={editorQuestion}
             quizMode={false}
