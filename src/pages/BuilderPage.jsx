@@ -475,7 +475,7 @@ function TrueFalseOptionsEditor({ question, quizMode, onChange, structureLocked 
   )
 }
 
-function OptionsEditor({ question, quizMode, onChange, structureLocked }) {
+function OptionsEditor({ question, quizMode, onChange, structureLocked, hideCorrectToggle = false }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -522,7 +522,7 @@ function OptionsEditor({ question, quizMode, onChange, structureLocked }) {
 
   const optionRows = question.options.map((opt) => (
     <div key={opt.id} className="flex flex-wrap items-center gap-2">
-      {question.type === 'MCQ' ? (
+      {question.type === 'MCQ' && !hideCorrectToggle ? (
         <button
           type="button"
           onClick={() => toggleCorrect(opt.id)}
@@ -601,7 +601,7 @@ function OptionsEditor({ question, quizMode, onChange, structureLocked }) {
               {question.options.map((opt) => (
                 <SortableRow key={opt.id} id={opt.id}>
                   <div className="flex flex-wrap items-center gap-2">
-                    {question.type === 'MCQ' ? (
+                    {question.type === 'MCQ' && !hideCorrectToggle ? (
                       <button
                         type="button"
                         onClick={() => toggleCorrect(opt.id)}
@@ -889,6 +889,7 @@ function SurveyQuestionConfig({ question, onChange, structureLocked }) {
           <OptionsEditor
             question={editorQuestion}
             quizMode={false}
+            hideCorrectToggle={subType === 'MCQ'}
             onChange={(next) => onChange({ ...question, options: next.options })}
             structureLocked={structureLocked}
           />
