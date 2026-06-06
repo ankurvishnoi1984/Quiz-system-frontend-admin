@@ -534,7 +534,7 @@ function LivePage() {
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Live session</p>
           <p className="mt-1 text-lg font-bold text-navy-900">{session.title}</p>
           <p className="mt-1 text-xs text-slate-600">
-            Session {session.session_id} • {statusLabel} • Socket: {socketStatus}
+            {statusLabel} • Socket: {socketStatus}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -545,7 +545,7 @@ function LivePage() {
           >
             {(deptSessionsQuery.data || []).map((s) => (
               <option key={s.session_id} value={s.session_id}>
-                {s.title} ({s.session_id})
+                {s.title}
               </option>
             ))}
           </select>

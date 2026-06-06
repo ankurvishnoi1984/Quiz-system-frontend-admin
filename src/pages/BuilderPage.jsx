@@ -1723,7 +1723,6 @@ function BuilderPage() {
             onSave={(nextTitle) => sessionTitleMutation.mutate(nextTitle)}
           />
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">Session {session.id}</span>
             <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-navy-700">{session.status}</span>
             <span className="text-xs">Last saved: {lastSavedLabel}</span>
             {dirty ? (
@@ -1743,7 +1742,7 @@ function BuilderPage() {
           >
             {filteredSessions.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.title} ({s.id})
+                {s.title}
               </option>
             ))}
           </select>
