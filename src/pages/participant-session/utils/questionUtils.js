@@ -1,4 +1,8 @@
 import { parseActivationTime } from '../../../utils/questionTimer'
+import {
+  getQuestionMediaKindFromApiType,
+  resolveQuestionMediaUrl,
+} from '../../../utils/questionMedia'
 
 export function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n))
@@ -43,6 +47,12 @@ export function mapParticipantQuestion(q) {
   return {
     id: q.question_id,
     text: q.question_text,
+    media: q.media_url
+      ? {
+          url: resolveQuestionMediaUrl(q.media_url),
+          kind: getQuestionMediaKindFromApiType(q.media_type),
+        }
+      : null,
     type,
     rawType,
     isSurvey,

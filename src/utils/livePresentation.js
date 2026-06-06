@@ -1,4 +1,5 @@
 import { getChartColor } from './chartColors'
+import { mapApiMediaToQuestionMedia } from './questionMedia'
 import { wordCountsFromApiResults, wordCountsFromResponses } from './wordCloud'
 
 /** High-contrast palette for fullscreen present mode (MCQ / rating). */
@@ -104,6 +105,7 @@ export function mapLiveQuestions(questions) {
       ratingMaxLabel: q.rating_max_label || '',
       correctOptionIds: resolveCorrectOptionIds({ ...q, answerRevealed }, options),
       options,
+      media: mapApiMediaToQuestionMedia(q),
     }
   })
 }

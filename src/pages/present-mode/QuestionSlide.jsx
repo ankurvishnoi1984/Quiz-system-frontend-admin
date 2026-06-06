@@ -23,6 +23,7 @@ import {
   shouldShowAnswerRevealUi,
 } from './PresentAnswerReveal'
 import { PresentLeaderboardList } from './PresentLeaderboardList'
+import { PresentQuestionMedia } from './PresentQuestionMedia'
 import { PresentResponsesList } from './PresentResponsesList'
 import { PresentSlideHeader } from './PresentShell'
 import { PresentViewSwitcher } from './PresentViewSwitcher'
@@ -239,9 +240,23 @@ export function QuestionSlide({
             {currentResponses.length} response{currentResponses.length === 1 ? '' : 's'}
           </span>
         </div>
-        <h2 className="mt-[clamp(0.75rem,2vh,1.25rem)] text-[clamp(1.75rem,5vw,3.5rem)] font-bold leading-tight text-navy-900">
-          {question.text || 'Untitled question'}
-        </h2>
+        <div
+          className={`mt-[clamp(0.75rem,2vh,1.25rem)] ${
+            question.media?.url
+              ? 'flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'
+              : ''
+          }`}
+        >
+          <h2 className="min-w-0 flex-1 text-[clamp(1.75rem,5vw,3.5rem)] font-bold leading-tight text-navy-900">
+            {question.text || 'Untitled question'}
+          </h2>
+          {question.media?.url ? (
+            <PresentQuestionMedia
+              media={question.media}
+              className="w-full lg:w-[min(30vw,340px)]"
+            />
+          ) : null}
+        </div>
       </div>
 
       {views.length > 1 ? (

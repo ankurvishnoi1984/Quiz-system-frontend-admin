@@ -42,6 +42,7 @@ import { useHostQuestionMutations } from '../hooks/useHostQuestionMutations'
 import { LiveQaPanel } from '../components/leaderboard/LiveQaPanel'
 import { QuestionLeaderboardModal } from '../components/leaderboard/QuestionLeaderboardModal'
 import { QuestionLeaderboardPanel } from '../components/leaderboard/QuestionLeaderboardPanel'
+import { QuestionMedia } from '../components/participant-session/QuestionMedia'
 import { SessionLeaderboardModal } from '../components/leaderboard/SessionLeaderboardModal'
 import {
   buildQuestionLeaderboardForQuestion,
@@ -691,7 +692,8 @@ function LivePage() {
           </div>
         ) : (
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="max-h-[min(75vh,900px)] space-y-2 overflow-y-auto pr-1">
+            <div className="space-y-3">
+              <div className="max-h-[min(75vh,900px)] space-y-2 overflow-y-auto pr-1">
               {mappedQuestions.map((q, idx) => {
                 const isSelected = questionIndex === idx
                 const respCount = responseCountByQuestionId[Number(q.id)] || 0
@@ -746,6 +748,16 @@ function LivePage() {
                   </button>
                 )
               })}
+              </div>
+
+              {activeQuestion?.media?.url ? (
+                <div className="rounded-2xl border border-blue-200/70 bg-white p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-navy-700">
+                    Question media
+                  </p>
+                  <QuestionMedia media={activeQuestion.media} />
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-4">

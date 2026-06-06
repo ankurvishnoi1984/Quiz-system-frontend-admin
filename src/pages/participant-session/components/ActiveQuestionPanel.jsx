@@ -1,4 +1,5 @@
 import { Pencil } from 'lucide-react'
+import { QuestionMedia } from '../../../components/participant-session/QuestionMedia'
 import { McqOptions } from './question/McqOptions'
 import { QuestionLeaderboard } from './question/QuestionLeaderboard'
 import { QuestionSurveyResults } from './question/QuestionSurveyResults'
@@ -114,21 +115,9 @@ export function ActiveQuestionPanel({
         </p>
       ) : null}
 
-      {question.media?.url && question.media.kind === 'image' && (
-        <img
-          src={question.media.url}
-          alt="Question media"
-          className="max-h-80 w-full rounded-2xl border border-blue-100 object-contain"
-        />
-      )}
-      {question.media?.url && question.media.kind === 'video' && (
-        <video
-          src={question.media.url}
-          controls
-          className="max-h-80 w-full rounded-2xl border border-blue-100"
-        />
-      )}
       <h2 className="text-2xl font-bold text-navy-900">{question.text || 'Untitled question'}</h2>
+
+      <QuestionMedia media={question.media} maxHeightClass="max-h-72" />
 
       {hasCountdown && !question.isSurvey && (
         <QuestionTimer timer={timer} timeLimit={timeLimit} submittedAtSeconds={submittedAtSeconds} />

@@ -9,7 +9,6 @@ import {
   Cloud,
   Eye,
   EyeOff,
-  FileUp,
   GripVertical,
   ListChecks,
   MessageSquareText,
@@ -25,6 +24,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { HostQuestionActionButton } from '../components/live/HostQuestionActionButton'
+import { QuestionMediaUpload } from '../components/builder/QuestionMediaUpload'
+import { QuestionMedia } from '../components/participant-session/QuestionMedia'
 import Modal from '../components/ui/Modal'
 import { useAuthStore } from '../store/authStore'
 import {
@@ -39,6 +40,10 @@ import {
 } from '../services/builderApi'
 import { setQuestionAnswerRevealedApi, setQuestionLeaderboardVisibleApi } from '../services/liveApi'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
+import {
+  buildQuestionMediaPayload,
+  mapApiMediaToQuestionMedia,
+} from '../utils/questionMedia'
 import { questionSupportsAnswerReveal } from '../utils/answerReveal'
 import { HostNoSessionsEmpty } from '../components/layout/HostNoSessionsEmpty'
 import { useHostNavSessions } from '../hooks/useHostNavSessions'
@@ -273,13 +278,6 @@ function buildOptionsPayload(question) {
   return []
 }
 
-function formatBytes(bytes) {
-  if (bytes < 1024) return `${bytes} B`
-  const kb = bytes / 1024
-  if (kb < 1024) return `${kb.toFixed(1)} KB`
-  return `${(kb / 1024).toFixed(1)} MB`
-}
-
 function SortableRow({ id, children, className = '' }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   const style = { transform: CSS.Transform.toString(transform), transition }
@@ -303,122 +301,6 @@ function SortableRow({ id, children, className = '' }) {
           <GripVertical className="size-4" />
         </button>
         <div className="min-w-0 flex-1">{children}</div>
-      </div>
-    </div>
-  )
-}
-
-function MediaUpload({ media, onChange, disabled = false }) {
-  const inputRef = useRef(null)
-  const [dragOver, setDragOver] = useState(false)
-
-  const pickFile = () => {
-    if (disabled) return
-    inputRef.current?.click()
-  }
-
-  const onFiles = (files) => {
-    if (disabled) return
-    const file = files?.[0]
-    if (!file) return
-    const url = URL.createObjectURL(file)
-    const kind = file.type.startsWith('image/')
-      ? 'image'
-      : file.type.startsWith('video/')
-        ? 'video'
-        : file.type.startsWith('audio/')
-          ? 'audio'
-          : 'file'
-    onChange({ file, url, kind })
-  }
-
-  useEffect(() => {
-    return () => {
-      if (media?.url) URL.revokeObjectURL(media.url)
-    }
-  }, [media?.url])
-
-  return (
-    <div className="space-y-3">
-      <input
-        ref={inputRef}
-        type="file"
-        className="hidden"
-        accept="image/*,video/*,audio/*"
-        onChange={(e) => onFiles(e.target.files)}
-      />
-
-      <div
-        className={`rounded-2xl border border-dashed p-4 transition ${
-          disabled ? 'pointer-events-none opacity-60' : ''
-        } ${dragOver && !disabled ? 'border-blue-400 bg-blue-50/70' : 'border-blue-300 bg-white/60'}`}
-        onDragEnter={(e) => {
-          if (disabled) return
-          e.preventDefault()
-          setDragOver(true)
-        }}
-        onDragOver={(e) => {
-          if (disabled) return
-          e.preventDefault()
-          setDragOver(true)
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          if (disabled) return
-          e.preventDefault()
-          setDragOver(false)
-          onFiles(e.dataTransfer.files)
-        }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-2xl bg-linear-to-br from-navy-600 to-navy-500 text-white">
-              <FileUp className="size-4" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-navy-900">Media upload</p>
-              <p className="text-xs text-slate-600">Drag & drop or browse (image/video/audio)</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={pickFile}
-            disabled={disabled}
-            className="rounded-xl border border-blue-200/70 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Browse
-          </button>
-        </div>
-
-        {media?.url && (
-          <div className="mt-4 rounded-2xl border border-blue-200/70 bg-white p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-navy-900">{media.file?.name ?? 'Uploaded file'}</p>
-                <p className="text-xs text-slate-600">{media.file ? formatBytes(media.file.size) : ''}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => !disabled && onChange(null)}
-                disabled={disabled}
-                className="rounded-xl border border-blue-200/70 p-2 text-slate-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label="Remove media"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div className="mt-3 overflow-hidden rounded-xl border border-blue-100 bg-slate-50">
-              {media.kind === 'image' && <img src={media.url} alt="Preview" className="max-h-72 w-full object-contain" />}
-              {media.kind === 'video' && (
-                <video src={media.url} controls className="max-h-72 w-full" />
-              )}
-              {media.kind === 'audio' && <audio src={media.url} controls className="w-full p-3" />}
-              {media.kind === 'file' && (
-                <div className="p-3 text-sm text-slate-600">Preview not available for this file type.</div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -925,10 +807,11 @@ function ParticipantPreview({ question, quizMode }) {
         <p className="mt-1 text-sm text-slate-600">
           Type: {question.type === 'Survey' ? `Survey · ${surveySubTypeLabel(question.surveySubType)}` : previewQuestion.type}
         </p>
-        {previewQuestion.media?.url && previewQuestion.media.kind === 'image' && (
-          <img src={previewQuestion.media.url} alt="Preview" className="mt-3 max-h-72 w-full rounded-xl border border-blue-100 object-contain" />
-        )}
       </div>
+
+      {previewQuestion.media?.url ? (
+        <QuestionMedia media={previewQuestion.media} />
+      ) : null}
 
       {previewQuestion.type === 'MCQ' && (
         <div className="grid gap-2">
@@ -1140,13 +1023,7 @@ function BuilderPage() {
         surveySubType,
         allowMultipleSelect: Boolean(question.allow_multiple_select),
         text: question.question_text || '',
-        media: question.media_url
-          ? {
-              url: question.media_url,
-              kind: question.media_type?.includes('video') ? 'video' : 'image',
-              file: null,
-            }
-          : null,
+        media: mapApiMediaToQuestionMedia(question),
         points: 0,
         ratingMin: question.rating_min ?? DEFAULT_RATING_MIN,
         ratingMax: question.rating_max ?? DEFAULT_RATING_MAX,
@@ -1175,13 +1052,7 @@ function BuilderPage() {
       questionId: question.question_id,
       type: uiType,
       text: question.question_text || '',
-      media: question.media_url
-        ? {
-            url: question.media_url,
-            kind: question.media_type?.includes('video') ? 'video' : 'image',
-            file: null,
-          }
-        : null,
+      media: mapApiMediaToQuestionMedia(question),
       points: question.points_value ?? 10,
       answerRevealed: Boolean(question.answer_revealed),
       showLeaderboard: Boolean(question.show_leaderboard),
@@ -1586,6 +1457,7 @@ function BuilderPage() {
         const payload = {
           question_type: uiToApiType(question.type),
           question_text: question.text || 'Untitled question',
+          ...buildQuestionMediaPayload(question.media),
           is_quiz_mode: isPoll || isSurvey ? false : true,
           points_value: isPoll || isSurvey ? 0 : Number(question.points || 0),
           time_limit_seconds: isSurvey ? null : effectiveTimeLimitSeconds || null,
@@ -2187,6 +2059,13 @@ function BuilderPage() {
                   />
                 </div>
               )}
+
+              <QuestionMediaUpload
+                media={selected.media}
+                deptId={sessionQuery.data?.dept_id}
+                onChange={(media) => updateQuestion({ ...selected, media })}
+                disabled={!isDraftSession}
+              />
 
               {selected.type !== 'Survey' && (
               <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
