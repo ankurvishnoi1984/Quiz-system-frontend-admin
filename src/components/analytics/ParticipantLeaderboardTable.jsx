@@ -10,6 +10,7 @@ export function ParticipantLeaderboardTable({
   isLoading,
   onExport,
   isExporting,
+  showScore = true,
 }) {
   return (
     <div className="rounded-2xl border border-amber-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
@@ -18,8 +19,12 @@ export function ParticipantLeaderboardTable({
           <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">
             Per-participant report
           </p>
-          <h3 className="mt-1 text-lg font-bold text-navy-900">Participant leaderboard</h3>
-          <p className="mt-1 text-xs text-slate-600">Top 20 by score · export includes every participant</p>
+          <h3 className="mt-1 text-lg font-bold text-navy-900">Participants</h3>
+          <p className="mt-1 text-xs text-slate-600">
+            {showScore
+              ? 'Top 20 by score · export includes every participant'
+              : 'Top 20 participants · export includes every participant'}
+          </p>
         </div>
         <button
           type="button"
@@ -42,8 +47,12 @@ export function ParticipantLeaderboardTable({
                 <th className="px-3 py-2.5 font-semibold text-slate-700">Rank</th>
                 <th className="px-3 py-2.5 font-semibold text-slate-700">Nickname</th>
                 <th className="px-3 py-2.5 font-semibold text-slate-700">Answered</th>
-                <th className="px-3 py-2.5 font-semibold text-slate-700">Correct</th>
-                <th className="px-3 py-2.5 font-semibold text-slate-700">Score</th>
+                {showScore ? (
+                  <th className="px-3 py-2.5 font-semibold text-slate-700">Correct</th>
+                ) : null}
+                {showScore ? (
+                  <th className="px-3 py-2.5 font-semibold text-slate-700">Score</th>
+                ) : null}
                 <th className="px-3 py-2.5 font-semibold text-slate-700">Avg time</th>
               </tr>
             </thead>
@@ -53,8 +62,12 @@ export function ParticipantLeaderboardTable({
                   <td className="px-3 py-2.5 font-bold text-navy-900">{row.rank}</td>
                   <td className="px-3 py-2.5 font-semibold text-navy-900">{row.nickname}</td>
                   <td className="px-3 py-2.5 text-slate-700">{row.questions_answered}</td>
-                  <td className="px-3 py-2.5 text-slate-700">{row.correct_count}</td>
-                  <td className="px-3 py-2.5 font-bold text-navy-900">{row.total_score}</td>
+                  {showScore ? (
+                    <td className="px-3 py-2.5 text-slate-700">{row.correct_count}</td>
+                  ) : null}
+                  {showScore ? (
+                    <td className="px-3 py-2.5 font-bold text-navy-900">{row.total_score}</td>
+                  ) : null}
                   <td className="px-3 py-2.5 text-slate-700">{formatAvgTime(row.avg_response_time_seconds)}</td>
                 </tr>
               ))}

@@ -333,6 +333,13 @@ function AnalyticsPage() {
     }
   }, [sessionDetail, listSession, sortedQuestions])
 
+  const isPollOrSurveySession = useMemo(() => {
+    if (!sortedQuestions.length) return false
+    return sortedQuestions.every(
+      (q) => q.question_type === 'poll' || q.question_type === 'survey',
+    )
+  }, [sortedQuestions])
+
   const exportCsv = () => {
     if (!sessionMeta) return
     const headers = [
@@ -387,7 +394,7 @@ function AnalyticsPage() {
     const report =
       participantsReportQuery.data ||
       (await getSessionParticipantsReportApi(accessToken, numericSessionId))
-    await exportPerParticipantExcel(report)
+    await exportPerParticipantExcel(report, { showScore: !isPollOrSurveySession })
   }
 
   const handleExportReport = async (reportId) => {
@@ -708,6 +715,7 @@ function AnalyticsPage() {
         <ParticipantLeaderboardTable
           leaderboard={participantsReport?.leaderboard}
           isLoading={participantsReportLoading}
+          showScore={!isPollOrSurveySession}
           onExport={async () => {
             try {
               setExportingReportId('participants')
