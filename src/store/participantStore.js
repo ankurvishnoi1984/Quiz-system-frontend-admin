@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { pickParticipantProgressState } from '../utils/participantSessionState'
 
 const initialQuiz = {
   quizResponses: {},
@@ -41,6 +42,12 @@ export const useParticipantStore = create(
         }),
 
       resetQuizProgress: () => set({ ...initialQuiz }),
+
+      hydrateQuizProgress: (progress) =>
+        set({
+          ...initialQuiz,
+          ...pickParticipantProgressState(progress),
+        }),
 
       setQuizResponses: (updater) =>
         set((s) => ({

@@ -62,7 +62,22 @@ export async function joinSessionApi(sessionCode, payload) {
   return {
     participant: data?.participant,
     token: data?.participant_token,
+    isReturning: Boolean(data?.is_returning),
+    sessionState: data?.session_state || null,
   }
+}
+
+export async function getParticipantSessionStateApi(participantToken) {
+  const data = await authRequest('/participants/me/session-state', participantToken)
+  return data?.session_state || null
+}
+
+export async function saveParticipantSessionStateApi(participantToken, sessionState) {
+  const data = await authRequest('/participants/me/session-state', participantToken, {
+    method: 'PUT',
+    body: JSON.stringify({ session_state: sessionState }),
+  })
+  return data?.session_state || null
 }
 
 export async function submitResponseApi(participantToken, payload) {

@@ -15,6 +15,7 @@ import {
 } from '../../services/participantApi'
 import { createRealtimeClient, RealtimeEvent } from '../../services/realtimeClient'
 import { useParticipantStore } from '../../store/participantStore'
+import { useParticipantProgressPersistence } from '../../hooks/useParticipantProgressPersistence'
 import { hasSessionCodeInJoinPath, normalizeSessionCode } from '../../utils/joinUrl'
 import { computeResponseTimeMs } from '../../utils/quizResponseTime'
 import { isStrictLateJoinSession, sessionHasTimedQuestions } from '../../utils/sessionFlags'
@@ -81,6 +82,7 @@ function ParticipantSessionPage() {
     setSubmitted,
     setQuizCountdown,
     resetQuizProgress,
+    hydrateQuizProgress,
     freezeCountdownAfterSubmit,
     freezeAllCountdowns,
     markQuestionsSubmitted,
@@ -103,6 +105,7 @@ function ParticipantSessionPage() {
       setSubmitted: s.setQuizSubmitted,
       setQuizCountdown: s.setQuizCountdown,
       resetQuizProgress: s.resetQuizProgress,
+      hydrateQuizProgress: s.hydrateQuizProgress,
       freezeCountdownAfterSubmit: s.freezeCountdownAfterSubmit,
       freezeAllCountdowns: s.freezeAllCountdowns,
       markQuestionsSubmitted: s.markQuestionsSubmitted,
@@ -259,6 +262,10 @@ function ParticipantSessionPage() {
   ])
 
   const joinRequirement = session?.join_type || 'name'
+  useParticipantProgressPersistence({
+    enabled: joinRequirement === 'name_email' && Boolean(participantToken),
+    participantToken,
+  })
   const timeLimit = question?.timeLimit ?? 0
   const hasCountdown = Number(timeLimit) > 0
   const questionLockedBySubmission = Boolean((quizSubmittedQuestionIds || {})[String(question?.id)])
@@ -1491,7 +1498,11 @@ function ParticipantSessionPage() {
       if (nickname) joinPayload.nickname = nickname
 
       const result = await joinSessionApi(effectiveSessionCode, joinPayload)
-      resetQuizProgress()
+      if (result.isReturning && result.sessionState) {
+        hydrateQuizProgress(result.sessionState)
+      } else {
+        resetQuizProgress()
+      }
       setParticipant({
         token: result.token,
         participant: {
