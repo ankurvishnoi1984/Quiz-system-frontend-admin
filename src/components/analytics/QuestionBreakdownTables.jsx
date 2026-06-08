@@ -52,18 +52,17 @@ function BreakdownTable({ title, questions, emptyMessage }) {
 export function QuestionBreakdownTables({ surveyQuestions, standaloneQuestions }) {
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-bold text-navy-900">Survey Responses</h3>
-        <p className="mt-1 text-sm text-slate-600">
-          Survey items grouped by format. No scoring or correct-answer highlights apply.
-        </p>
-        <div className="mt-4">
-          <BreakdownTable
-            questions={surveyQuestions}
-            emptyMessage="No survey questions in this session."
-          />
+      {surveyQuestions?.length ? (
+        <div>
+          <h3 className="text-lg font-bold text-navy-900">Survey Responses</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Survey items grouped by format. No scoring or correct-answer highlights apply.
+          </p>
+          <div className="mt-4">
+            <BreakdownTable questions={surveyQuestions} />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div>
         <h3 className="text-lg font-bold text-navy-900">Quiz, Poll & Other Questions</h3>
