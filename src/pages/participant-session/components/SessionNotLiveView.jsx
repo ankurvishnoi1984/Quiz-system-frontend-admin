@@ -33,7 +33,6 @@ export function SessionNotLiveView({
   const copy = getSessionNotLiveCopy(session?.status)
   const tone = TONE_STYLES[copy.tone] || TONE_STYLES.waiting
   const Icon = tone.icon
-  const sessionCode = session?.session_code || ''
   const scheduledLabel = formatScheduledSessionForDisplay(
     session?.scheduled_date,
     session?.scheduled_time,
@@ -60,12 +59,6 @@ export function SessionNotLiveView({
         <div className="rounded-2xl border border-blue-200/70 bg-blue-50/40 px-4 py-4 text-left">
           <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session</p>
           <p className="mt-1 text-lg font-bold text-navy-900">{session?.title || 'Quiz session'}</p>
-          {sessionCode ? (
-            <p className="mt-2 text-sm text-slate-600">
-              Code:{' '}
-              <span className="font-mono font-semibold tracking-widest text-navy-800">{sessionCode}</span>
-            </p>
-          ) : null}
           {showScheduledDetails ? (
             <div className="mt-3 rounded-xl border border-sky-200/80 bg-white/80 px-3 py-2.5">
               <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-sky-900">

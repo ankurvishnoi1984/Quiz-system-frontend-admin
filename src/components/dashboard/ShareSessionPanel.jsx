@@ -8,6 +8,7 @@ import {
   normalizeSessionCode,
   resolveSessionJoinUrl,
 } from '../../utils/joinUrl'
+import { formatScheduledSessionForDisplay } from '../../utils/sessionSchedule'
 
 const SHARE_TABS = [
   { id: 'link', label: 'Link', icon: Link2 },
@@ -38,9 +39,9 @@ function qrDownloadFilename(sessionCode, sessionId) {
   return `quiz-qr-${slug}.png`
 }
 
-function buildShareLinkText({ title, sessionCode, description, joinUrl }) {
+function buildShareLinkText({ title, description, scheduledLabel, joinUrl }) {
   const lines = ["You're invited to join a quiz session!", '', `Session: ${title}`]
-  if (sessionCode) lines.push(`Session code: ${sessionCode}`)
+  if (scheduledLabel) lines.push(`Date and time: ${scheduledLabel}`)
   if (description?.trim()) lines.push(`Description: ${description.trim()}`)
   lines.push('', `Join link: ${joinUrl}`, '', 'Open the link to join directly — no code entry needed.')
   return lines.join('\n')
@@ -176,16 +177,20 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
   const sessionCode = normalizeSessionCode(session?.session_code)
   const genericJoinUrl = buildGenericJoinUrl()
   const sessionDescription = session?.description || ''
+  const scheduledLabel = formatScheduledSessionForDisplay(
+    session?.scheduled_date,
+    session?.scheduled_time,
+  )
 
   const shareLinkText = useMemo(
     () =>
       buildShareLinkText({
         title: session?.title || 'Quiz session',
-        sessionCode,
         description: sessionDescription,
+        scheduledLabel,
         joinUrl: shareJoinUrl,
       }),
-    [session?.title, sessionCode, sessionDescription, shareJoinUrl],
+    [session?.title, sessionDescription, scheduledLabel, shareJoinUrl],
   )
 
   useEffect(() => {
@@ -229,11 +234,8 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
         <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session</p>
           <p className="mt-1 text-lg font-bold text-navy-900">{session.title}</p>
-          {sessionCode ? (
-            <p className="mt-1 text-sm text-slate-600">
-              Session code:{' '}
-              <span className="font-mono font-semibold tracking-widest text-navy-800">{sessionCode}</span>
-            </p>
+          {scheduledLabel ? (
+            <p className="mt-1 text-sm text-slate-600">{scheduledLabel}</p>
           ) : (
             <p className="mt-1 text-sm text-slate-600">Share link for participants to join this session.</p>
           )}
@@ -266,10 +268,10 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
               <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session</p>
               <p className="mt-1 text-base font-bold text-navy-900">{session.title}</p>
             </div>
-            {sessionCode ? (
+            {scheduledLabel ? (
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session code</p>
-                <p className="mt-1 font-mono text-sm font-semibold tracking-widest text-navy-800">{sessionCode}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Date and time</p>
+                <p className="mt-1 text-sm font-semibold text-navy-900">{scheduledLabel}</p>
               </div>
             ) : null}
             {sessionDescription.trim() ? (
