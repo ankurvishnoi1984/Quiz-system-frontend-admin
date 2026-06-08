@@ -8,7 +8,7 @@ function formatBadge(format) {
 
 export function AnalyticsExportModal({ open, onClose, onExport, exportingId }) {
   return (
-    <Modal open={open} title="Export reports" onClose={onClose}>
+    <Modal open={open} title="Download Reports" onClose={onClose}>
       <p className="text-sm text-slate-600">
         Choose a report type to download. More report types will appear here as they are added.
       </p>
@@ -37,7 +37,8 @@ export function AnalyticsExportModal({ open, onClose, onExport, exportingId }) {
                   {isExporting ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : report.format === 'xlsx' ? (
-                    <FileSpreadsheet className="size-4" />
+               
+                     <Download className="size-4" />
                   ) : (
                     <Download className="size-4" />
                   )}

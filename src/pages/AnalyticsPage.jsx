@@ -543,7 +543,7 @@ function AnalyticsPage() {
             className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 shadow-sm shadow-blue-900/5 transition hover:bg-blue-50 disabled:opacity-50"
           >
             <Download className="size-4" />
-            Export
+             Download Report
           </button>
           <button
             type="button"
@@ -551,7 +551,7 @@ function AnalyticsPage() {
             className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
           >
             <Printer className="size-4" />
-            PDF report
+            PDF Report
           </button>
         </div>
       </div>
