@@ -17,6 +17,7 @@ export function ActiveQuestionPanel({
   hasCountdown,
   canGoToNextQuestion,
   inputsLocked,
+  wordCloudInputsLocked = false,
   submissionsClosed = false,
   allQuestionsClosedByHost = false,
   hasAnyQuestionSaved,
@@ -188,7 +189,7 @@ export function ActiveQuestionPanel({
         <WordCloudInput
           tagsInput={tagsInput}
           currentResponse={currentResponse}
-          inputsLocked={inputsLocked}
+          inputsLocked={wordCloudInputsLocked}
           onTagsInputChange={onTagsInputChange}
           onAddTag={() => onAddTag(question.id)}
         />

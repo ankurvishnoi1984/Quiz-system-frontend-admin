@@ -47,6 +47,7 @@ import {
   isParticipantAttemptingQuestion,
   mapParticipantQuestion,
   participantCanUpdateSubmittedResponse,
+  participantWordCloudInputLocked,
   participantQuestionHasAnswer,
   shouldIncludeQuestionInFinalize,
 } from './utils/questionUtils'
@@ -297,6 +298,17 @@ function ParticipantSessionPage() {
     (submissionsClosed && !openForReattempt) ||
     (navigationEnabled && allQuestionsClosedByHost && !openForReattempt) ||
     (hasCountdown && (questionLockedBySubmission || timer === 0))
+
+  const wordCloudInputsLocked = useMemo(
+    () =>
+      participantWordCloudInputLocked({
+        question,
+        navigationEnabled,
+        inputsLocked,
+        submittedIds: quizSubmittedQuestionIds,
+      }),
+    [question, navigationEnabled, inputsLocked, quizSubmittedQuestionIds],
+  )
 
   const showClosedByHostNotice = useCallback((questionText) => {
     const preview = String(questionText || '').trim()
@@ -1600,6 +1612,12 @@ function ParticipantSessionPage() {
   const handleAddWordCloudTag = useCallback(
     (questionId) => {
       if (isSessionEnded) return
+      if (
+        String(questionId) === String(question?.id) &&
+        wordCloudInputsLocked
+      ) {
+        return
+      }
       const t = tagsInput.trim()
       if (!t) return
       setResponses((prev) => ({
@@ -1611,7 +1629,7 @@ function ParticipantSessionPage() {
       }))
       setTagsInput('')
     },
-    [isSessionEnded, tagsInput, setResponses],
+    [isSessionEnded, question?.id, wordCloudInputsLocked, tagsInput, setResponses],
   )
 
   if (!participantHydrated) {
@@ -1742,6 +1760,7 @@ function ParticipantSessionPage() {
             hasCountdown={hasCountdown}
             canGoToNextQuestion={canGoToNextQuestion}
             inputsLocked={inputsLocked}
+            wordCloudInputsLocked={wordCloudInputsLocked}
             submissionsClosed={submissionsClosed}
             allQuestionsClosedByHost={allQuestionsClosedByHost}
             hasAnyQuestionSaved={hasAnyQuestionSaved}

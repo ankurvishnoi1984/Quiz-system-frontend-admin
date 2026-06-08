@@ -231,6 +231,20 @@ export function participantCanUpdateSubmittedResponse(question, navigationEnable
   return Boolean(navigationEnabled) && Number(question?.timeLimit ?? 0) <= 0
 }
 
+/** Word cloud: lock add/input after submit unless untimed multi-nav allows updates. */
+export function participantWordCloudInputLocked({
+  question,
+  navigationEnabled,
+  inputsLocked,
+  submittedIds,
+}) {
+  if (inputsLocked) return true
+  if (!question || question.type !== 'Word Cloud') return false
+  const submitted = Boolean(submittedIds?.[String(question.id)])
+  if (!submitted) return false
+  return !participantCanUpdateSubmittedResponse(question, navigationEnabled)
+}
+
 export function shouldIncludeQuestionInFinalize(
   question,
   submittedIds,
