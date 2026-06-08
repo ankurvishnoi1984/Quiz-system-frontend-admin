@@ -14,14 +14,28 @@ export const QUESTION_MEDIA_SUPPORTED_VIDEO_TYPES = [
   'video/quicktime',
 ]
 
+export const QUESTION_MEDIA_SUPPORTED_AUDIO_TYPES = [
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/mp4',
+  'audio/aac',
+  'audio/ogg',
+  'audio/webm',
+]
+
 export const QUESTION_MEDIA_ACCEPT = [
   ...QUESTION_MEDIA_SUPPORTED_IMAGE_TYPES,
   ...QUESTION_MEDIA_SUPPORTED_VIDEO_TYPES,
+  ...QUESTION_MEDIA_SUPPORTED_AUDIO_TYPES,
 ].join(',')
 
 export const QUESTION_MEDIA_BANNER = {
-  title: 'Images and videos only',
-  formats: 'JPEG, PNG, WebP, GIF, MP4, WebM, MOV',
+  title: 'Images, videos, and audio',
+  images: 'JPEG, PNG, WebP, GIF',
+  videos: 'MP4, WebM, MOV',
+  audio: 'MP3, WAV, M4A, AAC, OGG, WebM',
   maxSize: '10 MB max per file (images are compressed before upload)',
 }
 
@@ -87,19 +101,24 @@ export function formatBytes(bytes) {
 export function getQuestionMediaKind(mimeType) {
   if (!mimeType || typeof mimeType !== 'string') return null
   if (mimeType.startsWith('video/')) return 'video'
+  if (mimeType.startsWith('audio/')) return 'audio'
   if (mimeType.startsWith('image/')) return 'image'
   return null
 }
 
 export function getQuestionMediaKindFromApiType(mediaType) {
   if (!mediaType) return 'image'
-  return String(mediaType).includes('video') ? 'video' : 'image'
+  const normalized = String(mediaType).toLowerCase()
+  if (normalized.includes('video')) return 'video'
+  if (normalized.includes('audio')) return 'audio'
+  return 'image'
 }
 
 export function mapMimeToQuestionMediaType(mimeType) {
   if (mimeType === 'image/gif') return 'gif'
   if (mimeType?.startsWith('image/')) return 'image'
   if (mimeType?.startsWith('video/')) return 'video_file'
+  if (mimeType?.startsWith('audio/')) return 'audio_file'
   return null
 }
 
@@ -129,7 +148,7 @@ export function buildQuestionMediaPayload(media) {
   const mediaType =
     media.mediaType ||
     mapMimeToQuestionMediaType(media.mimeType) ||
-    (media.kind === 'video' ? 'video_file' : 'image')
+    (media.kind === 'video' ? 'video_file' : media.kind === 'audio' ? 'audio_file' : 'image')
 
   return {
     media_url: media.url,
@@ -143,16 +162,24 @@ export function validateQuestionMediaFile(file) {
 
   const kind = getQuestionMediaKind(file.type)
   if (!kind) {
-    return `Unsupported file type. Allowed: ${QUESTION_MEDIA_BANNER.formats}`
+    return `Unsupported file type. Allowed: ${QUESTION_MEDIA_BANNER.images}, ${QUESTION_MEDIA_BANNER.videos}, ${QUESTION_MEDIA_BANNER.audio}`
   }
 
   const allowedTypes =
     kind === 'video'
       ? QUESTION_MEDIA_SUPPORTED_VIDEO_TYPES
-      : QUESTION_MEDIA_SUPPORTED_IMAGE_TYPES
+      : kind === 'audio'
+        ? QUESTION_MEDIA_SUPPORTED_AUDIO_TYPES
+        : QUESTION_MEDIA_SUPPORTED_IMAGE_TYPES
 
   if (!allowedTypes.includes(file.type)) {
-    return `Unsupported ${kind} format. Allowed: ${QUESTION_MEDIA_BANNER.formats}`
+    return `Unsupported ${kind} format. Allowed: ${
+      kind === 'video'
+        ? QUESTION_MEDIA_BANNER.videos
+        : kind === 'audio'
+          ? QUESTION_MEDIA_BANNER.audio
+          : QUESTION_MEDIA_BANNER.images
+    }`
   }
 
   if (file.size > QUESTION_MEDIA_MAX_BYTES) {

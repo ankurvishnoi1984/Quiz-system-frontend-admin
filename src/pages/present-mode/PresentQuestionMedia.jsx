@@ -2,7 +2,7 @@ import { Maximize2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { resolveQuestionMediaUrl } from '../../utils/questionMedia'
 
-function PresentMediaContent({ media, src, className, videoControls = true }) {
+function PresentMediaContent({ media, src, className, videoControls = true, audioControls = true }) {
   if (media.kind === 'video') {
     return (
       <video
@@ -11,6 +11,14 @@ function PresentMediaContent({ media, src, className, videoControls = true }) {
         playsInline
         className={className}
       />
+    )
+  }
+
+  if (media.kind === 'audio') {
+    return (
+      <div className={`flex w-full items-center justify-center px-6 py-8 ${className}`.trim()}>
+        <audio src={src} controls={audioControls} className="w-full max-w-xl" />
+      </div>
     )
   }
 
@@ -36,26 +44,59 @@ export function PresentQuestionMedia({ media, className = '' }) {
 
   if (!src) return null
 
-  return (
-    <>
+  const compactVisualClassName =
+    'max-h-[min(18vh,160px)] w-full object-contain lg:max-h-[min(22vh,200px)]'
+
+  const compactAudioPanel = (
+    <div
+      className={`relative overflow-hidden rounded-2xl border border-blue-200/80 bg-slate-950/5 shadow-md shadow-navy-900/10 ${className}`.trim()}
+    >
+      <PresentMediaContent
+        media={media}
+        src={src}
+        videoControls={false}
+        audioControls
+        className="min-h-[88px] w-full py-5"
+      />
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className={`group relative overflow-hidden rounded-2xl border border-blue-200/80 bg-slate-950/5 shadow-md shadow-navy-900/10 transition hover:border-blue-300 hover:shadow-lg ${className}`.trim()}
+        className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-white/95 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-navy-800 shadow-sm transition hover:bg-white"
         aria-label="Expand question media"
       >
-        <PresentMediaContent
-          media={media}
-          src={src}
-          videoControls={false}
-          className="max-h-[min(18vh,160px)] w-full object-contain lg:max-h-[min(22vh,200px)]"
-        />
-        <span className="absolute inset-0 bg-linear-to-t from-navy-950/35 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
-        <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-white/95 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-navy-800 shadow-sm">
-          <Maximize2 className="size-3" />
-          Expand
-        </span>
+        <Maximize2 className="size-3" />
+        Expand
       </button>
+    </div>
+  )
+
+  return (
+    <>
+      {media.kind === 'audio' ? (
+        compactAudioPanel
+      ) : (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className={`group block w-full text-left ${className}`.trim()}
+          aria-label="Expand question media"
+        >
+          <div className="relative overflow-hidden rounded-2xl border border-blue-200/80 bg-slate-950/5 shadow-md shadow-navy-900/10 transition hover:border-blue-300 hover:shadow-lg">
+            <PresentMediaContent
+              media={media}
+              src={src}
+              videoControls={false}
+              audioControls={false}
+              className={compactVisualClassName}
+            />
+            <span className="absolute inset-0 bg-linear-to-t from-navy-950/35 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+            <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-white/95 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-navy-800 shadow-sm">
+              <Maximize2 className="size-3" />
+              Expand
+            </span>
+          </div>
+        </button>
+      )}
 
       {expanded ? (
         <div
@@ -81,7 +122,12 @@ export function PresentQuestionMedia({ media, className = '' }) {
               media={media}
               src={src}
               videoControls
-              className="max-h-[calc(90vh-1rem)] max-w-full object-contain"
+              audioControls
+              className={
+                media.kind === 'audio'
+                  ? 'w-full max-w-2xl'
+                  : 'max-h-[calc(90vh-1rem)] max-w-full object-contain'
+              }
             />
           </div>
         </div>

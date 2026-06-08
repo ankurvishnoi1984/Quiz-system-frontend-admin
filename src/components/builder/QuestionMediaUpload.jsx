@@ -109,7 +109,10 @@ export function QuestionMediaUpload({
       <div className="rounded-xl border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-950">
         <p className="font-semibold">{QUESTION_MEDIA_BANNER.title}</p>
         <p className="mt-0.5 text-sky-900/90">
-          {QUESTION_MEDIA_BANNER.formats} · {QUESTION_MEDIA_BANNER.maxSize}
+          Images: {QUESTION_MEDIA_BANNER.images} · Videos: {QUESTION_MEDIA_BANNER.videos}
+        </p>
+        <p className="mt-0.5 text-sky-900/90">
+          Audio: {QUESTION_MEDIA_BANNER.audio} · {QUESTION_MEDIA_BANNER.maxSize}
         </p>
       </div>
 
@@ -155,7 +158,7 @@ export function QuestionMediaUpload({
             <div>
               <p className="text-sm font-semibold text-navy-900">Question media</p>
               <p className="text-xs text-slate-600">
-                {uploading ? 'Uploading and compressing…' : 'Drag & drop or browse an image or video'}
+                {uploading ? 'Uploading and compressing…' : 'Drag & drop or browse an image, video, or audio file'}
               </p>
             </div>
           </div>
@@ -195,6 +198,10 @@ export function QuestionMediaUpload({
             <div className="mt-3 overflow-hidden rounded-xl border border-blue-100 bg-slate-50">
               {media?.kind === 'video' ? (
                 <video src={previewUrl} controls className="max-h-72 w-full" />
+              ) : media?.kind === 'audio' ? (
+                <div className="px-4 py-5">
+                  <audio src={previewUrl} controls className="w-full" />
+                </div>
               ) : (
                 <img src={previewUrl} alt="Question media preview" className="max-h-72 w-full object-contain" />
               )}
