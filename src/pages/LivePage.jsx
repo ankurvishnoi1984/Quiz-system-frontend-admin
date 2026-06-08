@@ -415,6 +415,7 @@ function LivePage() {
   const showRating = chartRawType === 'rating'
   const showOptionBreakdown = usesOptionChart && optionData.length > 0
   const showRatingBreakdown = showRating && ratingData.length > 0
+  const showLiveChart = chartRawType !== 'open_text'
   const chartBreakdownData = showRatingBreakdown ? ratingData : optionData
   const optionTotal = chartBreakdownData.reduce((sum, row) => sum + row.value, 0)
   const wordCloudTotal = wordCloudWords.reduce((sum, row) => sum + row.count, 0)
@@ -535,7 +536,7 @@ function LivePage() {
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Live session</p>
           <p className="mt-1 text-lg font-bold text-navy-900">{session.title}</p>
           <p className="mt-1 text-xs text-slate-600">
-            {statusLabel} • Socket: {socketStatus}
+            {statusLabel} 
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -864,6 +865,7 @@ function LivePage() {
           </div>
               </div>
 
+          {showLiveChart ? (
           <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -991,6 +993,7 @@ function LivePage() {
               </p>
             )}
           </div>
+          ) : null}
 
           <LiveQaPanel
             questions={qaQuery.data}
