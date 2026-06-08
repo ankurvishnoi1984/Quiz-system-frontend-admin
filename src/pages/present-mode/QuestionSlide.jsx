@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart3, Trophy } from 'lucide-react'
+import { BarChart3, Search, Trophy } from 'lucide-react'
 import { getQuestionResultsApi } from '../../services/liveApi'
 import WordCloudChart from '../../components/charts/WordCloudChart'
 import { buildQuestionLeaderboardForQuestion } from '../../utils/leaderboard'
@@ -55,6 +55,22 @@ function TextResponsesPanel({ rows }) {
 }
 
 function PresentResponsesPanel({ responseRows, showRevealUi, correctLabels }) {
+  const [search, setSearch] = useState('')
+
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return responseRows
+    return responseRows.filter(
+      (row) =>
+        row.participant.toLowerCase().includes(query) ||
+        String(row.response).toLowerCase().includes(query),
+    )
+  }, [responseRows, search])
+
+  const emptyLabel = search.trim()
+    ? `No responses match "${search.trim()}".`
+    : 'Waiting for responses…'
+
   return (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-blue-200/70 bg-white/90 shadow-xl shadow-navy-900/10">
       <div className="shrink-0 border-b border-blue-100/80 px-[clamp(0.85rem,2vw,1.25rem)] py-[clamp(0.65rem,1.5vh,0.85rem)]">
@@ -65,11 +81,28 @@ function PresentResponsesPanel({ responseRows, showRevealUi, correctLabels }) {
           {responseRows.length} submission{responseRows.length === 1 ? '' : 's'}
         </p>
       </div>
-      <div className="min-h-0 flex-1 p-[clamp(0.65rem,1.5vw,1rem)]">
+      <div className="flex min-h-0 flex-1 flex-col p-[clamp(0.65rem,1.5vw,1rem)]">
+        {responseRows.length > 0 ? (
+          <div className="relative mb-3 shrink-0">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500"
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search responses..."
+              className="h-9 w-full rounded-xl border border-blue-200/70 bg-white pl-9 pr-3 text-[clamp(0.8rem,1.4vw,0.9rem)] text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+              aria-label="Search responses"
+            />
+          </div>
+        ) : null}
         <PresentResponsesList
-          rows={responseRows}
+          rows={filteredRows}
           showRevealUi={showRevealUi}
           correctLabels={correctLabels}
+          emptyLabel={emptyLabel}
         />
       </div>
     </div>
@@ -317,6 +350,7 @@ export function QuestionSlide({
             </div>
             <div className="flex min-h-0 min-w-0 flex-col lg:max-h-[min(52vh,520px)]">
               <PresentResponsesPanel
+                key={question.id}
                 responseRows={responseRows}
                 showRevealUi={showRevealUi}
                 correctLabels={correctLabels}
