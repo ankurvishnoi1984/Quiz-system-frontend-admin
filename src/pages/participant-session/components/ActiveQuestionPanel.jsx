@@ -90,8 +90,9 @@ export function ActiveQuestionPanel({
           </p>
         )}
         {!navigationEnabled && !submissionsClosed && (
-          <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
-            Answer and submit; the host will show the next question when ready.
+          <p className="max-w-[min(100%,22rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
+            Answer and submit; the host will show the next question{' '}
+            <span className="whitespace-nowrap">when ready.</span>
           </p>
         )}
       </div>
