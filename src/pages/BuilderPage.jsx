@@ -163,14 +163,20 @@ function defaultOptionsForSurveySubType(subType) {
 const DEFAULT_RATING_MIN = 1
 const DEFAULT_RATING_MAX = 10
 
-function createSurveyQuestionDefaults(surveySubType = 'MCQ') {
+function createRatingQuestionDefaults() {
   return {
-    surveySubType,
-    allowMultipleSelect: false,
     ratingMin: DEFAULT_RATING_MIN,
     ratingMax: DEFAULT_RATING_MAX,
     ratingMinLabel: '',
     ratingMaxLabel: '',
+  }
+}
+
+function createSurveyQuestionDefaults(surveySubType = 'MCQ') {
+  return {
+    surveySubType,
+    allowMultipleSelect: false,
+    ...createRatingQuestionDefaults(),
     options: defaultOptionsForSurveySubType(surveySubType),
   }
 }
@@ -617,14 +623,7 @@ function applySurveySubTypeChange(question, nextSubType) {
     surveySubType: nextSubType,
     allowMultipleSelect: false,
     options: defaultOptionsForSurveySubType(nextSubType),
-    ...(nextSubType === 'Rating'
-      ? {
-          ratingMin: DEFAULT_RATING_MIN,
-          ratingMax: DEFAULT_RATING_MAX,
-          ratingMinLabel: '',
-          ratingMaxLabel: '',
-        }
-      : {}),
+    ...(nextSubType === 'Rating' ? createRatingQuestionDefaults() : {}),
   }
 }
 
@@ -691,6 +690,88 @@ function RatingScaleInfoBanner({ ratingMin, ratingMax, minLabel, maxLabel }) {
   )
 }
 
+function validateRatingScale(question, labelPrefix) {
+  const min = Number(question.ratingMin ?? DEFAULT_RATING_MIN)
+  const max = Number(question.ratingMax ?? DEFAULT_RATING_MAX)
+  if (min < DEFAULT_RATING_MIN || max > DEFAULT_RATING_MAX) {
+    return `${labelPrefix} rating values must stay between ${DEFAULT_RATING_MIN} and ${DEFAULT_RATING_MAX}.`
+  }
+  if (min >= max) {
+    return `${labelPrefix} rating scale max must be greater than min.`
+  }
+  return null
+}
+
+function buildRatingScalePayload(question) {
+  return {
+    rating_min: question.ratingMin ?? DEFAULT_RATING_MIN,
+    rating_max: question.ratingMax ?? DEFAULT_RATING_MAX,
+    rating_min_label: question.ratingMinLabel || null,
+    rating_max_label: question.ratingMaxLabel || null,
+  }
+}
+
+function RatingScaleEditor({ question, onChange, structureLocked }) {
+  return (
+    <>
+      <RatingScaleInfoBanner
+        ratingMin={question.ratingMin}
+        ratingMax={question.ratingMax}
+        minLabel={question.ratingMinLabel}
+        maxLabel={question.ratingMaxLabel}
+      />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="text-xs font-semibold text-slate-700">Min value</label>
+          <RatingNumberInput
+            min={DEFAULT_RATING_MIN}
+            max={DEFAULT_RATING_MAX}
+            fallback={DEFAULT_RATING_MIN}
+            value={question.ratingMin}
+            disabled={structureLocked}
+            onChange={(ratingMin) => onChange({ ...question, ratingMin })}
+            className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-700">Max value</label>
+          <RatingNumberInput
+            min={DEFAULT_RATING_MIN}
+            max={DEFAULT_RATING_MAX}
+            fallback={DEFAULT_RATING_MAX}
+            value={question.ratingMax}
+            disabled={structureLocked}
+            onChange={(ratingMax) => onChange({ ...question, ratingMax })}
+            className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-700">Min label (optional)</label>
+          <input
+            type="text"
+            disabled={structureLocked}
+            value={question.ratingMinLabel || ''}
+            onChange={(e) => onChange({ ...question, ratingMinLabel: e.target.value })}
+            placeholder="e.g. Not satisfied"
+            className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-700">Max label (optional)</label>
+          <input
+            type="text"
+            disabled={structureLocked}
+            value={question.ratingMaxLabel || ''}
+            onChange={(e) => onChange({ ...question, ratingMaxLabel: e.target.value })}
+            placeholder="e.g. Very satisfied"
+            className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
+          />
+        </div>
+      </div>
+    </>
+  )
+}
+
 function SurveyQuestionConfig({ question, onChange, structureLocked }) {
   const subType = question.surveySubType || 'MCQ'
   const editorQuestion = { ...question, type: subType }
@@ -698,62 +779,11 @@ function SurveyQuestionConfig({ question, onChange, structureLocked }) {
   return (
     <div className="space-y-4">
       {subType === 'Rating' && (
-        <>
-          <RatingScaleInfoBanner
-            ratingMin={question.ratingMin}
-            ratingMax={question.ratingMax}
-            minLabel={question.ratingMinLabel}
-            maxLabel={question.ratingMaxLabel}
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="text-xs font-semibold text-slate-700">Min value</label>
-            <RatingNumberInput
-              min={DEFAULT_RATING_MIN}
-              max={DEFAULT_RATING_MAX}
-              fallback={DEFAULT_RATING_MIN}
-              value={question.ratingMin}
-              disabled={structureLocked}
-              onChange={(ratingMin) => onChange({ ...question, ratingMin })}
-              className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-700">Max value</label>
-            <RatingNumberInput
-              min={DEFAULT_RATING_MIN}
-              max={DEFAULT_RATING_MAX}
-              fallback={DEFAULT_RATING_MAX}
-              value={question.ratingMax}
-              disabled={structureLocked}
-              onChange={(ratingMax) => onChange({ ...question, ratingMax })}
-              className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-700">Min label (optional)</label>
-            <input
-              type="text"
-              disabled={structureLocked}
-              value={question.ratingMinLabel || ''}
-              onChange={(e) => onChange({ ...question, ratingMinLabel: e.target.value })}
-              placeholder="e.g. Not satisfied"
-              className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-700">Max label (optional)</label>
-            <input
-              type="text"
-              disabled={structureLocked}
-              value={question.ratingMaxLabel || ''}
-              onChange={(e) => onChange({ ...question, ratingMaxLabel: e.target.value })}
-              placeholder="e.g. Very satisfied"
-              className="mt-1 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50"
-            />
-          </div>
-        </div>
-        </>
+        <RatingScaleEditor
+          question={question}
+          onChange={onChange}
+          structureLocked={structureLocked}
+        />
       )}
 
       {(subType === 'MCQ' || subType === 'Poll') && (
@@ -1054,6 +1084,14 @@ function BuilderPage() {
       text: question.question_text || '',
       media: mapApiMediaToQuestionMedia(question),
       points: question.points_value ?? 10,
+      ...(uiType === 'Rating'
+        ? {
+            ratingMin: question.rating_min ?? DEFAULT_RATING_MIN,
+            ratingMax: question.rating_max ?? DEFAULT_RATING_MAX,
+            ratingMinLabel: question.rating_min_label || '',
+            ratingMaxLabel: question.rating_max_label || '',
+          }
+        : {}),
       answerRevealed: Boolean(question.answer_revealed),
       showLeaderboard: Boolean(question.show_leaderboard),
       options,
@@ -1278,6 +1316,7 @@ function BuilderPage() {
       media: null,
       points: type === 'Survey' || type === 'Poll' ? 0 : 10,
       ...(type === 'Survey' ? createSurveyQuestionDefaults('MCQ') : {}),
+      ...(type === 'Rating' ? createRatingQuestionDefaults() : {}),
       options:
         type === 'MCQ' || type === 'Poll'
           ? [
@@ -1369,18 +1408,11 @@ function BuilderPage() {
             }
           }
           if (st === 'Rating') {
-            const min = Number(question.ratingMin ?? DEFAULT_RATING_MIN)
-            const max = Number(question.ratingMax ?? DEFAULT_RATING_MAX)
-            if (min < DEFAULT_RATING_MIN || max > DEFAULT_RATING_MAX) {
-              throw new Error(
-                `Survey item "${question.text || 'Untitled'}" rating values must stay between ${DEFAULT_RATING_MIN} and ${DEFAULT_RATING_MAX}.`,
-              )
-            }
-            if (min >= max) {
-              throw new Error(
-                `Survey item "${question.text || 'Untitled'}" rating scale max must be greater than min.`,
-              )
-            }
+            const ratingError = validateRatingScale(
+              question,
+              `Survey item "${question.text || 'Untitled'}"`,
+            )
+            if (ratingError) throw new Error(ratingError)
           }
           if (st === 'Ranking') {
             const opts = question.options || []
@@ -1395,6 +1427,13 @@ function BuilderPage() {
               )
             }
           }
+        }
+        if (question.type === 'Rating') {
+          const ratingError = validateRatingScale(
+            question,
+            `Question "${question.text || 'Untitled'}"`,
+          )
+          if (ratingError) throw new Error(ratingError)
         }
         if (question.type === 'MCQ') {
           const opts = question.options || []
@@ -1475,12 +1514,10 @@ function BuilderPage() {
           ...(isSurvey
             ? {
                 survey_subtype: uiToApiType(surveySubType),
-                rating_min: question.ratingMin ?? DEFAULT_RATING_MIN,
-                rating_max: question.ratingMax ?? DEFAULT_RATING_MAX,
-                rating_min_label: question.ratingMinLabel || null,
-                rating_max_label: question.ratingMaxLabel || null,
+                ...buildRatingScalePayload(question),
               }
             : {}),
+          ...(question.type === 'Rating' ? buildRatingScalePayload(question) : {}),
         }
 
         if (question.questionId) {
@@ -2036,6 +2073,16 @@ function BuilderPage() {
                   onChange={updateQuestion}
                   structureLocked={!isDraftSession}
                 />
+              )}
+
+              {selected.type === 'Rating' && (
+                <div className="space-y-4 rounded-2xl border border-blue-200/70 bg-white/70 p-4">
+                  <RatingScaleEditor
+                    question={selected}
+                    onChange={updateQuestion}
+                    structureLocked={!isDraftSession}
+                  />
+                </div>
               )}
 
               {(selected.type === 'MCQ' || selected.type === 'Poll' || selected.type === 'Ranking') && (
