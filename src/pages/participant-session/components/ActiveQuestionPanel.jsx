@@ -1,4 +1,4 @@
-import { Pencil } from 'lucide-react'
+import { ListChecks, Pencil } from 'lucide-react'
 import { QuestionMedia } from '../../../components/participant-session/QuestionMedia'
 import { McqOptions } from './question/McqOptions'
 import { QuestionLeaderboard } from './question/QuestionLeaderboard'
@@ -134,6 +134,15 @@ export function ActiveQuestionPanel({
               : 'The correct answer will be shown here only after you submit a response.'}
           </p>
         )}
+
+      {(question.type === 'MCQ' || question.type === 'Poll') && question.allowMultipleSelect && (
+        <div className="flex gap-3 rounded-xl border border-indigo-200 bg-indigo-50/90 px-3 py-2.5">
+          <ListChecks className="mt-0.5 size-4 shrink-0 text-indigo-700" aria-hidden />
+          <p className="text-sm font-medium text-indigo-900">
+            Select all that apply — you can choose more than one option.
+          </p>
+        </div>
+      )}
 
       {(question.type === 'MCQ' || question.type === 'Poll') && (
         <McqOptions
