@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart3, List, Trophy } from 'lucide-react'
+import { BarChart3, Trophy } from 'lucide-react'
 import { getQuestionResultsApi } from '../../services/liveApi'
 import WordCloudChart from '../../components/charts/WordCloudChart'
 import { buildQuestionLeaderboardForQuestion } from '../../utils/leaderboard'
@@ -54,6 +54,28 @@ function TextResponsesPanel({ rows }) {
   )
 }
 
+function PresentResponsesPanel({ responseRows, showRevealUi, correctLabels }) {
+  return (
+    <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-blue-200/70 bg-white/90 shadow-xl shadow-navy-900/10">
+      <div className="shrink-0 border-b border-blue-100/80 px-[clamp(0.85rem,2vw,1.25rem)] py-[clamp(0.65rem,1.5vh,0.85rem)]">
+        <p className="text-[clamp(0.65rem,1.2vw,0.75rem)] font-semibold uppercase tracking-wider text-slate-500">
+          Responses
+        </p>
+        <p className="text-[clamp(0.9rem,1.6vw,1rem)] font-semibold text-navy-800">
+          {responseRows.length} submission{responseRows.length === 1 ? '' : 's'}
+        </p>
+      </div>
+      <div className="min-h-0 flex-1 p-[clamp(0.65rem,1.5vw,1rem)]">
+        <PresentResponsesList
+          rows={responseRows}
+          showRevealUi={showRevealUi}
+          correctLabels={correctLabels}
+        />
+      </div>
+    </div>
+  )
+}
+
 export function QuestionSlide({
   accessToken,
   sessionTitle,
@@ -64,7 +86,7 @@ export function QuestionSlide({
   isSessionLive,
   onParticipantsClick,
 }) {
-  const [viewMode, setViewMode] = useState('results')
+  const [viewMode, setViewMode] = useState('overview')
 
   const currentResponses = filterResponsesForQuestion(allResponses, question.id)
 
@@ -105,7 +127,6 @@ export function QuestionSlide({
   const chartData = showRating ? ratingData : optionData
   const hasChart = (usesOptionChart || showRating) && chartData.length > 0
   const hasChartResponses = chartData.some((d) => d.value > 0)
-  const hasResponses = responseRows.length > 0
 
   const correctLabels = useMemo(
     () =>
@@ -117,67 +138,78 @@ export function QuestionSlide({
     [question],
   )
 
-  const views = useMemo(() => {
-    const list = [{ id: 'results', label: 'Results', icon: BarChart3 }]
-    if (showQuestionLeaderboard) {
-      list.push({ id: 'leaderboard', label: 'Leaderboard', icon: Trophy })
-    }
-    if (hasResponses && !showWordCloud && !showTextList) {
-      list.push({ id: 'responses', label: 'All responses', icon: List })
-    }
-    return list
-  }, [showQuestionLeaderboard, hasResponses, showWordCloud, showTextList])
+  const showSplitLayout = !showTextList
+  const leaderboardViews = useMemo(
+    () =>
+      showQuestionLeaderboard
+        ? [
+            { id: 'overview', label: 'Results & responses', icon: BarChart3 },
+            { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+          ]
+        : [],
+    [showQuestionLeaderboard],
+  )
 
   useEffect(() => {
-    setViewMode('results')
+    setViewMode('overview')
   }, [question.id])
 
   useEffect(() => {
-    if (!views.some((v) => v.id === viewMode)) {
-      setViewMode(views[0]?.id ?? 'results')
+    if (viewMode === 'leaderboard' && !showQuestionLeaderboard) {
+      setViewMode('overview')
     }
-  }, [views, viewMode])
+  }, [viewMode, showQuestionLeaderboard])
 
-  const renderResults = () => {
+  const renderResultsPanel = ({ compact = false } = {}) => {
+    const panelClass = compact
+      ? 'flex min-h-0 flex-1 flex-col rounded-3xl border border-blue-200/70 bg-white/90 p-[clamp(0.65rem,1.5vw,1rem)] shadow-xl shadow-navy-900/10'
+      : 'min-h-0 flex-1 rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10'
+
     if (showWordCloud) {
       return (
-        <div className="min-h-0 flex-1 rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10">
+        <div className={panelClass}>
+          <p className="mb-2 shrink-0 text-[clamp(0.65rem,1.2vw,0.75rem)] font-semibold uppercase tracking-wider text-slate-500">
+            Word cloud
+          </p>
           <WordCloudChart
             words={wordCloudWords}
-            className="h-full min-h-[40vh]"
+            className={compact ? 'min-h-0 flex-1' : 'h-full min-h-[40vh]'}
             emptyLabel="Waiting for words…"
           />
         </div>
       )
     }
+
     if (showTextList) {
       return (
-        <div className="min-h-0 flex-1 rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10">
+        <div className={panelClass}>
           <TextResponsesPanel rows={responseRows} />
         </div>
       )
     }
+
     if (showRanking) {
       return (
-        <div className="min-h-0 flex-1 overflow-auto rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10">
-          <table className="w-full text-left text-[clamp(0.85rem,1.4vw,1rem)]">
+        <div className={`${panelClass} overflow-auto`}>
+          <p className="mb-2 shrink-0 text-[clamp(0.65rem,1.2vw,0.75rem)] font-semibold uppercase tracking-wider text-slate-500">
+            Ranking results
+          </p>
+          <table className="w-full text-left text-[clamp(0.8rem,1.3vw,0.95rem)]">
             <thead className="sticky top-0 bg-white">
               <tr className="border-b border-blue-100">
-                <th className="px-3 py-2 font-semibold text-slate-700">Rank</th>
-                <th className="px-3 py-2 font-semibold text-slate-700">Option</th>
-                <th className="px-3 py-2 font-semibold text-slate-700">Score</th>
-                <th className="px-3 py-2 font-semibold text-slate-700">Avg Score</th>
-                <th className="px-3 py-2 font-semibold text-slate-700">Avg Rank</th>
+                <th className="px-2 py-1.5 font-semibold text-slate-700">Rank</th>
+                <th className="px-2 py-1.5 font-semibold text-slate-700">Option</th>
+                <th className="px-2 py-1.5 font-semibold text-slate-700">Score</th>
+                <th className="px-2 py-1.5 font-semibold text-slate-700">Avg</th>
               </tr>
             </thead>
             <tbody>
               {rankingAnalytics.rankings.map((row) => (
                 <tr key={row.optionId} className="border-b border-blue-50 last:border-b-0">
-                  <td className="px-3 py-2 font-semibold text-navy-900">{row.rank}</td>
-                  <td className="px-3 py-2 text-slate-700">{row.optionText}</td>
-                  <td className="px-3 py-2 text-slate-700">{row.totalScore}</td>
-                  <td className="px-3 py-2 text-slate-700">{row.averageScore}</td>
-                  <td className="px-3 py-2 text-slate-700">{row.averageRank}</td>
+                  <td className="px-2 py-1.5 font-semibold text-navy-900">{row.rank}</td>
+                  <td className="px-2 py-1.5 text-slate-700">{row.optionText}</td>
+                  <td className="px-2 py-1.5 text-slate-700">{row.totalScore}</td>
+                  <td className="px-2 py-1.5 text-slate-700">{row.averageScore}</td>
                 </tr>
               ))}
             </tbody>
@@ -185,26 +217,32 @@ export function QuestionSlide({
         </div>
       )
     }
+
     if (hasChart) {
       return (
-        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col rounded-3xl border border-blue-200/70 bg-white/90 p-4 shadow-xl shadow-navy-900/10">
+        <div className={panelClass}>
+          <p className="mb-2 shrink-0 text-[clamp(0.65rem,1.2vw,0.75rem)] font-semibold uppercase tracking-wider text-slate-500">
+            Results
+          </p>
           <PresentBarChart
             data={usesOptionChart ? optionData : chartData}
             rawType={chartRawType}
             answerRevealed={showRevealUi}
+            compact={compact}
           />
           {showRevealUi ? <PresentOptionsKey question={question} chartData={optionData} /> : null}
           {!hasChartResponses ? (
-            <p className="mt-3 text-center text-[clamp(0.95rem,1.8vw,1.15rem)] text-slate-500">
+            <p className="mt-2 shrink-0 text-center text-[clamp(0.85rem,1.5vw,1rem)] text-slate-500">
               Waiting for participants to answer…
             </p>
           ) : null}
         </div>
       )
     }
+
     return (
-      <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-blue-200 bg-white/60">
-        <p className="text-[clamp(1.25rem,3vw,2rem)] font-semibold text-slate-500">
+      <div className="flex min-h-0 flex-1 items-center justify-center rounded-3xl border border-dashed border-blue-200 bg-white/60">
+        <p className="text-[clamp(1rem,2.2vw,1.5rem)] font-semibold text-slate-500">
           Waiting for participants to answer…
         </p>
       </div>
@@ -259,9 +297,9 @@ export function QuestionSlide({
         </div>
       </div>
 
-      {views.length > 1 ? (
+      {leaderboardViews.length > 1 ? (
         <div className="mb-[clamp(0.75rem,2vh,1rem)] flex shrink-0 justify-center">
-          <PresentViewSwitcher views={views} activeId={viewMode} onChange={setViewMode} />
+          <PresentViewSwitcher views={leaderboardViews} activeId={viewMode} onChange={setViewMode} />
         </div>
       ) : null}
 
@@ -272,29 +310,22 @@ export function QuestionSlide({
             title="Question leaderboard"
             emptyMessage="Rankings will appear as participants answer this question."
           />
-        ) : null}
-
-        {viewMode === 'responses' ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-blue-200/70 bg-white/90 shadow-xl shadow-navy-900/10">
-            <div className="shrink-0 border-b border-blue-100/80 px-[clamp(1rem,3vw,1.75rem)] py-[clamp(0.75rem,2vh,1rem)]">
-              <p className="text-[clamp(0.7rem,1.3vw,0.8rem)] font-semibold uppercase tracking-wider text-slate-500">
-                All responses
-              </p>
-              <p className="text-[clamp(0.95rem,1.8vw,1.1rem)] font-semibold text-navy-800">
-                {responseRows.length} submission{responseRows.length === 1 ? '' : 's'}
-              </p>
+        ) : showSplitLayout ? (
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2 lg:grid-rows-1">
+            <div className="flex min-h-0 min-w-0 flex-col lg:max-h-[min(52vh,520px)]">
+              {renderResultsPanel({ compact: true })}
             </div>
-            <div className="min-h-0 flex-1 p-[clamp(0.75rem,2vw,1.25rem)]">
-              <PresentResponsesList
-                rows={responseRows}
+            <div className="flex min-h-0 min-w-0 flex-col lg:max-h-[min(52vh,520px)]">
+              <PresentResponsesPanel
+                responseRows={responseRows}
                 showRevealUi={showRevealUi}
                 correctLabels={correctLabels}
               />
             </div>
           </div>
-        ) : null}
-
-        {viewMode === 'results' ? renderResults() : null}
+        ) : (
+          renderResultsPanel()
+        )}
       </div>
     </div>
   )

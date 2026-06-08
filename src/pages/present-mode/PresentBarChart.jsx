@@ -15,16 +15,20 @@ import { getPresentOptionColor } from '../../utils/livePresentation'
 
 const CHART_MIN_HEIGHT = 320
 
-export function PresentBarChart({ data, rawType, answerRevealed }) {
-  const { ref, width, height, ready } = useElementSize(CHART_MIN_HEIGHT)
+export function PresentBarChart({ data, rawType, answerRevealed, compact = false }) {
+  const minHeight = compact ? 180 : CHART_MIN_HEIGHT
+  const { ref, width, height, ready } = useElementSize(minHeight)
   const total = data.reduce((sum, row) => sum + row.value, 0)
   const margin = { top: answerRevealed ? 32 : 16, right: 24, left: 8, bottom: 4 }
 
   return (
     <div
       ref={ref}
-      className="w-full min-w-0 shrink-0"
-      style={{ height: 'min(45vh, 480px)', minHeight: CHART_MIN_HEIGHT }}
+      className={`w-full min-w-0 ${compact ? 'min-h-0 flex-1' : 'shrink-0'}`}
+      style={{
+        height: compact ? '100%' : 'min(45vh, 480px)',
+        minHeight,
+      }}
     >
       {!ready ? (
         <div className="h-full w-full animate-pulse rounded-2xl bg-slate-100/80" aria-hidden />
