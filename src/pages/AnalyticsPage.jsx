@@ -8,6 +8,7 @@ import { AnalyticsQuestionInsights } from '../components/analytics/AnalyticsQues
 import { AnalyticsPrintReport } from '../components/analytics/AnalyticsPrintReport'
 import { SessionSummaryPrintReport } from '../components/analytics/SessionSummaryPrintReport'
 import { SessionSummaryReportCard } from '../components/analytics/SessionSummaryReportCard'
+import { QaAnalyticsPrintReport } from '../components/analytics/QaAnalyticsPrintReport'
 import { QaAnalyticsReportCard } from '../components/analytics/QaAnalyticsReportCard'
 import { ParticipantLeaderboardTable } from '../components/analytics/ParticipantLeaderboardTable'
 import { PerQuestionReportDetails } from '../components/analytics/PerQuestionReportDetails'
@@ -387,6 +388,9 @@ function AnalyticsPage() {
     if (activeReportView === 'question-breakdown' && !questionsReport && accessToken && numericSessionId) {
       await questionsReportQuery.refetch()
     }
+    if (activeReportView === 'qa-analytics' && !qaReport && accessToken && numericSessionId) {
+      await qaReportQuery.refetch()
+    }
     window.print()
   }
 
@@ -482,6 +486,8 @@ function AnalyticsPage() {
     <>
       {activeReportView === 'summary' ? (
         <SessionSummaryPrintReport report={summaryReport} />
+      ) : activeReportView === 'qa-analytics' ? (
+        <QaAnalyticsPrintReport report={qaReport} />
       ) : (
         <AnalyticsPrintReport
           sessionMeta={sessionMeta}
