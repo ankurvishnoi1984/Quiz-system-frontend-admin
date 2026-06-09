@@ -10,7 +10,9 @@ import {
   Layers,
   PanelLeftClose,
   PanelLeftOpen,
+  Users,
 } from 'lucide-react'
+import { SidebarNavGroup } from './SidebarNavGroup'
 import { useHostNavSessions, getBuilderNavTo, getLiveNavTo } from '../../hooks/useHostNavSessions'
 import { useAuthStore } from '../../store/authStore'
 import { isAdminRole } from '../../utils/adminRoles'
@@ -49,6 +51,50 @@ function Sidebar({ collapsed, onToggle }) {
     [builderTo, liveTo, user?.role],
   )
 
+  const manageClientsItems = useMemo(() => {
+    const items = []
+    if (user?.role === 'super_admin') {
+      items.push({ to: '/manage/clients', label: 'Clients' })
+    }
+    if (['super_admin', 'client_admin'].includes(user?.role)) {
+      items.push({ to: '/manage/departments', label: 'Department' })
+    }
+    return items
+  }, [user?.role])
+
+  const dashboardItem = navigationItems.find((item) => item.to === '/dashboard')
+  const otherNavigationItems = navigationItems.filter((item) => item.to !== '/dashboard')
+
+  const renderNavLink = (item) => {
+    const Icon = item.icon
+    const navKey = item.kind === 'builder' ? 'nav-builder' : item.kind === 'live' ? 'nav-live' : item.to
+    return (
+      <NavLink
+        key={navKey}
+        to={item.to}
+        className={({ isActive }) =>
+          `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+            isActive
+              ? 'bg-white/18 text-white'
+              : 'text-blue-100/85 hover:bg-white/10 hover:text-white'
+          }`
+        }
+      >
+        <Icon className="size-4 shrink-0" />
+        {!collapsed && (
+          <>
+            <span className="truncate">{item.label}</span>
+            <div className="ml-auto flex items-center gap-2">
+              {item.live && <span className="rounded-full bg-accent/25 px-2 py-0.5 text-[10px] font-semibold text-red-100">LIVE</span>}
+              {item.isNew && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-red-100">NEW</span>}
+            </div>
+          </>
+        )}
+        {collapsed && item.live && <span className="ml-auto size-2 rounded-full bg-red-500" />}
+      </NavLink>
+    )
+  }
+
   return (
     <aside
       data-host-sidebar
@@ -82,35 +128,18 @@ function Sidebar({ collapsed, onToggle }) {
       </div>
 
       <nav className="space-y-1 p-3">
-        {navigationItems.map((item) => {
-          const Icon = item.icon
-          const navKey = item.kind === 'builder' ? 'nav-builder' : item.kind === 'live' ? 'nav-live' : item.to
-          return (
-            <NavLink
-              key={navKey}
-              to={item.to}
-              className={({ isActive }) =>
-                `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                  isActive
-                    ? 'bg-white/18 text-white'
-                    : 'text-blue-100/85 hover:bg-white/10 hover:text-white'
-                }`
-              }
-            >
-              <Icon className="size-4 shrink-0" />
-              {!collapsed && (
-                <>
-                  <span className="truncate">{item.label}</span>
-                  <div className="ml-auto flex items-center gap-2">
-                    {item.live && <span className="rounded-full bg-accent/25 px-2 py-0.5 text-[10px] font-semibold text-red-100">LIVE</span>}
-                    {item.isNew && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-red-100">NEW</span>}
-                  </div>
-                </>
-              )}
-              {collapsed && item.live && <span className="ml-auto size-2 rounded-full bg-red-500" />}
-            </NavLink>
-          )
-        })}
+        {dashboardItem ? renderNavLink(dashboardItem) : null}
+
+        {manageClientsItems.length > 0 ? (
+          <SidebarNavGroup
+            label="Manage Clients"
+            icon={Users}
+            items={manageClientsItems}
+            collapsed={collapsed}
+          />
+        ) : null}
+
+        {otherNavigationItems.map(renderNavLink)}
       </nav>
     </aside>
   )

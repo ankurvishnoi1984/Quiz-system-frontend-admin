@@ -10,6 +10,8 @@ import BuilderPage from './pages/BuilderPage'
 import LivePage from './pages/LivePage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import ReportsPage from './pages/ReportsPage'
+import ManageClientsPage from './pages/ManageClientsPage'
+import ManageDepartmentsPage from './pages/ManageDepartmentsPage'
 import ParticipantSessionPage from './pages/participant-session'
 import PresentModePage from './pages/present-mode'
 import { SessionsProvider } from './context/SessionsContext'
@@ -82,6 +84,22 @@ function App() {
             }
           />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route
+            path="/manage/clients"
+            element={
+              <SuperAdminOnlyRoute>
+                <ManageClientsPage />
+              </SuperAdminOnlyRoute>
+            }
+          />
+          <Route
+            path="/manage/departments"
+            element={
+              <AdminOnlyRoute>
+                <ManageDepartmentsPage />
+              </AdminOnlyRoute>
+            }
+          />
         </Route>
 
         <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
