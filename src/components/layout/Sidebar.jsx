@@ -55,6 +55,7 @@ function Sidebar({ collapsed, onToggle }) {
     const items = []
     if (user?.role === 'super_admin') {
       items.push({ to: '/manage/clients', label: 'Clients' })
+      items.push({ to: '/manage/users', label: 'Users' })
     }
     if (['super_admin', 'client_admin'].includes(user?.role)) {
       items.push({ to: '/manage/departments', label: 'Department' })

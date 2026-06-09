@@ -12,6 +12,7 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import ReportsPage from './pages/ReportsPage'
 import ManageClientsPage from './pages/ManageClientsPage'
 import ManageDepartmentsPage from './pages/ManageDepartmentsPage'
+import ManageUsersPage from './pages/ManageUsersPage'
 import ParticipantSessionPage from './pages/participant-session'
 import PresentModePage from './pages/present-mode'
 import { SessionsProvider } from './context/SessionsContext'
@@ -98,6 +99,14 @@ function App() {
               <AdminOnlyRoute>
                 <ManageDepartmentsPage />
               </AdminOnlyRoute>
+            }
+          />
+          <Route
+            path="/manage/users"
+            element={
+              <SuperAdminOnlyRoute>
+                <ManageUsersPage />
+              </SuperAdminOnlyRoute>
             }
           />
         </Route>
