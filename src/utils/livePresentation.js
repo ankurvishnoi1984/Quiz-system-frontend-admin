@@ -46,12 +46,29 @@ export function getQuestionChartRawType(question) {
   return rawType
 }
 
+/** Open-text questions do not support per-question or scoring leaderboards. */
+export function questionSupportsLeaderboard(question) {
+  return getQuestionChartRawType(question) !== 'open_text'
+}
+
 /** Open-text survey answers are not aggregated for participant-facing results. */
 export function surveySupportsParticipantResults(question) {
   const isSurvey = Boolean(question?.isSurvey || question?.rawType === 'survey')
   if (!isSurvey) return false
   const subType = question?.surveySubType ?? question?.survey_subtype ?? getQuestionChartRawType(question)
   return subType !== 'open_text'
+}
+
+/** Session-wide Q&A leaderboard requires at least one scorable quiz question. */
+export function sessionSupportsOverallLeaderboard(questions) {
+  if (!Array.isArray(questions) || !questions.length) return false
+  return questions.some(
+    (q) =>
+      questionSupportsLeaderboard(q) &&
+      Boolean(q.isQuizMode) &&
+      q.rawType !== 'poll' &&
+      !q.isSurvey,
+  )
 }
 
 export function questionUsesOptionChart(chartRawType) {

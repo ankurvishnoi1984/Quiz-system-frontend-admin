@@ -20,7 +20,11 @@ import { useParticipantPreJoinRealtime } from '../../hooks/useParticipantPreJoin
 import { hasSessionCodeInJoinPath, normalizeSessionCode } from '../../utils/joinUrl'
 import { computeResponseTimeMs } from '../../utils/quizResponseTime'
 import { isStrictLateJoinSession, sessionHasTimedQuestions } from '../../utils/sessionFlags'
-import { surveySupportsParticipantResults } from '../../utils/livePresentation'
+import {
+  questionSupportsLeaderboard,
+  sessionSupportsOverallLeaderboard,
+  surveySupportsParticipantResults,
+} from '../../utils/livePresentation'
 import {
   filterActiveQuestionsForLateJoinPolicy,
   getCountdownEndsAtForQuestion,
@@ -245,11 +249,8 @@ function ParticipantSessionPage() {
   const isSessionEnded =
     session?.status === 'completed' || session?.status === 'archived'
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
-  const isPollOrSurveySession = useMemo(() => {
-    if (!mappedQuestions.length) return false
-    return mappedQuestions.every((q) => q.rawType === 'poll' || q.isSurvey)
-  }, [mappedQuestions])
-  const showLeaderboardInQa = showOverallLeaderboard && !isPollOrSurveySession
+  const showLeaderboardInQa =
+    showOverallLeaderboard && sessionSupportsOverallLeaderboard(mappedQuestions)
   const navigationEnabled = session?.participant_navigation_enabled !== false
   const allLiveQuestionsClosed = useMemo(() => {
     if (!navigationEnabled) return false
@@ -1156,6 +1157,7 @@ function ParticipantSessionPage() {
     : false
   const showCurrentQuestionLeaderboard =
     !question?.isSurvey &&
+    questionSupportsLeaderboard(question) &&
     isCurrentQuestionLeaderboardVisible &&
     step === 'active' &&
     Boolean(questionLockedBySubmission || submitted)

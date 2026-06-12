@@ -68,7 +68,9 @@ import {
   buildRatingChartData,
   buildWordCloudData,
   mapLiveQuestions,
+  questionSupportsLeaderboard,
   questionUsesOptionChart,
+  sessionSupportsOverallLeaderboard,
 } from '../utils/livePresentation'
 
 function buildRankingResponseLabel(row, optionsById) {
@@ -464,13 +466,21 @@ function LivePage() {
   )
 
   const activeQuestionLeaderboard = useMemo(() => {
-    if (!activeQuestion?.id || !activeQuestion.isQuizMode) return []
+    if (
+      !activeQuestion?.id ||
+      !activeQuestion.isQuizMode ||
+      !questionSupportsLeaderboard(activeQuestion)
+    ) {
+      return []
+    }
     return buildQuestionLeaderboardForQuestion(
       sessionResponses,
       activeQuestion.id,
       leaderboardLimit,
     )
-  }, [activeQuestion?.id, activeQuestion?.isQuizMode, sessionResponses, leaderboardLimit])
+  }, [activeQuestion, sessionResponses, leaderboardLimit])
+
+  const showSessionLeaderboard = sessionSupportsOverallLeaderboard(mappedQuestions)
 
 
   const session = sessionQuery.data
@@ -580,16 +590,18 @@ function LivePage() {
             <Users className="size-4" />
             {participants} participants
           </span>
-          <button
-            type="button"
-            onClick={() => setLeaderboardOpen((p) => !p)}
-            className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition ${
-              leaderboardOpen ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-blue-200/70 bg-white/90 text-slate-700 hover:bg-blue-50'
-            }`}
-          >
-            <Trophy className="size-4" />
-            Leaderboard
-          </button>
+          {showSessionLeaderboard ? (
+            <button
+              type="button"
+              onClick={() => setLeaderboardOpen((p) => !p)}
+              className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition ${
+                leaderboardOpen ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-blue-200/70 bg-white/90 text-slate-700 hover:bg-blue-50'
+              }`}
+            >
+              <Trophy className="size-4" />
+              Leaderboard
+            </button>
+          ) : null}
           {canLaunchSession ? (
             <button
               type="button"
@@ -1018,7 +1030,11 @@ function LivePage() {
           <QuestionLeaderboardPanel
             activeQuestion={activeQuestion}
             questionNumber={activeQuestion ? questionIndex + 1 : null}
-            canShowLeaderboard={Boolean(activeQuestion?.isQuizMode && activeQuestion?.isLive)}
+            canShowLeaderboard={Boolean(
+              activeQuestion?.isQuizMode &&
+                activeQuestion?.isLive &&
+                questionSupportsLeaderboard(activeQuestion),
+            )}
             onShowLeaderboard={() => setQuestionLeaderboardOpen(true)}
           />
             </div>
