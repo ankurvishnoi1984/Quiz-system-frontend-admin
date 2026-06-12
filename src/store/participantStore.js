@@ -21,14 +21,16 @@ export const useParticipantStore = create(
   persist(
     (set, get) => ({
       participantToken: null,
+      participantRefreshToken: null,
       joinedUser: null,
       joinedSessionCode: null,
 
       ...initialQuiz,
 
-      setParticipant: ({ token, participant, sessionCode }) =>
+      setParticipant: ({ token, refreshToken, participant, sessionCode }) =>
         set({
           participantToken: token,
+          participantRefreshToken: refreshToken ?? get().participantRefreshToken,
           joinedUser: participant,
           joinedSessionCode: sessionCode ?? get().joinedSessionCode,
         }),
@@ -36,6 +38,7 @@ export const useParticipantStore = create(
       clearParticipant: () =>
         set({
           participantToken: null,
+          participantRefreshToken: null,
           joinedUser: null,
           joinedSessionCode: null,
           ...initialQuiz,
@@ -196,6 +199,7 @@ export const useParticipantStore = create(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         participantToken: state.participantToken,
+        participantRefreshToken: state.participantRefreshToken,
         joinedUser: state.joinedUser,
         joinedSessionCode: state.joinedSessionCode,
         quizResponses: state.quizResponses,
@@ -218,9 +222,14 @@ export const useParticipantStore = create(
             frozen: s.quizCountdownFrozen ?? null,
           }
         }
-        return { ...s, quizCountdownByQuestion: byQ, version }
+        return {
+          ...s,
+          quizCountdownByQuestion: byQ,
+          participantRefreshToken: s.participantRefreshToken ?? null,
+          version,
+        }
       },
-      version: 1,
+      version: 2,
     },
   ),
 )

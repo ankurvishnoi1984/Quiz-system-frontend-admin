@@ -1,3 +1,5 @@
+import { participantAuthRequest } from './participantAuthRequest'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1'
 
 async function parseJson(response) {
@@ -9,24 +11,7 @@ async function parseJson(response) {
 }
 
 async function authRequest(path, token, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-    ...options,
-  })
-
-  const payload = await parseJson(response)
-  if (!response.ok) {
-    const error = new Error(payload?.message || 'Request failed')
-    error.status = response.status
-    error.details = payload?.errors || null
-    throw error
-  }
-
-  return payload?.data
+  return participantAuthRequest(path, token, options)
 }
 
 async function publicRequest(path, options = {}) {
@@ -50,7 +35,14 @@ async function publicRequest(path, options = {}) {
 }
 
 export async function lookupSessionApi(sessionCode) {
-  const data = await publicRequest(`/sessions/join/${sessionCode}`)
+  const encoded = encodeURIComponent(sessionCode)
+  const data = await publicRequest(`/sessions/join/${encoded}?_=${Date.now()}`, {
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  })
   return data?.session || null
 }
 
@@ -62,6 +54,7 @@ export async function joinSessionApi(sessionCode, payload) {
   return {
     participant: data?.participant,
     token: data?.participant_token,
+    refreshToken: data?.participant_refresh_token || null,
     isReturning: Boolean(data?.is_returning),
     sessionState: data?.session_state || null,
   }

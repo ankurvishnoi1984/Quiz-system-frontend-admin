@@ -16,6 +16,7 @@ import {
 import { createRealtimeClient, RealtimeEvent } from '../../services/realtimeClient'
 import { useParticipantStore } from '../../store/participantStore'
 import { useParticipantProgressPersistence } from '../../hooks/useParticipantProgressPersistence'
+import { useParticipantPreJoinRealtime } from '../../hooks/useParticipantPreJoinRealtime'
 import { hasSessionCodeInJoinPath, normalizeSessionCode } from '../../utils/joinUrl'
 import { computeResponseTimeMs } from '../../utils/quizResponseTime'
 import { isStrictLateJoinSession, sessionHasTimedQuestions } from '../../utils/sessionFlags'
@@ -66,6 +67,17 @@ function ParticipantSessionPage() {
   const [sessionCodeInput, setSessionCodeInput] = useState('')
   const effectiveSessionCode = normalizeSessionCode(
     hasSessionCodeInUrl ? sessionId : sessionCodeInput,
+  )
+
+  const canUseStoredJoin = useMemo(
+    () =>
+      canReuseStoredParticipantSession({
+        hasSessionCodeInUrl,
+        participantToken,
+        joinedSessionCode,
+        effectiveSessionCode,
+      }),
+    [hasSessionCodeInUrl, participantToken, joinedSessionCode, effectiveSessionCode],
   )
 
   const {
@@ -154,15 +166,31 @@ function ParticipantSessionPage() {
     queryFn: () => lookupSessionApi(effectiveSessionCode),
     enabled: Boolean(effectiveSessionCode),
     retry: false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchIntervalInBackground: true,
     refetchInterval: (query) => {
       const status = query.state.data?.status
-      const onJoinStep = step === 'join' && !participantToken
+      const onJoinStep = step === 'join' && !participantToken && !canUseStoredJoin
       if (onJoinStep && !isSessionOpenForNewJoin(status)) return 3000
       if (onJoinStep && status === 'live') return 5000
       if (step === 'waiting' || status === 'draft') return 3000
       if (participantToken && (status === 'live' || status === 'paused')) return 5000
       return false
     },
+  })
+
+  const preJoinRealtimeEnabled = Boolean(
+    participantHydrated &&
+      effectiveSessionCode &&
+      step === 'join' &&
+      !participantToken &&
+      !canUseStoredJoin,
+  )
+
+  useParticipantPreJoinRealtime({
+    sessionCode: effectiveSessionCode,
+    enabled: preJoinRealtimeEnabled,
   })
 
   const questionsQuery = useQuery({
@@ -1517,6 +1545,7 @@ function ParticipantSessionPage() {
       }
       setParticipant({
         token: result.token,
+        refreshToken: result.refreshToken,
         participant: {
           name: result.participant.nickname || 'Anonymous',
           email: result.participant.email,
@@ -1639,13 +1668,6 @@ function ParticipantSessionPage() {
       </PageCenteredShell>
     )
   }
-
-  const canUseStoredJoin = canReuseStoredParticipantSession({
-    hasSessionCodeInUrl,
-    participantToken,
-    joinedSessionCode,
-    effectiveSessionCode,
-  })
 
   const showJoinForm = !canUseStoredJoin && step === 'join'
   const showSessionNotLive =
