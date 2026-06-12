@@ -2243,7 +2243,7 @@ function BuilderPage() {
                 />
               </div>
 
-              <div className="rounded-2xl border border-blue-200/70 bg-white p-3">
+              {/* <div className="rounded-2xl border border-blue-200/70 bg-white p-3">
                 <label className="text-sm font-semibold text-slate-700">Session password</label>
                 <input
                   type="text"
@@ -2256,7 +2256,7 @@ function BuilderPage() {
                   placeholder="Optional"
                   className="mt-2 h-10 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50"
                 />
-              </div>
+              </div> */}
 
               <div className="rounded-2xl border border-dashed border-blue-300 bg-white/70 p-4 text-sm text-slate-600">
                 Tip: Use <strong>Quiz mode</strong> + correct answers + points for scored quizzes.

@@ -1,5 +1,6 @@
 import { BarChart3, Eye, EyeOff, Lock, Play, RotateCcw, Square, Trophy } from 'lucide-react'
 import { questionSupportsAnswerReveal } from '../../utils/answerReveal'
+import { surveySupportsParticipantResults } from '../../utils/livePresentation'
 import { canHostCloseQuestion } from '../../utils/hostQuestionControls'
 import { HostQuestionActionButton } from './HostQuestionActionButton'
 
@@ -117,7 +118,7 @@ export function HostQuestionControls({
             size={size}
           />
         ) : null}
-        {canEditLive && question.isSurvey ? (
+        {canEditLive && question.isSurvey && surveySupportsParticipantResults(question) ? (
           <HostQuestionActionButton
             disabled={!isActiveQuestion || questionLeaderboardMutation.isPending}
             onClick={() =>

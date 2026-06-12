@@ -46,6 +46,14 @@ export function getQuestionChartRawType(question) {
   return rawType
 }
 
+/** Open-text survey answers are not aggregated for participant-facing results. */
+export function surveySupportsParticipantResults(question) {
+  const isSurvey = Boolean(question?.isSurvey || question?.rawType === 'survey')
+  if (!isSurvey) return false
+  const subType = question?.surveySubType ?? question?.survey_subtype ?? getQuestionChartRawType(question)
+  return subType !== 'open_text'
+}
+
 export function questionUsesOptionChart(chartRawType) {
   return chartRawType === 'mcq' || chartRawType === 'poll' || chartRawType === 'true_false'
 }

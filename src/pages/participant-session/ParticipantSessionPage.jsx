@@ -20,6 +20,7 @@ import { useParticipantPreJoinRealtime } from '../../hooks/useParticipantPreJoin
 import { hasSessionCodeInJoinPath, normalizeSessionCode } from '../../utils/joinUrl'
 import { computeResponseTimeMs } from '../../utils/quizResponseTime'
 import { isStrictLateJoinSession, sessionHasTimedQuestions } from '../../utils/sessionFlags'
+import { surveySupportsParticipantResults } from '../../utils/livePresentation'
 import {
   filterActiveQuestionsForLateJoinPolicy,
   getCountdownEndsAtForQuestion,
@@ -1161,6 +1162,7 @@ function ParticipantSessionPage() {
 
   const showCurrentSurveyResults =
     question?.isSurvey &&
+    surveySupportsParticipantResults(question) &&
     isCurrentQuestionLeaderboardVisible &&
     step === 'active' &&
     Boolean(questionLockedBySubmission || submitted)
