@@ -1,4 +1,11 @@
-import { sortTrueFalseOptionData } from './livePresentation'
+import { sortTrueFalseOptionData, getQuestionChartRawType, mapLiveQuestionType } from './livePresentation'
+
+export function getParticipantResultsTitle(question) {
+  if (!question) return 'Results'
+  const label =
+    question.type || mapLiveQuestionType(getQuestionChartRawType(question)) || 'Question'
+  return `${label} results`
+}
 
 function normalizeOptions(question) {
   return (question?.options || []).map((option) => ({

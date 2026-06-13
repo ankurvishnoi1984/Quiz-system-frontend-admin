@@ -46,9 +46,10 @@ export function getQuestionChartRawType(question) {
   return rawType
 }
 
-/** Open-text questions do not support per-question or scoring leaderboards. */
+/** Open-text and rating questions do not support per-question scoring leaderboards. */
 export function questionSupportsLeaderboard(question) {
-  return getQuestionChartRawType(question) !== 'open_text'
+  const chartType = getQuestionChartRawType(question)
+  return chartType !== 'open_text' && chartType !== 'rating'
 }
 
 /** Open-text survey answers are not aggregated for participant-facing results. */
@@ -59,11 +60,11 @@ export function surveySupportsParticipantResults(question) {
   return subType !== 'open_text'
 }
 
-/** Poll questions and non-open-text surveys can show anonymous aggregate results. */
+/** Poll, rating, and non-open-text surveys can show anonymous aggregate results. */
 export function questionSupportsParticipantResults(question) {
   if (!question) return false
   const rawType = question.rawType ?? question.question_type
-  if (rawType === 'poll') return true
+  if (rawType === 'poll' || rawType === 'rating') return true
   if (rawType === 'survey' || question.isSurvey) {
     return surveySupportsParticipantResults(question)
   }

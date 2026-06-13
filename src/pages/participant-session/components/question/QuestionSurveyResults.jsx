@@ -1,5 +1,8 @@
 import { BarChart3 } from 'lucide-react'
-import { buildParticipantSurveyResultsView } from '../../../../utils/participantSurveyResults'
+import {
+  buildParticipantSurveyResultsView,
+  getParticipantResultsTitle,
+} from '../../../../utils/participantSurveyResults'
 
 function ResultBar({ label, count, percent, meta }) {
   return (
@@ -23,6 +26,7 @@ function ResultBar({ label, count, percent, meta }) {
 
 export function QuestionSurveyResults({ question, results, isLoading }) {
   const view = buildParticipantSurveyResultsView(question, results)
+  const resultsTitle = getParticipantResultsTitle(question)
 
   return (
     <div className="rounded-2xl border border-sky-200 bg-sky-50/80 p-4">
@@ -30,7 +34,7 @@ export function QuestionSurveyResults({ question, results, isLoading }) {
         <div>
           <p className="text-sm font-bold text-sky-950">
             <BarChart3 className="mr-2 inline size-4" />
-            Survey results
+            {resultsTitle}
           </p>
           <p className="mt-1 text-xs text-sky-900/80">
             Anonymous group results · no names shown
