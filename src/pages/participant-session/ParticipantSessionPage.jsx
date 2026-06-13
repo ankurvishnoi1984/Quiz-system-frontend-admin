@@ -22,8 +22,8 @@ import { computeResponseTimeMs } from '../../utils/quizResponseTime'
 import { isStrictLateJoinSession, sessionHasTimedQuestions } from '../../utils/sessionFlags'
 import {
   questionSupportsLeaderboard,
+  questionSupportsParticipantResults,
   sessionSupportsOverallLeaderboard,
-  surveySupportsParticipantResults,
 } from '../../utils/livePresentation'
 import {
   filterActiveQuestionsForLateJoinPolicy,
@@ -1163,8 +1163,7 @@ function ParticipantSessionPage() {
     Boolean(questionLockedBySubmission || submitted)
 
   const showCurrentSurveyResults =
-    question?.isSurvey &&
-    surveySupportsParticipantResults(question) &&
+    questionSupportsParticipantResults(question) &&
     isCurrentQuestionLeaderboardVisible &&
     step === 'active' &&
     Boolean(questionLockedBySubmission || submitted)

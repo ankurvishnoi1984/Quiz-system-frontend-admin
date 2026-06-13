@@ -2,7 +2,7 @@ import { BarChart3, Eye, EyeOff, Lock, Play, RotateCcw, Square, Trophy } from 'l
 import { questionSupportsAnswerReveal } from '../../utils/answerReveal'
 import {
   questionSupportsLeaderboard,
-  surveySupportsParticipantResults,
+  questionSupportsParticipantResults,
 } from '../../utils/livePresentation'
 import { canHostCloseQuestion } from '../../utils/hostQuestionControls'
 import { HostQuestionActionButton } from './HostQuestionActionButton'
@@ -62,6 +62,7 @@ export function HostQuestionControls({
               supportsReveal,
               isQuizMode: question.isQuizMode,
               isSurvey: Boolean(question.isSurvey),
+              supportsParticipantResults: questionSupportsParticipantResults(question),
             })
           }
           icon={question.isLive ? Square : Play}
@@ -121,7 +122,7 @@ export function HostQuestionControls({
             size={size}
           />
         ) : null}
-        {canEditLive && question.isSurvey && surveySupportsParticipantResults(question) ? (
+        {canEditLive && questionSupportsParticipantResults(question) ? (
           <HostQuestionActionButton
             disabled={!isActiveQuestion || questionLeaderboardMutation.isPending}
             onClick={() =>
@@ -136,8 +137,8 @@ export function HostQuestionControls({
               !isActiveQuestion
                 ? 'Activate this question before showing results to participants'
                 : question.showLeaderboard
-                  ? 'Hide anonymous survey results on participant screens'
-                  : 'Show anonymous survey results on participant screens'
+                  ? 'Hide anonymous results on participant screens'
+                  : 'Show anonymous results on participant screens'
             }
             active={question.showLeaderboard}
             tone="sky"

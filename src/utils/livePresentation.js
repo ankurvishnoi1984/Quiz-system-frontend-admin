@@ -59,6 +59,17 @@ export function surveySupportsParticipantResults(question) {
   return subType !== 'open_text'
 }
 
+/** Poll questions and non-open-text surveys can show anonymous aggregate results. */
+export function questionSupportsParticipantResults(question) {
+  if (!question) return false
+  const rawType = question.rawType ?? question.question_type
+  if (rawType === 'poll') return true
+  if (rawType === 'survey' || question.isSurvey) {
+    return surveySupportsParticipantResults(question)
+  }
+  return false
+}
+
 /** Session-wide Q&A leaderboard requires at least one scorable quiz question. */
 export function sessionSupportsOverallLeaderboard(questions) {
   if (!Array.isArray(questions) || !questions.length) return false
