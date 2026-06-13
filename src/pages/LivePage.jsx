@@ -635,17 +635,19 @@ function LivePage() {
               {transitionMutation.isPending ? 'Launching…' : 'Launch'}
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              const url = `${window.location.origin}/present?session=${encodeURIComponent(sessionId)}`
-              window.open(url, '_blank', 'noopener,noreferrer')
-            }}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-navy-900/20 transition hover:brightness-110"
-          >
-            <Presentation className="size-4" />
-            Present
-          </button>
+          {canEditLive ? (
+            <button
+              type="button"
+              onClick={() => {
+                const url = `${window.location.origin}/present?session=${encodeURIComponent(sessionId)}`
+                window.open(url, '_blank', 'noopener,noreferrer')
+              }}
+              className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-navy-900/20 transition hover:brightness-110"
+            >
+              <Presentation className="size-4" />
+              Present
+            </button>
+          ) : null}
           {canShareSession ? (
             <button
               type="button"
