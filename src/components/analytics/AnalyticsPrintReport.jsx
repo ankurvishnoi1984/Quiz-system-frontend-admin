@@ -4,7 +4,7 @@ function formatRankingTopOption(question) {
   return `${top.optionText} (avg ${top.averageScore})`
 }
 
-export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leaderboard, settingsSnapshot }) {
+export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leaderboard }) {
   if (!sessionMeta) return null
 
   const generatedAt = new Date().toLocaleString()
@@ -77,51 +77,30 @@ export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leader
         </table>
       </section>
 
-      <section className="mt-6 grid grid-cols-2 gap-6">
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Top participants</h2>
-          {leaderboard.length ? (
-            <table className="mt-3 w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-slate-300 text-left">
-                  <th className="py-2 pr-3 font-semibold">Rank</th>
-                  <th className="py-2 pr-3 font-semibold">Name</th>
-                  <th className="py-2 font-semibold">Score</th>
+      <section className="mt-6">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Top participants</h2>
+        {leaderboard.length ? (
+          <table className="mt-3 w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-slate-300 text-left">
+                <th className="py-2 pr-3 font-semibold">Rank</th>
+                <th className="py-2 pr-3 font-semibold">Name</th>
+                <th className="py-2 font-semibold">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaderboard.map((row, idx) => (
+                <tr key={`${row.name}-${idx}`} className="border-b border-slate-100">
+                  <td className="py-2 pr-3">{idx + 1}</td>
+                  <td className="py-2 pr-3">{row.name}</td>
+                  <td className="py-2">{row.score}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {leaderboard.map((row, idx) => (
-                  <tr key={`${row.name}-${idx}`} className="border-b border-slate-100">
-                    <td className="py-2 pr-3">{idx + 1}</td>
-                    <td className="py-2 pr-3">{row.name}</td>
-                    <td className="py-2">{row.score}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="mt-3 text-sm text-slate-500">No scored responses.</p>
-          )}
-        </div>
-
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Session settings</h2>
-          <dl className="mt-3 space-y-2 text-sm">
-            {[
-              ['Join requirement', settingsSnapshot.joinRequirement],
-              ['Time limit', settingsSnapshot.timeLimitLabel],
-              ['Quiz mode', settingsSnapshot.quizMode ? 'Enabled' : 'Disabled'],
-              ['Max participants', String(settingsSnapshot.maxParticipants)],
-              ['Anonymous', settingsSnapshot.anonymous ? 'Yes' : 'No'],
-              ['Leaderboard', settingsSnapshot.leaderboard ? 'Enabled' : 'Disabled'],
-            ].map(([label, value]) => (
-              <div key={label} className="flex justify-between gap-4 border-b border-slate-100 py-1">
-                <dt className="text-slate-600">{label}</dt>
-                <dd className="font-semibold text-slate-900">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="mt-3 text-sm text-slate-500">No scored responses.</p>
+        )}
       </section>
     </div>
   )

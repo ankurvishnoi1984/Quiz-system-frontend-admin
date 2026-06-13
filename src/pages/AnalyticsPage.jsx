@@ -1,4 +1,4 @@
-import { Download, FileText, Loader2, Printer } from 'lucide-react'
+import { Download, Loader2, Printer } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
@@ -27,7 +27,7 @@ import {
   getSessionReportApi,
   getSessionSummaryReportApi,
 } from '../services/analyticsApi'
-import { getSessionDetailApi, listSessionQuestionsApi } from '../services/builderApi'
+import { listSessionQuestionsApi } from '../services/builderApi'
 import { getQuestionResultsApi, getSessionResponsesApi } from '../services/liveApi'
 import { useAuthStore } from '../store/authStore'
 
@@ -155,12 +155,6 @@ function AnalyticsPage() {
     enabled: Boolean(accessToken && numericSessionId),
   })
 
-  const sessionDetailQuery = useQuery({
-    queryKey: ['analytics-session-detail', numericSessionId],
-    queryFn: () => getSessionDetailApi(accessToken, numericSessionId),
-    enabled: Boolean(accessToken && numericSessionId),
-  })
-
   const questionsQuery = useQuery({
     queryKey: ['analytics-session-questions', numericSessionId],
     queryFn: () => listSessionQuestionsApi(accessToken, numericSessionId),
@@ -205,7 +199,6 @@ function AnalyticsPage() {
   }, [reportQuery.data?.question_breakdown])
 
   const report = reportQuery.data
-  const sessionDetail = sessionDetailQuery.data
   const allResponses = responsesQuery.data || []
 
   const listSession = activeSessionId ? sessions.find((s) => String(s.id) === String(activeSessionId)) : null
@@ -304,35 +297,6 @@ function AnalyticsPage() {
   }, [selectedQuestion, questionsReportById, questionsReport?.total_participants, summary.joined])
 
   const leaderboard = useMemo(() => buildLeaderboard(allResponses), [allResponses])
-
-  const settingsSnapshot = useMemo(() => {
-    const d = sessionDetail
-    if (!d) {
-      return {
-        joinRequirement: listSession?.joinRequirement ?? 'name',
-        timeLimitLabel: 'Off',
-        quizMode: false,
-        maxParticipants: 0,
-        anonymous: listSession?.joinRequirement === 'anonymous',
-        password: false,
-        leaderboard: true,
-      }
-    }
-    const timed = sortedQuestions.some((q) => Number(q.time_limit_seconds) > 0)
-    const maxTime = sortedQuestions.reduce(
-      (max, q) => Math.max(max, Number(q.time_limit_seconds) || 0),
-      0,
-    )
-    return {
-      joinRequirement: d.join_type ?? 'name',
-      timeLimitLabel: timed ? (maxTime ? `${maxTime}s (max per question)` : 'Varies') : 'Off',
-      quizMode: sortedQuestions.some((q) => q.is_quiz_mode),
-      maxParticipants: d.max_participants ?? 0,
-      anonymous: d.join_type === 'anonymous',
-      password: Boolean(d.password_hash),
-      leaderboard: Boolean(d.leaderboard_enabled),
-    }
-  }, [sessionDetail, listSession, sortedQuestions])
 
   const isPollOrSurveySession = useMemo(() => {
     if (!sortedQuestions.length) return false
@@ -445,7 +409,6 @@ function AnalyticsPage() {
   const isLoading =
     Boolean(numericSessionId) &&
     (reportQuery.isLoading ||
-      sessionDetailQuery.isLoading ||
       questionsQuery.isLoading ||
       responsesQuery.isLoading)
 
@@ -494,7 +457,6 @@ function AnalyticsPage() {
           summary={summary}
           perQuestion={perQuestion}
           leaderboard={leaderboard}
-          settingsSnapshot={settingsSnapshot}
         />
       )}
 
@@ -717,67 +679,23 @@ function AnalyticsPage() {
         )}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <ParticipantLeaderboardTable
-          leaderboard={participantsReport?.leaderboard}
-          isLoading={participantsReportLoading}
-          showScore={!isPollOrSurveySession}
-          onExport={async () => {
-            try {
-              setExportingReportId('participants')
-              await exportParticipantReport()
-            } catch (error) {
-              console.error(error)
-              window.alert(error?.message || 'Export failed')
-            } finally {
-              setExportingReportId(null)
-            }
-          }}
-          isExporting={exportingReportId === 'participants'}
-        />
-
-        <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session settings</p>
-              <h3 className="mt-1 text-lg font-bold text-navy-900">Snapshot</h3>
-            </div>
-            <FileText className="size-5 text-navy-700" />
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Join requirement</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.joinRequirement}</p>
-              <p className="mt-1 text-xs text-slate-600">Controls what participants must enter</p>
-            </div>
-            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Time limit</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.timeLimitLabel}</p>
-              <p className="mt-1 text-xs text-slate-600">Per question</p>
-            </div>
-            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Quiz mode</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.quizMode ? 'Enabled' : 'Disabled'}</p>
-              <p className="mt-1 text-xs text-slate-600">Correct answers + points</p>
-            </div>
-            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Max participants</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.maxParticipants}</p>
-              <p className="mt-1 text-xs text-slate-600">Capacity control</p>
-            </div>
-            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Anonymous</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.anonymous ? 'Yes' : 'No'}</p>
-              <p className="mt-1 text-xs text-slate-600">Identity hidden in reports</p>
-            </div>
-            <div className="rounded-2xl border border-blue-200/70 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Leaderboard</p>
-              <p className="mt-1 text-sm font-bold text-navy-900">{settingsSnapshot.leaderboard ? 'Enabled' : 'Disabled'}</p>
-              <p className="mt-1 text-xs text-slate-600">Shown to participants</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ParticipantLeaderboardTable
+        leaderboard={participantsReport?.leaderboard}
+        isLoading={participantsReportLoading}
+        showScore={!isPollOrSurveySession}
+        onExport={async () => {
+          try {
+            setExportingReportId('participants')
+            await exportParticipantReport()
+          } catch (error) {
+            console.error(error)
+            window.alert(error?.message || 'Export failed')
+          } finally {
+            setExportingReportId(null)
+          }
+        }}
+        isExporting={exportingReportId === 'participants'}
+      />
       </>
       )}
 
