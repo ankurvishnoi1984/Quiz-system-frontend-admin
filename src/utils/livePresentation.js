@@ -46,10 +46,16 @@ export function getQuestionChartRawType(question) {
   return rawType
 }
 
-/** Open-text and rating questions do not support per-question scoring leaderboards. */
+/** Open-text, poll, and rating questions do not support per-question scoring leaderboards. */
 export function questionSupportsLeaderboard(question) {
   const chartType = getQuestionChartRawType(question)
-  return chartType !== 'open_text' && chartType !== 'rating'
+  return chartType !== 'open_text' && chartType !== 'rating' && chartType !== 'poll'
+}
+
+/** True when every question in the session is a standalone poll (non-scored). */
+export function sessionIsStandalonePollOnly(questions) {
+  if (!Array.isArray(questions) || !questions.length) return false
+  return questions.every((q) => (q.rawType ?? q.question_type) === 'poll')
 }
 
 /** Open-text survey answers are not aggregated for participant-facing results. */
@@ -74,6 +80,7 @@ export function questionSupportsParticipantResults(question) {
 /** Session-wide Q&A leaderboard requires at least one scorable quiz question. */
 export function sessionSupportsOverallLeaderboard(questions) {
   if (!Array.isArray(questions) || !questions.length) return false
+  if (sessionIsStandalonePollOnly(questions)) return false
   return questions.some(
     (q) =>
       questionSupportsLeaderboard(q) &&

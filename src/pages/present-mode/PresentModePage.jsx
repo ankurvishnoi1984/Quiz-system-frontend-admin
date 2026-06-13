@@ -6,6 +6,7 @@ import { HostQuestionControls } from '../../components/live/HostQuestionControls
 import { useAuthStore } from '../../store/authStore'
 import { useHostQuestionMutations } from '../../hooks/useHostQuestionMutations'
 import { useLiveSession } from '../../hooks/useLiveSession'
+import { sessionSupportsOverallLeaderboard } from '../../utils/livePresentation'
 import { LeaderboardSlide } from './LeaderboardSlide'
 import { ParticipantsSlide } from './ParticipantsSlide'
 import { PresentNavButton, PresentShell } from './PresentShell'
@@ -82,7 +83,9 @@ function PresentModePage() {
   const slides = useMemo(() => {
     const list = [{ type: 'participants' }]
     mappedQuestions.forEach((q, i) => list.push({ type: 'question', question: q, questionNumber: i + 1 }))
-    list.push({ type: 'leaderboard' })
+    if (sessionSupportsOverallLeaderboard(mappedQuestions)) {
+      list.push({ type: 'leaderboard' })
+    }
     return list
   }, [mappedQuestions])
 
