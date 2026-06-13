@@ -46,10 +46,15 @@ export function getQuestionChartRawType(question) {
   return rawType
 }
 
-/** Open-text, poll, and rating questions do not support per-question scoring leaderboards. */
+/** Non-scored formats do not support per-question scoring leaderboards. */
 export function questionSupportsLeaderboard(question) {
   const chartType = getQuestionChartRawType(question)
-  return chartType !== 'open_text' && chartType !== 'rating' && chartType !== 'poll'
+  return (
+    chartType !== 'open_text' &&
+    chartType !== 'rating' &&
+    chartType !== 'poll' &&
+    chartType !== 'word_cloud'
+  )
 }
 
 /** True when every question in the session is a standalone poll (non-scored). */
