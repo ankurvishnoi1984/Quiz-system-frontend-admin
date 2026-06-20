@@ -197,6 +197,43 @@ function uid(prefix = 'id') {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`
 }
 
+function normalizeTimeLimitSeconds(value) {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+}
+
+function timeLimitSecondsToMode(seconds) {
+  const n = normalizeTimeLimitSeconds(seconds)
+  if (n === 0) return 'Off'
+  if (n === 15) return '15s'
+  if (n === 30) return '30s'
+  if (n === 60) return '60s'
+  if (n === 120) return '120s'
+  return 'Custom'
+}
+
+function timeLimitModeToSeconds(mode, customTime) {
+  if (mode === 'Off') return 0
+  if (mode === '15s') return 15
+  if (mode === '30s') return 30
+  if (mode === '60s') return 60
+  if (mode === '120s') return 120
+  return Math.max(1, Number(customTime || 1))
+}
+
+function areAllQuestionsUntimed(questions) {
+  return (questions || []).every((q) => normalizeTimeLimitSeconds(q.timeLimitSeconds) === 0)
+}
+
+function resolveDefaultTimeLimitForNewQuestion(questions) {
+  if (!questions.length) return 0
+  if (areAllQuestionsUntimed(questions)) return 0
+  const limits = questions.map((q) => normalizeTimeLimitSeconds(q.timeLimitSeconds))
+  const unique = new Set(limits)
+  if (unique.size === 1) return limits[0]
+  return 0
+}
+
 function createTrueFalseOptions(correctIsTrue = true) {
   return [
     { id: uid('opt'), optionId: null, text: 'True', isCorrect: correctIsTrue },
@@ -1061,6 +1098,7 @@ function BuilderPage() {
         ratingMaxLabel: question.rating_max_label || '',
         answerRevealed: Boolean(question.answer_revealed),
         showLeaderboard: Boolean(question.show_leaderboard),
+        timeLimitSeconds: 0,
         options,
       }
     }
@@ -1094,6 +1132,7 @@ function BuilderPage() {
         : {}),
       answerRevealed: Boolean(question.answer_revealed),
       showLeaderboard: Boolean(question.show_leaderboard),
+      timeLimitSeconds: normalizeTimeLimitSeconds(question.time_limit_seconds),
       options,
     }
   }
@@ -1251,35 +1290,32 @@ function BuilderPage() {
       status: statusMap[sessionQuery.data.status] || 'Draft',
       rawStatus: sessionQuery.data.status,
       date: (sessionQuery.data.created_at || '').slice(0, 10),
-      timeLimitSeconds: 30,
     }
   }, [sessionQuery.data])
 
   const isDraftSession = session?.rawStatus === 'draft'
 
-  const timeLimitSeconds = 30
-  const [timeLimitMode, setTimeLimitMode] = useState('30s')
+  const [timeLimitMode, setTimeLimitMode] = useState('Off')
   const [customTime, setCustomTime] = useState(45)
-
-  useEffect(() => {
-    if (!sessionId) return
-    if (timeLimitSeconds === 0) setTimeLimitMode('Off')
-    else if (timeLimitSeconds === 15) setTimeLimitMode('15s')
-    else if (timeLimitSeconds === 30) setTimeLimitMode('30s')
-    else if (timeLimitSeconds === 60) setTimeLimitMode('60s')
-    else if (timeLimitSeconds === 120) setTimeLimitMode('120s')
-    else {
-      setTimeLimitMode('Custom')
-      setCustomTime(timeLimitSeconds)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId])
 
   const selected = useMemo(
     () => questions.find((q) => q.id === selectedId) ?? questions[0],
     [questions, selectedId],
   )
   const quizMode = selected?.type !== 'Poll' && selected?.type !== 'Survey'
+  const sessionAllUntimed = areAllQuestionsUntimed(questions)
+  const selectedTimeLimitSeconds = selected
+    ? normalizeTimeLimitSeconds(selected.timeLimitSeconds)
+    : 0
+
+  useEffect(() => {
+    if (!selected || selected.type === 'Survey') return
+    const mode = timeLimitSecondsToMode(selected.timeLimitSeconds)
+    setTimeLimitMode(mode)
+    if (mode === 'Custom') {
+      setCustomTime(normalizeTimeLimitSeconds(selected.timeLimitSeconds) || 45)
+    }
+  }, [selected?.id, selected?.timeLimitSeconds, selected?.type])
   const sessionQuestionType = questions[0]?.type ?? null
   const hasMixedQuestionTypes = useMemo(() => {
     if (questions.length <= 1) return false
@@ -1300,6 +1336,37 @@ function BuilderPage() {
     setQuestions((prev) => prev.map((q) => (q.id === next.id ? next : q)))
   }
 
+  const applyQuestionTimeLimit = (seconds) => {
+    if (!selected || selected.type === 'Survey') return
+    const normalized = normalizeTimeLimitSeconds(seconds)
+    const applyToAll = areAllQuestionsUntimed(questions)
+    setDirty(true)
+    if (applyToAll) {
+      setQuestions((prev) =>
+        prev.map((q) => (q.type === 'Survey' ? q : { ...q, timeLimitSeconds: normalized })),
+      )
+      return
+    }
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === selected.id && q.type !== 'Survey' ? { ...q, timeLimitSeconds: normalized } : q,
+      ),
+    )
+  }
+
+  const handleTimeLimitModeChange = (mode) => {
+    setTimeLimitMode(mode)
+    applyQuestionTimeLimit(timeLimitModeToSeconds(mode, customTime))
+  }
+
+  const handleCustomTimeChange = (value) => {
+    const next = Math.max(1, Number(value || 1))
+    setCustomTime(next)
+    if (timeLimitMode === 'Custom') {
+      applyQuestionTimeLimit(next)
+    }
+  }
+
   const addQuestion = (type) => {
     if (!session || session.rawStatus !== 'draft') return
     if (sessionQuestionType && sessionQuestionType !== type) {
@@ -1315,6 +1382,7 @@ function BuilderPage() {
       text: '',
       media: null,
       points: type === 'Survey' || type === 'Poll' ? 0 : 10,
+      timeLimitSeconds: resolveDefaultTimeLimitForNewQuestion(questions),
       ...(type === 'Survey' ? createSurveyQuestionDefaults('MCQ') : {}),
       ...(type === 'Rating' ? createRatingQuestionDefaults() : {}),
       options:
@@ -1362,25 +1430,6 @@ function BuilderPage() {
     const newIndex = questions.findIndex((q) => q.id === over.id)
     setQuestions((prev) => arrayMove(prev, oldIndex, newIndex))
   }
-
-  const effectiveTimeLimitSeconds =
-    timeLimitMode === 'Off'
-      ? 0
-      : timeLimitMode === '15s'
-        ? 15
-        : timeLimitMode === '30s'
-          ? 30
-          : timeLimitMode === '60s'
-            ? 60
-            : timeLimitMode === '120s'
-              ? 120
-              : Math.max(1, Number(customTime || 1))
-
-  useEffect(() => {
-    if (!session) return
-    if (effectiveTimeLimitSeconds !== timeLimitSeconds) setDirty(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveTimeLimitSeconds])
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -1499,7 +1548,9 @@ function BuilderPage() {
           ...buildQuestionMediaPayload(question.media),
           is_quiz_mode: isPoll || isSurvey ? false : true,
           points_value: isPoll || isSurvey ? 0 : Number(question.points || 0),
-          time_limit_seconds: isSurvey ? null : effectiveTimeLimitSeconds || null,
+          time_limit_seconds: isSurvey
+            ? null
+            : normalizeTimeLimitSeconds(question.timeLimitSeconds) || null,
           allow_multiple_select:
             isSurvey && (surveySubType === 'MCQ' || surveySubType === 'Poll')
               ? Boolean(question.allowMultipleSelect)
@@ -2119,13 +2170,17 @@ function BuilderPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-navy-900">Time limit</p>
-                    <p className="text-xs text-slate-600">Per question timing</p>
+                    <p className="text-xs text-slate-600">
+                      {sessionAllUntimed
+                        ? 'All questions are untimed — changing this applies to every question.'
+                        : 'Per-question timing — adjust individually or turn off for specific questions.'}
+                    </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <select
                       value={timeLimitMode}
                       disabled={!isDraftSession}
-                      onChange={(e) => setTimeLimitMode(e.target.value)}
+                      onChange={(e) => handleTimeLimitModeChange(e.target.value)}
                       className="h-10 rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
                     >
                       {['Off', '15s', '30s', '60s', '120s', 'Custom'].map((x) => (
@@ -2140,15 +2195,17 @@ function BuilderPage() {
                         min={1}
                         disabled={!isDraftSession}
                         value={customTime}
-                        onChange={(e) => setCustomTime(Number(e.target.value || 1))}
+                        onChange={(e) => handleCustomTimeChange(e.target.value)}
                         className="h-10 w-24 rounded-xl border border-blue-200/70 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:bg-slate-50"
                       />
                     )}
                   </div>
                 </div>
                 <p className="mt-3 text-sm text-slate-600">
-                  Effective time limit:{' '}
-                  <span className="font-semibold text-navy-900">{effectiveTimeLimitSeconds === 0 ? 'Off' : `${effectiveTimeLimitSeconds}s`}</span>
+                  This question:{' '}
+                  <span className="font-semibold text-navy-900">
+                    {selectedTimeLimitSeconds === 0 ? 'Off' : `${selectedTimeLimitSeconds}s`}
+                  </span>
                 </p>
               </div>
               )}
