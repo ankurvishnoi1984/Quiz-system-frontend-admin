@@ -226,23 +226,48 @@ export function findNextUnsubmittedActiveQuestion(activeQuestions, submittedIds,
   )
 }
 
-/** Untimed + multi-question navigation: participant may change answers until final Submit. */
-export function participantCanUpdateSubmittedResponse(question, navigationEnabled) {
+/**
+ * Quiz total time: participant finalized by submitting the last question.
+ * @param {Array} activeQuestions
+ * @param {Record<string, boolean>} explicitSubmittedIds
+ */
+export function isQuizTotalTimeSessionFinalized(activeQuestions = [], explicitSubmittedIds = {}) {
+  if (!activeQuestions.length) return false
+  const lastId = activeQuestions[activeQuestions.length - 1]?.id
+  return lastId != null && Boolean(explicitSubmittedIds[String(lastId)])
+}
+
+/**
+ * Whether a previously saved answer may still be edited.
+ * @param {object} [editPolicy]
+ * @param {boolean} [editPolicy.sessionQuizTotalTimeEnabled]
+ * @param {boolean} [editPolicy.quizTotalTimeFinalized]
+ */
+export function participantCanUpdateSubmittedResponse(
+  question,
+  navigationEnabled,
+  editPolicy = {},
+) {
+  const { sessionQuizTotalTimeEnabled = false, quizTotalTimeFinalized = false } = editPolicy
+  if (sessionQuizTotalTimeEnabled) {
+    return !quizTotalTimeFinalized
+  }
   return Boolean(navigationEnabled) && Number(question?.timeLimit ?? 0) <= 0
 }
 
-/** Word cloud: lock add/input after submit unless untimed multi-nav allows updates. */
+/** Word cloud: lock add/input after submit unless edits are still allowed. */
 export function participantWordCloudInputLocked({
   question,
   navigationEnabled,
   inputsLocked,
   submittedIds,
+  editPolicy = {},
 }) {
   if (inputsLocked) return true
   if (!question || question.type !== 'Word Cloud') return false
   const submitted = Boolean(submittedIds?.[String(question.id)])
   if (!submitted) return false
-  return !participantCanUpdateSubmittedResponse(question, navigationEnabled)
+  return !participantCanUpdateSubmittedResponse(question, navigationEnabled, editPolicy)
 }
 
 export function shouldIncludeQuestionInFinalize(
@@ -250,12 +275,13 @@ export function shouldIncludeQuestionInFinalize(
   submittedIds,
   navigationEnabled,
   responses,
+  editPolicy = {},
 ) {
   if (question?.submissionsClosed && !question?.openForReattempt) return false
   const payload = buildResponsePayloadForQuestion(question, responses[question.id])
   if (!payload) return false
   if (!submittedIds?.[String(question.id)]) return true
-  return participantCanUpdateSubmittedResponse(question, navigationEnabled)
+  return participantCanUpdateSubmittedResponse(question, navigationEnabled, editPolicy)
 }
 
 export function participantQuestionHasAnswer(question, response = {}) {
@@ -331,4 +357,20 @@ export function canShowPreviousForTimedMultiNav(activeQuestions, explicitSubmitt
 /** Multi-nav + untimed: Previous is always available when multiple questions are active. */
 export function canShowPreviousForUntimedMultiNav(activeQuestions) {
   return Boolean(activeQuestions?.length > 1)
+}
+
+/**
+ * Multi-nav + quiz total time: Previous only after the final question was submitted
+ * via Submit or when the personal session timer expires.
+ */
+export function canShowPreviousForQuizTotalTimeMultiNav(
+  activeQuestions,
+  explicitSubmittedIds = {},
+  sessionTimerExpired = false,
+) {
+  if (!activeQuestions?.length || activeQuestions.length <= 1) return false
+  return (
+    isQuizTotalTimeSessionFinalized(activeQuestions, explicitSubmittedIds) ||
+    sessionTimerExpired
+  )
 }

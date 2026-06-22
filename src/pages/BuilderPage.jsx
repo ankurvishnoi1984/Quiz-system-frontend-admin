@@ -234,6 +234,16 @@ function resolveDefaultTimeLimitForNewQuestion(questions) {
   return 0
 }
 
+function isSessionQuizTotalTimeEnabled(sessionData) {
+  if (!sessionData) return false
+  const minutes = Number(sessionData.quiz_total_time_minutes)
+  return (
+    sessionData.participant_navigation_enabled !== false &&
+    Number.isFinite(minutes) &&
+    minutes > 0
+  )
+}
+
 function createTrueFalseOptions(correctIsTrue = true) {
   return [
     { id: uid('opt'), optionId: null, text: 'True', isCorrect: correctIsTrue },
@@ -1294,6 +1304,10 @@ function BuilderPage() {
   }, [sessionQuery.data])
 
   const isDraftSession = session?.rawStatus === 'draft'
+  const sessionQuizTotalTimeEnabled = isSessionQuizTotalTimeEnabled(sessionQuery.data)
+  const sessionQuizTotalTimeMinutes = sessionQuizTotalTimeEnabled
+    ? Number(sessionQuery.data?.quiz_total_time_minutes)
+    : null
 
   const [timeLimitMode, setTimeLimitMode] = useState('Off')
   const [customTime, setCustomTime] = useState(45)
@@ -1382,7 +1396,9 @@ function BuilderPage() {
       text: '',
       media: null,
       points: type === 'Survey' || type === 'Poll' ? 0 : 10,
-      timeLimitSeconds: resolveDefaultTimeLimitForNewQuestion(questions),
+      timeLimitSeconds: sessionQuizTotalTimeEnabled
+        ? 0
+        : resolveDefaultTimeLimitForNewQuestion(questions),
       ...(type === 'Survey' ? createSurveyQuestionDefaults('MCQ') : {}),
       ...(type === 'Rating' ? createRatingQuestionDefaults() : {}),
       options:
@@ -1550,7 +1566,9 @@ function BuilderPage() {
           points_value: isPoll || isSurvey ? 0 : Number(question.points || 0),
           time_limit_seconds: isSurvey
             ? null
-            : normalizeTimeLimitSeconds(question.timeLimitSeconds) || null,
+            : sessionQuizTotalTimeEnabled
+              ? null
+              : normalizeTimeLimitSeconds(question.timeLimitSeconds) || null,
           allow_multiple_select:
             isSurvey && (surveySubType === 'MCQ' || surveySubType === 'Poll')
               ? Boolean(question.allowMultipleSelect)
@@ -2165,7 +2183,17 @@ function BuilderPage() {
                 disabled={!isDraftSession}
               />
 
-              {selected.type !== 'Survey' && (
+              {selected.type !== 'Survey' && sessionQuizTotalTimeEnabled ? (
+                <div className="rounded-2xl border border-sky-200/70 bg-sky-50/80 p-4">
+                  <p className="text-sm font-semibold text-sky-950">Session quiz total time</p>
+                  <p className="mt-1 text-xs text-sky-900/80">
+                    This session uses a {sessionQuizTotalTimeMinutes}-minute quiz window. Per-question
+                    time limits are disabled while quiz total time is enabled.
+                  </p>
+                </div>
+              ) : null}
+
+              {selected.type !== 'Survey' && !sessionQuizTotalTimeEnabled ? (
               <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -2208,7 +2236,7 @@ function BuilderPage() {
                   </span>
                 </p>
               </div>
-              )}
+              ) : null}
             </div>
               </>
             )}

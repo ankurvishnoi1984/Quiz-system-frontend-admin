@@ -5,6 +5,17 @@ export function isAllowLateJoinEnabled(value) {
 
 export const MULTI_NAV_TIMED_JOIN_CLOSED_MESSAGE = 'Session has already started'
 
+/** Multiple active questions with a personal session-wide quiz timer (minutes). */
+export function isSessionQuizTotalTimeEnabled(session) {
+  if (!session) return false
+  const minutes = Number(session?.quiz_total_time_minutes)
+  return (
+    session.participant_navigation_enabled !== false &&
+    Number.isFinite(minutes) &&
+    minutes > 0
+  )
+}
+
 export function sessionHasTimedQuestions(questions = []) {
   return (questions || []).some(
     (q) => Number(q?.timeLimit ?? q?.time_limit_seconds ?? 0) > 0,
@@ -31,6 +42,7 @@ export function getFirstTimedQuestion(questions = []) {
  * Multi-question navigation + timed: new joins blocked after first timed question expires.
  */
 export function isMultiNavTimedJoinClosed(session, questions = []) {
+  if (isSessionQuizTotalTimeEnabled(session)) return false
   if (session?.participant_navigation_enabled === false) return false
   if (!sessionHasTimedQuestions(questions)) return false
 
@@ -52,6 +64,7 @@ export function isMultiNavTimedJoinClosed(session, questions = []) {
  * @param {Array|boolean} [questionsOrHasTimed] Question list, or boolean from DB lookup.
  */
 export function isStrictLateJoinSession(session, questionsOrHasTimed = []) {
+  if (isSessionQuizTotalTimeEnabled(session)) return false
   if (session?.participant_navigation_enabled !== false) return false
   if (typeof questionsOrHasTimed === 'boolean') return questionsOrHasTimed
   return sessionHasTimedQuestions(questionsOrHasTimed)

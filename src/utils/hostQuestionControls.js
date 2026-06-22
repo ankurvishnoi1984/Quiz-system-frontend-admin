@@ -15,7 +15,11 @@ export function canHostCloseAllQuestions(questions, { canEditLive, singleActiveQ
 }
 
 /** Multi-question sessions (timed or untimed): activate every question at once. */
-export function canHostActivateAllQuestions(questions, { canEditLive, singleActiveQuestionMode }) {
+export function canHostActivateAllQuestions(
+  questions,
+  { canEditLive, singleActiveQuestionMode, sessionQuizTotalTimeEnabled = false },
+) {
+  if (sessionQuizTotalTimeEnabled) return false
   if (!canEditLive || singleActiveQuestionMode) return false
   const list = questions || []
   if (!list.length) return false

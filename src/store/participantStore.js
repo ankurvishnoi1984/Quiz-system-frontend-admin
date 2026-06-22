@@ -13,6 +13,8 @@ const initialQuiz = {
   quizExplicitSubmittedQuestionIds: {},
   /** Per-question countdown: { [questionId]: { endsAt, frozen } } — frozen = seconds left at submit/session end */
   quizCountdownByQuestion: {},
+  /** Quiz total time: personal session-wide countdown { endsAt, frozen } */
+  quizSessionCountdown: null,
   /** Untimed: when the participant first saw each question (epoch ms) */
   quizQuestionOpenedAt: {},
 }
@@ -160,6 +162,30 @@ export const useParticipantStore = create(
         }))
       },
 
+      startQuizSessionCountdown: (minutes) => {
+        const mins = Number(minutes)
+        if (!Number.isFinite(mins) || mins <= 0) return
+        const existing = get().quizSessionCountdown
+        if (existing?.endsAt && existing.endsAt > Date.now() && existing.frozen == null) return
+        if (existing?.frozen != null) return
+        set({
+          quizSessionCountdown: {
+            endsAt: Date.now() + mins * 60 * 1000,
+            frozen: null,
+          },
+        })
+      },
+
+      freezeQuizSessionCountdown: () => {
+        const entry = get().quizSessionCountdown
+        if (!entry?.endsAt) return
+        const remaining =
+          entry.frozen != null
+            ? entry.frozen
+            : Math.max(0, Math.ceil((entry.endsAt - Date.now()) / 1000))
+        set({ quizSessionCountdown: { ...entry, frozen: remaining } })
+      },
+
       /** Stop all per-question timers when the host ends the session */
       freezeAllCountdowns: () => {
         const s = get()
@@ -176,7 +202,21 @@ export const useParticipantStore = create(
           next[qid] = { ...entry, frozen: remaining }
           changed = true
         }
-        if (changed) set({ quizCountdownByQuestion: next })
+        const sessionEntry = s.quizSessionCountdown
+        let nextSession = sessionEntry
+        if (sessionEntry?.endsAt) {
+          const remaining =
+            sessionEntry.frozen != null
+              ? sessionEntry.frozen
+              : Math.max(0, Math.ceil((sessionEntry.endsAt - now) / 1000))
+          nextSession = { ...sessionEntry, frozen: remaining }
+        }
+        if (changed || nextSession !== sessionEntry) {
+          set({
+            quizCountdownByQuestion: changed ? next : byQ,
+            quizSessionCountdown: nextSession,
+          })
+        }
       },
 
       /** Call after a successful submit while a per-question timer is active */
@@ -209,6 +249,7 @@ export const useParticipantStore = create(
         quizSubmittedQuestionIds: state.quizSubmittedQuestionIds,
         quizExplicitSubmittedQuestionIds: state.quizExplicitSubmittedQuestionIds,
         quizCountdownByQuestion: state.quizCountdownByQuestion,
+        quizSessionCountdown: state.quizSessionCountdown,
         quizQuestionOpenedAt: state.quizQuestionOpenedAt,
       }),
       migrate: (persistedState, version) => {
@@ -229,7 +270,7 @@ export const useParticipantStore = create(
           version,
         }
       },
-      version: 2,
+      version: 3,
     },
   ),
 )

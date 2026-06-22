@@ -19,7 +19,7 @@ import { useParticipantProgressPersistence } from '../../hooks/useParticipantPro
 import { useParticipantPreJoinRealtime } from '../../hooks/useParticipantPreJoinRealtime'
 import { hasSessionCodeInJoinPath, normalizeSessionCode } from '../../utils/joinUrl'
 import { computeResponseTimeMs } from '../../utils/quizResponseTime'
-import { isStrictLateJoinSession, sessionHasTimedQuestions } from '../../utils/sessionFlags'
+import { isSessionQuizTotalTimeEnabled, isStrictLateJoinSession, sessionHasTimedQuestions } from '../../utils/sessionFlags'
 import {
   questionSupportsLeaderboard,
   questionSupportsParticipantResults,
@@ -45,6 +45,8 @@ import {
   buildResponsePayloadForQuestion,
   canShowPreviousForTimedMultiNav,
   canShowPreviousForUntimedMultiNav,
+  canShowPreviousForQuizTotalTimeMultiNav,
+  isQuizTotalTimeSessionFinalized,
   getLastActivatedLiveQuestion,
   canAutoNavigateToActivatedQuestion,
   clamp,
@@ -91,6 +93,7 @@ function ParticipantSessionPage() {
     liveQuestionId,
     submitted,
     quizCountdownByQuestion,
+    quizSessionCountdown,
     quizQuestionOpenedAt,
     quizSubmittedQuestionIds,
     quizExplicitSubmittedQuestionIds,
@@ -99,6 +102,8 @@ function ParticipantSessionPage() {
     setLiveQuestionId,
     setSubmitted,
     setQuizCountdown,
+    startQuizSessionCountdown,
+    freezeQuizSessionCountdown,
     resetQuizProgress,
     hydrateQuizProgress,
     freezeCountdownAfterSubmit,
@@ -114,6 +119,7 @@ function ParticipantSessionPage() {
       liveQuestionId: s.quizLiveQuestionId,
       submitted: s.quizSubmitted,
       quizCountdownByQuestion: s.quizCountdownByQuestion,
+      quizSessionCountdown: s.quizSessionCountdown,
       quizQuestionOpenedAt: s.quizQuestionOpenedAt,
       quizSubmittedQuestionIds: s.quizSubmittedQuestionIds,
       quizExplicitSubmittedQuestionIds: s.quizExplicitSubmittedQuestionIds,
@@ -122,6 +128,8 @@ function ParticipantSessionPage() {
       setLiveQuestionId: s.setQuizLiveQuestionId,
       setSubmitted: s.setQuizSubmitted,
       setQuizCountdown: s.setQuizCountdown,
+      startQuizSessionCountdown: s.startQuizSessionCountdown,
+      freezeQuizSessionCountdown: s.freezeQuizSessionCountdown,
       resetQuizProgress: s.resetQuizProgress,
       hydrateQuizProgress: s.hydrateQuizProgress,
       freezeCountdownAfterSubmit: s.freezeCountdownAfterSubmit,
@@ -252,6 +260,13 @@ function ParticipantSessionPage() {
   const showLeaderboardInQa =
     showOverallLeaderboard && sessionSupportsOverallLeaderboard(mappedQuestions)
   const navigationEnabled = session?.participant_navigation_enabled !== false
+  const sessionQuizTotalTimeEnabled = useMemo(
+    () => isSessionQuizTotalTimeEnabled(session),
+    [session],
+  )
+  const sessionQuizTotalTimeSeconds = sessionQuizTotalTimeEnabled
+    ? Math.max(0, Number(session?.quiz_total_time_minutes) || 0) * 60
+    : 0
   const allLiveQuestionsClosed = useMemo(() => {
     if (!navigationEnabled) return false
     const live = mappedQuestions.filter((q) => q.isLive)
@@ -267,6 +282,29 @@ function ParticipantSessionPage() {
   const activeQuestions = useMemo(
     () => filterActiveQuestionsForLateJoinPolicy(mappedQuestions),
     [mappedQuestions],
+  )
+
+  const participantEditPolicy = useMemo(
+    () => ({
+      sessionQuizTotalTimeEnabled,
+      quizTotalTimeFinalized:
+        sessionQuizTotalTimeEnabled &&
+        isQuizTotalTimeSessionFinalized(activeQuestions, quizExplicitSubmittedQuestionIds),
+    }),
+    [
+      sessionQuizTotalTimeEnabled,
+      activeQuestions,
+      quizExplicitSubmittedQuestionIds,
+    ],
+  )
+
+  const { quizTotalTimeFinalized } = participantEditPolicy
+
+  const canEditResponses = useMemo(
+    () =>
+      !isSessionEnded &&
+      !(sessionQuizTotalTimeEnabled && quizTotalTimeFinalized),
+    [isSessionEnded, sessionQuizTotalTimeEnabled, quizTotalTimeFinalized],
   )
 
   const question = useMemo(() => {
@@ -298,15 +336,20 @@ function ParticipantSessionPage() {
     participantToken,
   })
   const timeLimit = question?.timeLimit ?? 0
-  const hasCountdown = Number(timeLimit) > 0
+  const hasCountdown = sessionQuizTotalTimeEnabled || Number(timeLimit) > 0
+  const displayTimeLimit = sessionQuizTotalTimeEnabled ? sessionQuizTotalTimeSeconds : timeLimit
   const questionLockedBySubmission = Boolean((quizSubmittedQuestionIds || {})[String(question?.id)])
   const dbSessionId = session?.session_id
 
   const questionCountdown = question?.id
     ? (quizCountdownByQuestion || {})[String(question.id)]
     : null
-  const countdownEndsAt = questionCountdown?.endsAt ?? null
-  const countdownFrozen = questionCountdown?.frozen ?? null
+  const countdownEndsAt = sessionQuizTotalTimeEnabled
+    ? quizSessionCountdown?.endsAt ?? null
+    : questionCountdown?.endsAt ?? null
+  const countdownFrozen = sessionQuizTotalTimeEnabled
+    ? quizSessionCountdown?.frozen ?? null
+    : questionCountdown?.frozen ?? null
 
   const timer = useMemo(() => {
     if (isSessionEnded && hasCountdown) {
@@ -317,8 +360,14 @@ function ParticipantSessionPage() {
     return Math.max(0, Math.ceil((countdownEndsAt - Date.now()) / 1000))
   }, [isSessionEnded, hasCountdown, countdownFrozen, countdownEndsAt, countdownTick])
 
+  const sessionTimerExpired = sessionQuizTotalTimeEnabled && hasCountdown && timer === 0
+
   const submittedAtSeconds =
-    questionLockedBySubmission && countdownFrozen != null ? countdownFrozen : null
+    !sessionQuizTotalTimeEnabled &&
+    questionLockedBySubmission &&
+    countdownFrozen != null
+      ? countdownFrozen
+      : null
 
   const submissionsClosed = Boolean(question?.submissionsClosed)
   const openForReattempt = Boolean(question?.openForReattempt)
@@ -327,7 +376,10 @@ function ParticipantSessionPage() {
     isSessionEnded ||
     (submissionsClosed && !openForReattempt) ||
     (navigationEnabled && allQuestionsClosedByHost && !openForReattempt) ||
-    (hasCountdown && (questionLockedBySubmission || timer === 0))
+    (sessionQuizTotalTimeEnabled && (sessionTimerExpired || quizTotalTimeFinalized)) ||
+    (!sessionQuizTotalTimeEnabled &&
+      hasCountdown &&
+      (questionLockedBySubmission || timer === 0))
 
   const wordCloudInputsLocked = useMemo(
     () =>
@@ -336,8 +388,9 @@ function ParticipantSessionPage() {
         navigationEnabled,
         inputsLocked,
         submittedIds: quizSubmittedQuestionIds,
+        editPolicy: participantEditPolicy,
       }),
-    [question, navigationEnabled, inputsLocked, quizSubmittedQuestionIds],
+    [question, navigationEnabled, inputsLocked, quizSubmittedQuestionIds, participantEditPolicy],
   )
 
   const showClosedByHostNotice = useCallback((questionText) => {
@@ -941,6 +994,13 @@ function ParticipantSessionPage() {
 
   const canShowPreviousQuestion = useMemo(() => {
     if (!navigationEnabled) return false
+    if (sessionQuizTotalTimeEnabled) {
+      return canShowPreviousForQuizTotalTimeMultiNav(
+        activeQuestions,
+        quizExplicitSubmittedQuestionIds,
+        sessionTimerExpired,
+      )
+    }
     if (multiNavTimedSession) {
       return canShowPreviousForTimedMultiNav(
         activeQuestions,
@@ -950,6 +1010,8 @@ function ParticipantSessionPage() {
     return canShowPreviousForUntimedMultiNav(activeQuestions)
   }, [
     navigationEnabled,
+    sessionQuizTotalTimeEnabled,
+    sessionTimerExpired,
     multiNavTimedSession,
     activeQuestions,
     quizExplicitSubmittedQuestionIds,
@@ -992,9 +1054,10 @@ function ParticipantSessionPage() {
           quizSubmittedQuestionIds,
           navigationEnabled,
           responses,
+          participantEditPolicy,
         ),
       ),
-    [activeQuestions, responses, quizSubmittedQuestionIds, navigationEnabled],
+    [activeQuestions, responses, quizSubmittedQuestionIds, navigationEnabled, participantEditPolicy],
   )
 
   const currentQuestionAnswered = useMemo(
@@ -1003,22 +1066,37 @@ function ParticipantSessionPage() {
   )
 
   const canGoToNextQuestion = useMemo(() => {
+    if (sessionQuizTotalTimeEnabled) return true
     if (!hasCountdown) return true
     if (questionLockedBySubmission) return true
     if (timer === 0) return true
     return currentQuestionAnswered
-  }, [hasCountdown, questionLockedBySubmission, timer, currentQuestionAnswered])
+  }, [
+    sessionQuizTotalTimeEnabled,
+    hasCountdown,
+    questionLockedBySubmission,
+    timer,
+    currentQuestionAnswered,
+  ])
 
   const goToQuestionIndex = useCallback(
     (nextIndex) => {
       if (!navigationEnabled || !activeQuestions.length) return
       const n = clamp(nextIndex, 0, activeQuestions.length - 1)
-      if (hasCountdown && n > displayQuestionIndex && !canGoToNextQuestion) return
+      if (
+        !sessionQuizTotalTimeEnabled &&
+        hasCountdown &&
+        n > displayQuestionIndex &&
+        !canGoToNextQuestion
+      ) {
+        return
+      }
       setLiveQuestionId(null)
       setQuestionIndex(n)
     },
     [
       activeQuestions.length,
+      sessionQuizTotalTimeEnabled,
       hasCountdown,
       displayQuestionIndex,
       canGoToNextQuestion,
@@ -1031,14 +1109,35 @@ function ParticipantSessionPage() {
   useEffect(() => {
     if (isSessionEnded) return
     if (step !== 'active') return
-    if (!strictLateJoin && !hasCountdown) return
+    if (!hasCountdown) return
     const id = setInterval(() => setCountdownTick((t) => t + 1), 1000)
     return () => clearInterval(id)
-  }, [isSessionEnded, step, hasCountdown, strictLateJoin, question?.id])
+  }, [isSessionEnded, step, hasCountdown])
+
+  useEffect(() => {
+    if (isSessionEnded) return
+    if (step !== 'active') return
+    if (!sessionQuizTotalTimeEnabled) return
+    if (!activeQuestions.length) return
+    startQuizSessionCountdown(Number(session?.quiz_total_time_minutes))
+  }, [
+    isSessionEnded,
+    step,
+    sessionQuizTotalTimeEnabled,
+    activeQuestions.length,
+    session?.quiz_total_time_minutes,
+    startQuizSessionCountdown,
+  ])
+
+  useEffect(() => {
+    if (!sessionQuizTotalTimeEnabled || !sessionTimerExpired) return
+    freezeQuizSessionCountdown()
+  }, [sessionQuizTotalTimeEnabled, sessionTimerExpired, freezeQuizSessionCountdown])
 
   useEffect(() => {
     if (isSessionEnded) return
     if (step !== 'active' || !question?.id) return
+    if (sessionQuizTotalTimeEnabled) return
     if (!hasCountdown) {
       setQuizCountdown({ questionId: null, endsAt: null })
       return
@@ -1181,7 +1280,13 @@ function ParticipantSessionPage() {
     const submittedIds = quizSubmittedQuestionIds || {}
     return activeQuestions
       .filter((q) =>
-        shouldIncludeQuestionInFinalize(q, submittedIds, navigationEnabled, responses),
+        shouldIncludeQuestionInFinalize(
+          q,
+          submittedIds,
+          navigationEnabled,
+          responses,
+          participantEditPolicy,
+        ),
       )
       .map((q) => {
         const payload = buildResponsePayloadForQuestion(q, responses[q.id])
@@ -1193,7 +1298,7 @@ function ParticipantSessionPage() {
         return payload
       })
       .filter(Boolean)
-  }, [activeQuestions, responses, quizSubmittedQuestionIds, navigationEnabled])
+  }, [activeQuestions, responses, quizSubmittedQuestionIds, navigationEnabled, participantEditPolicy])
 
   const submitQuestionById = useCallback(
     async (questionId) => {
@@ -1206,7 +1311,7 @@ function ParticipantSessionPage() {
       const alreadySubmitted = Boolean((quizSubmittedQuestionIds || {})[String(questionId)])
       if (
         alreadySubmitted &&
-        !participantCanUpdateSubmittedResponse(q, navigationEnabled)
+        !participantCanUpdateSubmittedResponse(q, navigationEnabled, participantEditPolicy)
       ) {
         return true
       }
@@ -1262,11 +1367,12 @@ function ParticipantSessionPage() {
       markQuestionsSubmitted,
       freezeCountdownAfterSubmit,
       navigationEnabled,
+      participantEditPolicy,
     ],
   )
 
   const handleSubmitResponse = async () => {
-    if (isSessionEnded) return false
+    if (isSessionEnded || quizTotalTimeFinalized) return false
     const payloads = buildFinalPayload()
     if (!payloads.length || !participantToken) return false
 
@@ -1276,10 +1382,12 @@ function ParticipantSessionPage() {
       await Promise.all(payloads.map((p) => submitResponseApi(participantToken, p)))
       const submittedIds = payloads.map((p) => p.question_id)
       markQuestionsSubmitted(submittedIds)
-      if (multiNavTimedSession) {
+      if (multiNavTimedSession || sessionQuizTotalTimeEnabled) {
         markQuestionsExplicitlySubmitted(submittedIds)
       }
-      if (hadCountdown && question?.id) freezeCountdownAfterSubmit(question.id)
+      if (hadCountdown && !sessionQuizTotalTimeEnabled && question?.id) {
+        freezeCountdownAfterSubmit(question.id)
+      }
       if (dbSessionId) {
         queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
       }
@@ -1374,15 +1482,16 @@ function ParticipantSessionPage() {
   }
 
   const handleSubmit = async () => {
-    if (isSessionEnded) return
+    if (isSessionEnded || quizTotalTimeFinalized) return
     if (!isLastDisplayedQuestion) return
     const ok = await handleSubmitResponse()
     if (ok) {
       setSubmitModal({
         variant: 'success',
         title: 'Submission successful',
-        message:
-          'Your answers were submitted successfully. You can keep browsing questions or open Q&A when ready.',
+        message: sessionQuizTotalTimeEnabled
+          ? 'Your answers were submitted successfully. You can review questions or open Q&A, but answers can no longer be changed.'
+          : 'Your answers were submitted successfully. You can keep browsing questions or open Q&A when ready.',
         confirmLabel: 'Continue',
       })
     } else {
@@ -1423,6 +1532,7 @@ function ParticipantSessionPage() {
     if (step !== 'active') return
     if (!hasCountdown) return
     if (timer > 0) return
+    if (sessionQuizTotalTimeEnabled) return
     if (questionLockedBySubmission) return
 
     const qid = question?.id
@@ -1473,6 +1583,7 @@ function ParticipantSessionPage() {
     hasCountdown,
     question?.id,
     isLastDisplayedQuestion,
+    sessionQuizTotalTimeEnabled,
     submitQuestionById,
     tryApplyPendingActivatedQuestion,
     advanceToNextUnsubmittedActiveQuestion,
@@ -1604,18 +1715,18 @@ function ParticipantSessionPage() {
 
   const updateResponse = useCallback(
     (questionId, patch) => {
-      if (isSessionEnded) return
+      if (!canEditResponses) return
       setResponses((prev) => ({
         ...prev,
         [questionId]: { ...prev[questionId], ...patch },
       }))
     },
-    [isSessionEnded, setResponses],
+    [canEditResponses, setResponses],
   )
 
   const handleSelectOption = useCallback(
     (questionId, optionText) => {
-      if (isSessionEnded) return
+      if (!canEditResponses) return
       const q = activeQuestions.find((item) => item.id === questionId)
       if (!q) return
       if (q.allowMultipleSelect) {
@@ -1638,12 +1749,12 @@ function ParticipantSessionPage() {
       }
       updateResponse(questionId, { selectedOption: optionText, selectedOptions: [optionText] })
     },
-    [isSessionEnded, activeQuestions, setResponses, updateResponse],
+    [canEditResponses, activeQuestions, setResponses, updateResponse],
   )
 
   const handleAddWordCloudTag = useCallback(
     (questionId) => {
-      if (isSessionEnded) return
+      if (!canEditResponses) return
       if (
         String(questionId) === String(question?.id) &&
         wordCloudInputsLocked
@@ -1661,7 +1772,7 @@ function ParticipantSessionPage() {
       }))
       setTagsInput('')
     },
-    [isSessionEnded, question?.id, wordCloudInputsLocked, tagsInput, setResponses],
+    [canEditResponses, question?.id, wordCloudInputsLocked, tagsInput, setResponses],
   )
 
   if (!participantHydrated) {
@@ -1789,9 +1900,11 @@ function ParticipantSessionPage() {
             submissionsClosed={submissionsClosed}
             allQuestionsClosedByHost={allQuestionsClosedByHost}
             hasAnyQuestionSaved={hasAnyQuestionSaved}
-            timeLimit={timeLimit}
+            timeLimit={displayTimeLimit}
             timer={timer}
             submittedAtSeconds={submittedAtSeconds}
+            sessionQuizTotalTimeEnabled={sessionQuizTotalTimeEnabled}
+            quizTotalTimeFinalized={quizTotalTimeFinalized}
             currentResponse={currentResponse}
             answerRevealMeta={answerRevealMeta}
             isAnswerRevealed={isAnswerRevealed}

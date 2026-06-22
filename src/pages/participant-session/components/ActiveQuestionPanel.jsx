@@ -33,6 +33,8 @@ export function ActiveQuestionPanel({
   sessionEnded = false,
   navigationEnabled = true,
   canShowPreviousQuestion = false,
+  sessionQuizTotalTimeEnabled = false,
+  quizTotalTimeFinalized = false,
   lastActivatedLiveQuestion = null,
   highlightNextButton = false,
   showNewQuestionAlert = false,
@@ -68,18 +70,30 @@ export function ActiveQuestionPanel({
             </p>
           </div>
         ) : null}
-        {navigationEnabled && hasCountdown && !canGoToNextQuestion && (
+        {navigationEnabled && sessionQuizTotalTimeEnabled && !canShowPreviousQuestion && (
+          <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
+            Submit the last question or wait for the quiz timer to use Previous.
+          </p>
+        )}
+        {navigationEnabled && sessionQuizTotalTimeEnabled && canShowPreviousQuestion && (
+          <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
+            {quizTotalTimeFinalized
+              ? 'Answers are locked — use Previous and Next to review only.'
+              : 'Quiz timer: use Previous and Next to review your answers.'}
+          </p>
+        )}
+        {navigationEnabled && hasCountdown && !sessionQuizTotalTimeEnabled && !canGoToNextQuestion && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             Answer this question or wait for the timer to use Next.
           </p>
         )}
-        {navigationEnabled && hasCountdown && canGoToNextQuestion && inputsLocked && canShowPreviousQuestion && (
+        {navigationEnabled && hasCountdown && !sessionQuizTotalTimeEnabled && canGoToNextQuestion && inputsLocked && canShowPreviousQuestion && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             Timed: use Previous and Next to browse; answers cannot be changed after submit or when
             time runs out.
           </p>
         )}
-        {navigationEnabled && hasCountdown && canGoToNextQuestion && inputsLocked && !canShowPreviousQuestion && (
+        {navigationEnabled && hasCountdown && !sessionQuizTotalTimeEnabled && canGoToNextQuestion && inputsLocked && !canShowPreviousQuestion && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
             Submit the latest active question before you can use Previous.
           </p>
@@ -275,6 +289,16 @@ export function ActiveQuestionPanel({
           </button>
         </div>
       </div>
+
+      {navigationEnabled && sessionQuizTotalTimeEnabled && quizTotalTimeFinalized && !sessionEnded && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-semibold text-emerald-900">Quiz submitted</p>
+          <p className="mt-1 text-xs text-emerald-800">
+            Your answers are final. You can browse questions with Previous and Next, or open Q&amp;A
+            when ready.
+          </p>
+        </div>
+      )}
 
       {navigationEnabled && submitted && !hasCountdown && !sessionEnded && (
         <div className="flex gap-3 rounded-2xl border border-sky-200 bg-sky-50/90 p-4">

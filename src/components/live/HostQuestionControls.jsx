@@ -36,6 +36,7 @@ export function HostQuestionControls({
   onOpenForReattempt,
   onCloseQuestion,
   singleActiveQuestionMode = false,
+  sessionQuizTotalTimeEnabled = false,
 }) {
   if (!question) return null
 
@@ -51,31 +52,33 @@ export function HostQuestionControls({
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <HostQuestionActionButton
-          disabled={!canEditLive || questionLiveMutation.isPending}
-          onClick={() =>
-            questionLiveMutation.mutate({
-              questionId: question.id,
-              isLive: !question.isLive,
-              answerRevealed: question.answerRevealed,
-              showLeaderboard: question.showLeaderboard,
-              supportsReveal,
-              isQuizMode: question.isQuizMode,
-              isSurvey: Boolean(question.isSurvey),
-              supportsParticipantResults: questionSupportsParticipantResults(question),
-            })
-          }
-          icon={question.isLive ? Square : Play}
-          label={question.isLive ? 'Deactivate' : 'Activate'}
-          title={
-            question.isLive
-              ? 'Stop accepting new responses'
-              : 'Let participants answer this question'
-          }
-          active={question.isLive}
-          tone={question.isLive ? 'rose' : 'emerald'}
-          size={size}
-        />
+        {!sessionQuizTotalTimeEnabled ? (
+          <HostQuestionActionButton
+            disabled={!canEditLive || questionLiveMutation.isPending}
+            onClick={() =>
+              questionLiveMutation.mutate({
+                questionId: question.id,
+                isLive: !question.isLive,
+                answerRevealed: question.answerRevealed,
+                showLeaderboard: question.showLeaderboard,
+                supportsReveal,
+                isQuizMode: question.isQuizMode,
+                isSurvey: Boolean(question.isSurvey),
+                supportsParticipantResults: questionSupportsParticipantResults(question),
+              })
+            }
+            icon={question.isLive ? Square : Play}
+            label={question.isLive ? 'Deactivate' : 'Activate'}
+            title={
+              question.isLive
+                ? 'Stop accepting new responses'
+                : 'Let participants answer this question'
+            }
+            active={question.isLive}
+            tone={question.isLive ? 'rose' : 'emerald'}
+            size={size}
+          />
+        ) : null}
         {supportsReveal ? (
           <HostQuestionActionButton
             disabled={!canEditLive || !isActiveQuestion || answerRevealMutation.isPending}

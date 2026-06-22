@@ -6,6 +6,7 @@ export const PARTICIPANT_PROGRESS_FIELDS = [
   'quizSubmittedQuestionIds',
   'quizExplicitSubmittedQuestionIds',
   'quizCountdownByQuestion',
+  'quizSessionCountdown',
   'quizQuestionOpenedAt',
 ]
 
@@ -23,6 +24,7 @@ export function pickParticipantProgressState(state = {}) {
     quizSubmittedQuestionIds: state.quizSubmittedQuestionIds || {},
     quizExplicitSubmittedQuestionIds: state.quizExplicitSubmittedQuestionIds || {},
     quizCountdownByQuestion: state.quizCountdownByQuestion || {},
+    quizSessionCountdown: state.quizSessionCountdown ?? null,
     quizQuestionOpenedAt: state.quizQuestionOpenedAt || {},
   }
 }

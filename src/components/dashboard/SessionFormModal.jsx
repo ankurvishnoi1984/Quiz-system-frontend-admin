@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import Modal from '../ui/Modal'
 
+const QUIZ_TOTAL_TIME_MINUTES = [15, 30, 45, 60]
+
 const defaultInitial = {
   title: '',
   description: '',
@@ -9,6 +11,8 @@ const defaultInitial = {
   departmentId: '',
   joinRequirement: 'name',
   enableNavigation: false,
+  quizTotalTimeEnabled: false,
+  quizTotalTimeMinutes: 30,
   overallLeaderboard: true,
 }
 
@@ -28,14 +32,29 @@ function SessionFormModal({
 }) {
   const [joinRequirement, setJoinRequirement] = useState(defaultInitial.joinRequirement)
   const [enableNavigation, setEnableNavigation] = useState(defaultInitial.enableNavigation)
+  const [quizTotalTimeEnabled, setQuizTotalTimeEnabled] = useState(defaultInitial.quizTotalTimeEnabled)
+  const [quizTotalTimeMinutes, setQuizTotalTimeMinutes] = useState(defaultInitial.quizTotalTimeMinutes)
   const [overallLeaderboard, setOverallLeaderboard] = useState(defaultInitial.overallLeaderboard)
 
   useEffect(() => {
     if (!open) return
     setJoinRequirement(initialValues.joinRequirement ?? defaultInitial.joinRequirement)
     setEnableNavigation(Boolean(initialValues.enableNavigation))
+    setQuizTotalTimeEnabled(Boolean(initialValues.quizTotalTimeEnabled))
+    setQuizTotalTimeMinutes(
+      QUIZ_TOTAL_TIME_MINUTES.includes(Number(initialValues.quizTotalTimeMinutes))
+        ? Number(initialValues.quizTotalTimeMinutes)
+        : 30,
+    )
     setOverallLeaderboard(initialValues.overallLeaderboard !== false)
   }, [open, initialValues])
+
+  const handleNavigationChange = (enabled) => {
+    setEnableNavigation(enabled)
+    if (!enabled) {
+      setQuizTotalTimeEnabled(false)
+    }
+  }
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -48,6 +67,8 @@ function SessionFormModal({
       departmentId: String(form.get('department') || defaultDepartmentId || ''),
       joinRequirement,
       enableNavigation,
+      quizTotalTimeEnabled: enableNavigation && quizTotalTimeEnabled,
+      quizTotalTimeMinutes: enableNavigation && quizTotalTimeEnabled ? quizTotalTimeMinutes : null,
       overallLeaderboard,
     })
   }
@@ -135,7 +156,7 @@ function SessionFormModal({
               <select
                 id="question-availability"
                 value={enableNavigation ? 'enabled' : 'disabled'}
-                onChange={(e) => setEnableNavigation(e.target.value === 'enabled')}
+                onChange={(e) => handleNavigationChange(e.target.value === 'enabled')}
                 className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
               >
                 <option value="disabled">
@@ -152,6 +173,47 @@ function SessionFormModal({
                 time.
               </p>
             </div>
+            {enableNavigation ? (
+              <>
+                <div className="md:col-span-2">
+                  <label className="text-sm font-semibold text-slate-700" htmlFor="quiz-total-time">
+                    Quiz total time
+                  </label>
+                  <select
+                    id="quiz-total-time"
+                    value={quizTotalTimeEnabled ? 'yes' : 'no'}
+                    onChange={(e) => setQuizTotalTimeEnabled(e.target.value === 'yes')}
+                    className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Limit how long participants have to complete the full quiz in multiple-question
+                    mode.
+                  </p>
+                </div>
+                {quizTotalTimeEnabled ? (
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-semibold text-slate-700" htmlFor="quiz-total-duration">
+                      Total quiz duration
+                    </label>
+                    <select
+                      id="quiz-total-duration"
+                      value={String(quizTotalTimeMinutes)}
+                      onChange={(e) => setQuizTotalTimeMinutes(Number(e.target.value))}
+                      className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                    >
+                      {QUIZ_TOTAL_TIME_MINUTES.map((minutes) => (
+                        <option key={minutes} value={minutes}>
+                          {minutes} minutes
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
           </>
         ) : (
           <p className="md:col-span-2 rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs text-amber-900">

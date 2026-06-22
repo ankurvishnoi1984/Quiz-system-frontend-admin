@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/authStore'
 import { useHostQuestionMutations } from '../../hooks/useHostQuestionMutations'
 import { useLiveSession } from '../../hooks/useLiveSession'
 import { sessionSupportsOverallLeaderboard } from '../../utils/livePresentation'
+import { isSessionQuizTotalTimeEnabled } from '../../utils/sessionFlags'
 import { LeaderboardSlide } from './LeaderboardSlide'
 import { ParticipantsSlide } from './ParticipantsSlide'
 import { PresentNavButton, PresentShell } from './PresentShell'
@@ -30,6 +31,7 @@ function PresentModePage() {
 
   const canEditLive = session?.status === 'live'
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
+  const sessionQuizTotalTimeEnabled = isSessionQuizTotalTimeEnabled(session)
 
   const {
     questionLiveMutation,
@@ -174,6 +176,7 @@ function PresentModePage() {
                 question={currentQuestion}
                 canEditLive={canEditLive}
                 singleActiveQuestionMode={singleActiveQuestionMode}
+                sessionQuizTotalTimeEnabled={sessionQuizTotalTimeEnabled}
                 size="compact"
                 showLabel
                 questionLiveMutation={questionLiveMutation}

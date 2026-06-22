@@ -33,6 +33,7 @@ import Modal from '../components/ui/Modal'
 import { HostAlertModal } from '../components/live/HostAlertModal'
 import { HostQuestionActionButton } from '../components/live/HostQuestionActionButton'
 import { canHostActivateAllQuestions, canHostCloseAllQuestions } from '../utils/hostQuestionControls'
+import { isSessionQuizTotalTimeEnabled } from '../utils/sessionFlags'
 import { HostNoSessionsEmpty } from '../components/layout/HostNoSessionsEmpty'
 import { useHostNavSessions } from '../hooks/useHostNavSessions'
 import { HostQuestionControls } from '../components/live/HostQuestionControls'
@@ -253,6 +254,7 @@ function LivePage() {
         )
       }
       queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
       queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
     },
     onError: (error) => setErrorMessage(error.message || 'Unable to update session state'),
@@ -491,6 +493,7 @@ function LivePage() {
   const canShareSession =
     Boolean(session) && session.status !== 'completed' && session.status !== 'archived'
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
+  const sessionQuizTotalTimeEnabled = isSessionQuizTotalTimeEnabled(session)
   const showSessionControls = session?.status === 'live' || session?.status === 'paused'
   const showCloseAllQuestionsButton = useMemo(
     () =>
@@ -506,8 +509,9 @@ function LivePage() {
       canHostActivateAllQuestions(mappedQuestions, {
         canEditLive,
         singleActiveQuestionMode,
+        sessionQuizTotalTimeEnabled,
       }),
-    [mappedQuestions, canEditLive, singleActiveQuestionMode],
+    [mappedQuestions, canEditLive, singleActiveQuestionMode, sessionQuizTotalTimeEnabled],
   )
 
   if (!sessionId) {
@@ -674,6 +678,12 @@ function LivePage() {
             <p className="text-xs text-slate-600">
               {mappedQuestions.length} question{mappedQuestions.length === 1 ? '' : 's'} • select a question to control and view results
             </p>
+            {sessionQuizTotalTimeEnabled ? (
+              <p className="mt-1 text-xs font-medium text-violet-800">
+                Quiz total time ({session?.quiz_total_time_minutes} min): all questions become
+                available when you launch the session. Participants use a personal timer.
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {showActivateAllQuestionsButton ? (
@@ -805,10 +815,17 @@ function LivePage() {
                   other live question.
                 </p>
               ) : null}
+              {canEditLive && sessionQuizTotalTimeEnabled ? (
+                <p className="mb-3 rounded-xl border border-violet-200/80 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-900">
+                  Quiz total time: all questions are available to participants. Use reveal,
+                  results, and close controls per question as needed.
+                </p>
+              ) : null}
               <HostQuestionControls
                 question={activeQuestion}
                 canEditLive={canEditLive}
                 singleActiveQuestionMode={singleActiveQuestionMode}
+                sessionQuizTotalTimeEnabled={sessionQuizTotalTimeEnabled}
                 questionLiveMutation={questionLiveMutation}
                 answerRevealMutation={answerRevealMutation}
                 questionLeaderboardMutation={questionLeaderboardMutation}
