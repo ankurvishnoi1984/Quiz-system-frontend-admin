@@ -568,6 +568,7 @@ function AnalyticsPage() {
       {activeReportView === 'summary' ? (
         <SessionSummaryReportCard report={summaryReport} isLoading={summaryReportLoading} />
       ) : activeReportView === 'qa-analytics' ? (
+        // Q&A analytics: Anonymous vs named pie chart disabled in QaAnalyticsReportCard
         <QaAnalyticsReportCard report={qaReport} isLoading={qaReportLoading} />
       ) : (
       <>

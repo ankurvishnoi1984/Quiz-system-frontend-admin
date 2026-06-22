@@ -1,6 +1,7 @@
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import { CHART_COLORS, CHART_TOOLTIP_STYLE } from '../../utils/chartColors'
-import { renderPieLabel } from '../charts/renderPieLabel'
+// Pie chart (Anonymous vs named) — disabled; restore when re-enabling chart below:
+// import { CHART_COLORS, CHART_TOOLTIP_STYLE } from '../../utils/chartColors'
+// import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
+// import { renderPieLabel } from '../charts/renderPieLabel'
 
 function StatTile({ label, value, hint }) {
   return (
@@ -30,10 +31,11 @@ export function QaAnalyticsReportCard({ report, isLoading }) {
   }
 
   const { summary, top_questions: topQuestions, submission_ratio: submissionRatio } = report
-  const donutData = [
-    { name: 'Anonymous', value: submissionRatio.anonymous },
-    { name: 'Named', value: submissionRatio.named },
-  ].filter((row) => row.value > 0)
+  // Pie chart data — kept for future use (see commented chart block below)
+  // const donutData = [
+  //   { name: 'Anonymous', value: submissionRatio.anonymous },
+  //   { name: 'Named', value: submissionRatio.named },
+  // ].filter((row) => row.value > 0)
 
   return (
     <div className="space-y-5 rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
@@ -83,10 +85,11 @@ export function QaAnalyticsReportCard({ report, isLoading }) {
         </div>
 
         <div>
-          <p className="text-sm font-semibold text-navy-900">Anonymous vs named</p>
+          {/* <p className="text-sm font-semibold text-navy-900">Anonymous vs named</p>
           <p className="text-xs text-slate-600">
             {submissionRatio.anonymous} anonymous · {submissionRatio.named} named
-          </p>
+          </p> */}
+          {/*
           <div className="mt-3 h-56">
             {donutData.length ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -123,6 +126,7 @@ export function QaAnalyticsReportCard({ report, isLoading }) {
               </div>
             )}
           </div>
+          */}
         </div>
       </div>
     </div>

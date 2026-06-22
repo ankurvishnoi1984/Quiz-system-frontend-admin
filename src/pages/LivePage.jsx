@@ -1026,6 +1026,10 @@ function LivePage() {
           </div>
           ) : null}
 
+          {/*
+            Q&A analytics (LiveQaPanel → QaAnalyticsReportCard): Anonymous vs named pie chart
+            is commented out in QaAnalyticsReportCard.jsx; text counts still shown.
+          */}
           <LiveQaPanel
             questions={qaQuery.data}
             report={qaReportQuery.data}
