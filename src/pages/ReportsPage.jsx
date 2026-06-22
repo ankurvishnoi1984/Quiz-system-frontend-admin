@@ -26,7 +26,7 @@ const REPORT_CSV_HEADERS = [
   'questionIndex',
   'questionType',
   'questionText',
-  'sampleResponse',
+  'response',
 ]
 
 function csvEscapeCell(value) {
