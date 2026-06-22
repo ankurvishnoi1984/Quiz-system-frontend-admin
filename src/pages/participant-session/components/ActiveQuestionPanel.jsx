@@ -34,7 +34,7 @@ export function ActiveQuestionPanel({
   navigationEnabled = true,
   canShowPreviousQuestion = false,
   sessionQuizTotalTimeEnabled = false,
-  quizTotalTimeFinalized = false,
+  lastQuestionFinalized = false,
   lastActivatedLiveQuestion = null,
   highlightNextButton = false,
   showNewQuestionAlert = false,
@@ -77,7 +77,7 @@ export function ActiveQuestionPanel({
         )}
         {navigationEnabled && sessionQuizTotalTimeEnabled && canShowPreviousQuestion && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
-            {quizTotalTimeFinalized
+            {lastQuestionFinalized
               ? 'Answers are locked — use Previous and Next to review only.'
               : 'Quiz timer: use Previous and Next to review your answers.'}
           </p>
@@ -290,9 +290,11 @@ export function ActiveQuestionPanel({
         </div>
       </div>
 
-      {navigationEnabled && sessionQuizTotalTimeEnabled && quizTotalTimeFinalized && !sessionEnded && (
+      {navigationEnabled && lastQuestionFinalized && !sessionEnded && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-sm font-semibold text-emerald-900">Quiz submitted</p>
+          <p className="text-sm font-semibold text-emerald-900">
+            {question?.isSurvey ? 'Survey submitted' : 'Quiz submitted'}
+          </p>
           <p className="mt-1 text-xs text-emerald-800">
             Your answers are final. You can browse questions with Previous and Next, or open Q&amp;A
             when ready.
@@ -300,7 +302,7 @@ export function ActiveQuestionPanel({
         </div>
       )}
 
-      {navigationEnabled && submitted && !hasCountdown && !sessionEnded && (
+      {navigationEnabled && submitted && !hasCountdown && !sessionEnded && !lastQuestionFinalized && (
         <div className="flex gap-3 rounded-2xl border border-sky-200 bg-sky-50/90 p-4">
           <Pencil className="mt-0.5 size-5 shrink-0 text-sky-700" aria-hidden />
           <div>

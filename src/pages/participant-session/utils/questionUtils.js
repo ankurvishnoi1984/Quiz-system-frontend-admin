@@ -226,33 +226,43 @@ export function findNextUnsubmittedActiveQuestion(activeQuestions, submittedIds,
   )
 }
 
+/** Last question in session display order (host-defined sequence). */
+export function getSessionLastQuestionId(questions = []) {
+  if (!questions.length) return null
+  const sorted = [...questions].sort((a, b) => {
+    const orderDiff = Number(a.display_order ?? 0) - Number(b.display_order ?? 0)
+    if (orderDiff !== 0) return orderDiff
+    return Number(a.id ?? 0) - Number(b.id ?? 0)
+  })
+  return sorted[sorted.length - 1]?.id ?? null
+}
+
 /**
- * Quiz total time: participant finalized by submitting the last question.
- * @param {Array} activeQuestions
+ * Multi-nav: participant finalized by submitting the session's last question.
+ * @param {Array} sessionQuestions All session questions (ordered by host)
  * @param {Record<string, boolean>} explicitSubmittedIds
  */
-export function isQuizTotalTimeSessionFinalized(activeQuestions = [], explicitSubmittedIds = {}) {
-  if (!activeQuestions.length) return false
-  const lastId = activeQuestions[activeQuestions.length - 1]?.id
+export function isMultiNavLastQuestionFinalized(sessionQuestions = [], explicitSubmittedIds = {}) {
+  const lastId = getSessionLastQuestionId(sessionQuestions)
   return lastId != null && Boolean(explicitSubmittedIds[String(lastId)])
 }
+
+/** @deprecated Use isMultiNavLastQuestionFinalized */
+export const isQuizTotalTimeSessionFinalized = isMultiNavLastQuestionFinalized
 
 /**
  * Whether a previously saved answer may still be edited.
  * @param {object} [editPolicy]
- * @param {boolean} [editPolicy.sessionQuizTotalTimeEnabled]
- * @param {boolean} [editPolicy.quizTotalTimeFinalized]
+ * @param {boolean} [editPolicy.lastQuestionFinalized]
  */
 export function participantCanUpdateSubmittedResponse(
   question,
   navigationEnabled,
   editPolicy = {},
 ) {
-  const { sessionQuizTotalTimeEnabled = false, quizTotalTimeFinalized = false } = editPolicy
-  if (sessionQuizTotalTimeEnabled) {
-    return !quizTotalTimeFinalized
-  }
-  return Boolean(navigationEnabled) && Number(question?.timeLimit ?? 0) <= 0
+  const { lastQuestionFinalized = false } = editPolicy
+  if (!navigationEnabled || lastQuestionFinalized) return false
+  return Number(question?.timeLimit ?? 0) <= 0
 }
 
 /** Word cloud: lock add/input after submit unless edits are still allowed. */
@@ -370,7 +380,7 @@ export function canShowPreviousForQuizTotalTimeMultiNav(
 ) {
   if (!activeQuestions?.length || activeQuestions.length <= 1) return false
   return (
-    isQuizTotalTimeSessionFinalized(activeQuestions, explicitSubmittedIds) ||
+    isMultiNavLastQuestionFinalized(activeQuestions, explicitSubmittedIds) ||
     sessionTimerExpired
   )
 }

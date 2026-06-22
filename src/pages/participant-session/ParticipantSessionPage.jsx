@@ -46,7 +46,8 @@ import {
   canShowPreviousForTimedMultiNav,
   canShowPreviousForUntimedMultiNav,
   canShowPreviousForQuizTotalTimeMultiNav,
-  isQuizTotalTimeSessionFinalized,
+  getSessionLastQuestionId,
+  isMultiNavLastQuestionFinalized,
   getLastActivatedLiveQuestion,
   canAutoNavigateToActivatedQuestion,
   clamp,
@@ -284,28 +285,27 @@ function ParticipantSessionPage() {
     [mappedQuestions],
   )
 
+  const sessionLastQuestionId = useMemo(
+    () => getSessionLastQuestionId(mappedQuestions),
+    [mappedQuestions],
+  )
+
   const participantEditPolicy = useMemo(
     () => ({
       sessionQuizTotalTimeEnabled,
-      quizTotalTimeFinalized:
-        sessionQuizTotalTimeEnabled &&
-        isQuizTotalTimeSessionFinalized(activeQuestions, quizExplicitSubmittedQuestionIds),
+      lastQuestionFinalized:
+        navigationEnabled &&
+        isMultiNavLastQuestionFinalized(mappedQuestions, quizExplicitSubmittedQuestionIds),
     }),
     [
       sessionQuizTotalTimeEnabled,
-      activeQuestions,
+      navigationEnabled,
+      mappedQuestions,
       quizExplicitSubmittedQuestionIds,
     ],
   )
 
-  const { quizTotalTimeFinalized } = participantEditPolicy
-
-  const canEditResponses = useMemo(
-    () =>
-      !isSessionEnded &&
-      !(sessionQuizTotalTimeEnabled && quizTotalTimeFinalized),
-    [isSessionEnded, sessionQuizTotalTimeEnabled, quizTotalTimeFinalized],
-  )
+  const { lastQuestionFinalized } = participantEditPolicy
 
   const question = useMemo(() => {
     if (!activeQuestions.length) return null
@@ -362,6 +362,19 @@ function ParticipantSessionPage() {
 
   const sessionTimerExpired = sessionQuizTotalTimeEnabled && hasCountdown && timer === 0
 
+  const canEditResponses = useMemo(
+    () =>
+      !isSessionEnded &&
+      !lastQuestionFinalized &&
+      !(sessionQuizTotalTimeEnabled && sessionTimerExpired),
+    [
+      isSessionEnded,
+      lastQuestionFinalized,
+      sessionQuizTotalTimeEnabled,
+      sessionTimerExpired,
+    ],
+  )
+
   const submittedAtSeconds =
     !sessionQuizTotalTimeEnabled &&
     questionLockedBySubmission &&
@@ -376,7 +389,8 @@ function ParticipantSessionPage() {
     isSessionEnded ||
     (submissionsClosed && !openForReattempt) ||
     (navigationEnabled && allQuestionsClosedByHost && !openForReattempt) ||
-    (sessionQuizTotalTimeEnabled && (sessionTimerExpired || quizTotalTimeFinalized)) ||
+    lastQuestionFinalized ||
+    (sessionQuizTotalTimeEnabled && sessionTimerExpired) ||
     (!sessionQuizTotalTimeEnabled &&
       hasCountdown &&
       (questionLockedBySubmission || timer === 0))
@@ -978,9 +992,19 @@ function ParticipantSessionPage() {
     return idx !== -1 ? idx : clamp(questionIndex, 0, activeQuestions.length - 1)
   }, [question?.id, activeQuestions, questionIndex])
 
-  const isLastDisplayedQuestion = navigationEnabled
-    ? activeQuestions.length > 0 && displayQuestionIndex === activeQuestions.length - 1
-    : true
+  const isLastDisplayedQuestion = useMemo(() => {
+    if (!navigationEnabled) return true
+    if (sessionLastQuestionId != null && question?.id != null) {
+      return Number(question.id) === Number(sessionLastQuestionId)
+    }
+    return activeQuestions.length > 0 && displayQuestionIndex === activeQuestions.length - 1
+  }, [
+    navigationEnabled,
+    sessionLastQuestionId,
+    question?.id,
+    activeQuestions.length,
+    displayQuestionIndex,
+  ])
 
   const multiNavTimedSession = useMemo(
     () => navigationEnabled && sessionHasTimedQuestions(activeQuestions),
@@ -996,7 +1020,7 @@ function ParticipantSessionPage() {
     if (!navigationEnabled) return false
     if (sessionQuizTotalTimeEnabled) {
       return canShowPreviousForQuizTotalTimeMultiNav(
-        activeQuestions,
+        mappedQuestions,
         quizExplicitSubmittedQuestionIds,
         sessionTimerExpired,
       )
@@ -1012,6 +1036,7 @@ function ParticipantSessionPage() {
     navigationEnabled,
     sessionQuizTotalTimeEnabled,
     sessionTimerExpired,
+    mappedQuestions,
     multiNavTimedSession,
     activeQuestions,
     quizExplicitSubmittedQuestionIds,
@@ -1372,7 +1397,7 @@ function ParticipantSessionPage() {
   )
 
   const handleSubmitResponse = async () => {
-    if (isSessionEnded || quizTotalTimeFinalized) return false
+    if (isSessionEnded || lastQuestionFinalized) return false
     const payloads = buildFinalPayload()
     if (!payloads.length || !participantToken) return false
 
@@ -1382,8 +1407,13 @@ function ParticipantSessionPage() {
       await Promise.all(payloads.map((p) => submitResponseApi(participantToken, p)))
       const submittedIds = payloads.map((p) => p.question_id)
       markQuestionsSubmitted(submittedIds)
-      if (multiNavTimedSession || sessionQuizTotalTimeEnabled) {
-        markQuestionsExplicitlySubmitted(submittedIds)
+      if (
+        navigationEnabled &&
+        sessionLastQuestionId != null &&
+        question?.id != null &&
+        Number(question.id) === Number(sessionLastQuestionId)
+      ) {
+        markQuestionsExplicitlySubmitted([sessionLastQuestionId])
       }
       if (hadCountdown && !sessionQuizTotalTimeEnabled && question?.id) {
         freezeCountdownAfterSubmit(question.id)
@@ -1482,16 +1512,15 @@ function ParticipantSessionPage() {
   }
 
   const handleSubmit = async () => {
-    if (isSessionEnded || quizTotalTimeFinalized) return
+    if (isSessionEnded || lastQuestionFinalized) return
     if (!isLastDisplayedQuestion) return
     const ok = await handleSubmitResponse()
     if (ok) {
       setSubmitModal({
         variant: 'success',
         title: 'Submission successful',
-        message: sessionQuizTotalTimeEnabled
-          ? 'Your answers were submitted successfully. You can review questions or open Q&A, but answers can no longer be changed.'
-          : 'Your answers were submitted successfully. You can keep browsing questions or open Q&A when ready.',
+        message:
+          'Your answers were submitted successfully. You can review questions or open Q&A, but answers can no longer be changed.',
         confirmLabel: 'Continue',
       })
     } else {
@@ -1904,7 +1933,7 @@ function ParticipantSessionPage() {
             timer={timer}
             submittedAtSeconds={submittedAtSeconds}
             sessionQuizTotalTimeEnabled={sessionQuizTotalTimeEnabled}
-            quizTotalTimeFinalized={quizTotalTimeFinalized}
+            lastQuestionFinalized={lastQuestionFinalized}
             currentResponse={currentResponse}
             answerRevealMeta={answerRevealMeta}
             isAnswerRevealed={isAnswerRevealed}
