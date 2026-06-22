@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Maximize2, Minimize2 } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Maximize2, Minimize2, Trophy } from 'lucide-react'
 import { HostAlertModal } from '../../components/live/HostAlertModal'
+import { HostQuestionActionButton } from '../../components/live/HostQuestionActionButton'
 import { HostQuestionControls } from '../../components/live/HostQuestionControls'
 import { useAuthStore } from '../../store/authStore'
 import { useHostQuestionMutations } from '../../hooks/useHostQuestionMutations'
 import { useLiveSession } from '../../hooks/useLiveSession'
+import { updateSessionApi } from '../../services/liveApi'
 import { sessionSupportsOverallLeaderboard } from '../../utils/livePresentation'
 import { isSessionQuizTotalTimeEnabled } from '../../utils/sessionFlags'
 import { LeaderboardSlide } from './LeaderboardSlide'
@@ -18,6 +21,7 @@ function PresentModePage() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session') || ''
   const accessToken = useAuthStore((state) => state.accessToken)
+  const queryClient = useQueryClient()
 
   const { session, mappedQuestions, responses, participants, leaderboard, isLoading, isError } =
     useLiveSession(accessToken, sessionId)
@@ -30,8 +34,38 @@ function PresentModePage() {
   const openParticipantsModal = useCallback(() => setParticipantsModalOpen(true), [])
 
   const canEditLive = session?.status === 'live'
+  const showSessionControls = session?.status === 'live' || session?.status === 'paused'
+  const canToggleOverallLeaderboard = sessionSupportsOverallLeaderboard(mappedQuestions)
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
   const sessionQuizTotalTimeEnabled = isSessionQuizTotalTimeEnabled(session)
+
+  const sessionLeaderboardMutation = useMutation({
+    mutationFn: (enabled) =>
+      updateSessionApi(accessToken, sessionId, { leaderboard_enabled: enabled }),
+    onSuccess: (updated) => {
+      if (updated) {
+        queryClient.setQueryData(['live-session', sessionId], (old) =>
+          old
+            ? {
+                ...old,
+                ...updated,
+                leaderboard_enabled: updated.leaderboard_enabled,
+              }
+            : updated,
+        )
+      }
+      queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+    },
+    onError: () => {
+      setHostAlert({
+        variant: 'error',
+        title: 'Could not update leaderboard',
+        message: 'Unable to update the overall leaderboard setting. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
+  })
 
   const {
     questionLiveMutation,
@@ -201,6 +235,30 @@ function PresentModePage() {
               <p className="hidden text-xs font-medium text-slate-500 sm:block">
                 ← → arrow keys to change slides
               </p>
+              {canToggleOverallLeaderboard && showSessionControls ? (
+                <HostQuestionActionButton
+                  disabled={sessionLeaderboardMutation.isPending}
+                  icon={Trophy}
+                  size="compact"
+                  label={
+                    sessionLeaderboardMutation.isPending
+                      ? 'Updating…'
+                      : session?.leaderboard_enabled
+                        ? 'Overall leaderboard'
+                        : 'Overall leaderboard'
+                  }
+                  title={
+                    session?.leaderboard_enabled
+                      ? 'Hide session-wide leaderboard from participants'
+                      : 'Show session-wide leaderboard to participants on its own tab'
+                  }
+                  active={Boolean(session?.leaderboard_enabled)}
+                  tone="amber"
+                  onClick={() =>
+                    sessionLeaderboardMutation.mutate(!session?.leaderboard_enabled)
+                  }
+                />
+              ) : null}
               <button
                 type="button"
                 onClick={toggleFullscreen}
