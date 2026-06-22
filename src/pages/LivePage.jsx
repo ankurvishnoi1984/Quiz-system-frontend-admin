@@ -61,6 +61,7 @@ import {
   listSessionQuestionsApi,
   qaModerateApi,
   transitionSessionApi,
+  updateSessionApi,
 } from '../services/liveApi'
 import { formatQuizSubmitTimeCompact } from '../utils/quizResponseTime'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
@@ -258,6 +259,28 @@ function LivePage() {
       queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
     },
     onError: (error) => setErrorMessage(error.message || 'Unable to update session state'),
+  })
+
+  const sessionLeaderboardMutation = useMutation({
+    mutationFn: (enabled) =>
+      updateSessionApi(accessToken, sessionId, { leaderboard_enabled: enabled }),
+    onSuccess: (updated) => {
+      if (updated) {
+        queryClient.setQueryData(['live-session', sessionId], (old) =>
+          old
+            ? {
+                ...old,
+                ...updated,
+                leaderboard_enabled: updated.leaderboard_enabled,
+              }
+            : updated,
+        )
+      }
+      queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+    },
+    onError: (error) =>
+      setErrorMessage(error.message || 'Unable to update overall leaderboard setting'),
   })
 
 
@@ -482,10 +505,9 @@ function LivePage() {
     )
   }, [activeQuestion, sessionResponses, leaderboardLimit])
 
-  const showSessionLeaderboard = sessionSupportsOverallLeaderboard(mappedQuestions)
-
-
   const session = sessionQuery.data
+  const canViewSessionLeaderboard = sessionSupportsOverallLeaderboard(mappedQuestions)
+  const canToggleOverallLeaderboard = sessionSupportsOverallLeaderboard(mappedQuestions)
   const statusLabel = session?.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : '—'
   const canEditLive = session?.status === 'live'
   const canLaunchSession =
@@ -594,7 +616,7 @@ function LivePage() {
             <Users className="size-4" />
             {participants} participants
           </span>
-          {showSessionLeaderboard ? (
+          {canViewSessionLeaderboard ? (
             <button
               type="button"
               onClick={() => setLeaderboardOpen((p) => !p)}
@@ -686,6 +708,29 @@ function LivePage() {
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {canToggleOverallLeaderboard && showSessionControls ? (
+              <HostQuestionActionButton
+                disabled={sessionLeaderboardMutation.isPending}
+                icon={Trophy}
+                label={
+                  sessionLeaderboardMutation.isPending
+                    ? 'Updating…'
+                    : session?.leaderboard_enabled
+                      ? 'Overall leaderboard'
+                      : 'Overall leaderboard'
+                }
+                title={
+                  session?.leaderboard_enabled
+                    ? 'Hide session-wide leaderboard from participants'
+                    : 'Show session-wide leaderboard to participants on its own tab'
+                }
+                active={Boolean(session?.leaderboard_enabled)}
+                tone="amber"
+                onClick={() =>
+                  sessionLeaderboardMutation.mutate(!session?.leaderboard_enabled)
+                }
+              />
+            ) : null}
             {showActivateAllQuestionsButton ? (
               <HostQuestionActionButton
                 disabled={activateAllQuestionsMutation.isPending}

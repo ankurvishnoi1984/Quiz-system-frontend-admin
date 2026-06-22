@@ -226,7 +226,7 @@ function SessionFormModal({
             <div>
               <p className="text-sm font-semibold text-slate-700">Overall leaderboard (Q&A)</p>
               <p className="text-xs text-slate-500">
-                Show session-wide rankings to participants on the Q&A page
+                Show session-wide rankings to participants on the Overall Leaderboard tab
               </p>
             </div>
             <input

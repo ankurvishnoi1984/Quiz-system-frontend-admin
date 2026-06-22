@@ -32,10 +32,10 @@ import {
 import { ActiveQuestionPanel } from './components/ActiveQuestionPanel'
 import { JoinFormView } from './components/JoinFormView'
 import { SessionNotLiveView } from './components/SessionNotLiveView'
-import { LeaderboardModal } from './components/LeaderboardModal'
 import { PageCenteredShell } from './components/PageCenteredShell'
 import { ParticipantAlertModal } from './components/ParticipantAlertModal'
 import { QaPanel } from './components/QaPanel'
+import { OverallLeaderboardPanel } from './components/OverallLeaderboardPanel'
 import { SessionHeader } from './components/SessionHeader'
 import { SessionEndedBanner } from './components/SessionEndedBanner'
 import { WaitingForQuestion } from './components/WaitingForQuestion'
@@ -169,7 +169,6 @@ function ParticipantSessionPage() {
   const [leaderboard, setLeaderboard] = useState([])
   const [questionLeaderboardByQuestion, setQuestionLeaderboardByQuestion] = useState({})
   const [questionLbVisibleByQuestion, setQuestionLbVisibleByQuestion] = useState({})
-  const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [answerRevealByQuestion, setAnswerRevealByQuestion] = useState({})
   const [unseenActivatedQuestionIds, setUnseenActivatedQuestionIds] = useState(
     () => new Set(),
@@ -258,7 +257,7 @@ function ParticipantSessionPage() {
   const isSessionEnded =
     session?.status === 'completed' || session?.status === 'archived'
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
-  const showLeaderboardInQa =
+  const showOverallLeaderboardTab =
     showOverallLeaderboard && sessionSupportsOverallLeaderboard(mappedQuestions)
   const navigationEnabled = session?.participant_navigation_enabled !== false
   const sessionQuizTotalTimeEnabled = useMemo(
@@ -922,10 +921,16 @@ function ParticipantSessionPage() {
   ])
 
   useEffect(() => {
-    if (step === 'qa' && showLeaderboardInQa && dbSessionId) {
+    if (step === 'leaderboard' && showOverallLeaderboardTab && dbSessionId) {
       queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
     }
-  }, [step, showLeaderboardInQa, dbSessionId, queryClient])
+  }, [step, showOverallLeaderboardTab, dbSessionId, queryClient])
+
+  useEffect(() => {
+    if (step === 'leaderboard' && !showOverallLeaderboardTab) {
+      setStep('qa')
+    }
+  }, [step, showOverallLeaderboardTab])
 
   useEffect(() => {
     if (!activeQuestions.length) {
@@ -1234,8 +1239,8 @@ function ParticipantSessionPage() {
     enabled: Boolean(
       participantToken &&
         dbSessionId &&
-        showLeaderboardInQa &&
-        (step === 'qa' || hasAnyQuestionSaved || session?.status === 'completed'),
+        showOverallLeaderboardTab &&
+        (step === 'leaderboard' || hasAnyQuestionSaved || session?.status === 'completed'),
     ),
     staleTime: 5000,
   })
@@ -1900,6 +1905,7 @@ function ParticipantSessionPage() {
           joinedUser={joinedUser}
           step={step}
           onStepChange={setStep}
+          showOverallLeaderboardTab={showOverallLeaderboardTab}
         />
 
         {isSessionEnded ? <SessionEndedBanner /> : null}
@@ -1910,9 +1916,9 @@ function ParticipantSessionPage() {
           <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
             <h2 className="text-xl font-bold text-navy-900">Session ended</h2>
             <p className="text-sm text-slate-600">
-              The host has ended this session. Switch to Q&amp;A to{' '}
-              {showLeaderboardInQa ? 'see the leaderboard or ' : ''}
-              review past activity.
+              The host has ended this session. Switch to Q&amp;A or{' '}
+              {showOverallLeaderboardTab ? 'Overall Leaderboard ' : ''}
+              to review past activity.
             </p>
           </section>
         )}
@@ -1972,11 +1978,6 @@ function ParticipantSessionPage() {
 
         {step === 'qa' && (
           <QaPanel
-            showOverallLeaderboard={showLeaderboardInQa}
-            hasAnyQuestionSaved={hasAnyQuestionSaved}
-            sessionStatus={session?.status}
-            leaderboard={leaderboard}
-            onShowLeaderboard={() => setShowLeaderboard(true)}
             askText={askText}
             onAskTextChange={setAskText}
             allowAnonymousQa={allowAnonymousQa}
@@ -1987,6 +1988,15 @@ function ParticipantSessionPage() {
             approvedQa={approvedQa}
             upvotes={upvotes}
             onUpvote={handleUpvote}
+          />
+        )}
+
+        {step === 'leaderboard' && showOverallLeaderboardTab && (
+          <OverallLeaderboardPanel
+            leaderboard={leaderboard}
+            hasAnyQuestionSaved={hasAnyQuestionSaved}
+            sessionStatus={session?.status}
+            isLoading={leaderboardQuery.isLoading}
           />
         )}
       </div>
@@ -2036,11 +2046,6 @@ function ParticipantSessionPage() {
         onClose={() => setSessionEndedModal(false)}
       />
 
-      <LeaderboardModal
-        open={showLeaderboard}
-        leaderboard={leaderboard}
-        onClose={() => setShowLeaderboard(false)}
-      />
     </main>
   )
 }

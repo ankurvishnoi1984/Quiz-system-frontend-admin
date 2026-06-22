@@ -2290,7 +2290,7 @@ function BuilderPage() {
               <label className="flex items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white p-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-700">Overall leaderboard (Q&A)</p>
-                  <p className="text-xs text-slate-500">Session-wide rankings on the Q&A page</p>
+                  <p className="text-xs text-slate-500">Session-wide rankings on the Overall Leaderboard tab</p>
                 </div>
                 <input
                   type="checkbox"
