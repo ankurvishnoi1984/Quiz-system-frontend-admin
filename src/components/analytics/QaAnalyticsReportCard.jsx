@@ -48,20 +48,20 @@ export function QaAnalyticsReportCard({ report, isLoading }) {
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatTile label="Total asked" value={summary.total_asked} hint="All submissions" />
-        <StatTile
+        {/* <StatTile
           label="Approval rate"
           value={`${summary.approval_rate_percent}%`}
           hint="Approved, answered, or pinned"
-        />
-        <StatTile
+        /> */}
+        {/* <StatTile
           label="Unanswered"
           value={summary.unanswered_count}
           hint="Pending, approved, or pinned"
-        />
+        /> */}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div>
+        {/* <div>
           <p className="text-sm font-semibold text-navy-900">Top 5 by upvotes</p>
           {topQuestions?.length ? (
             <ol className="mt-3 space-y-2">
@@ -82,7 +82,7 @@ export function QaAnalyticsReportCard({ report, isLoading }) {
           ) : (
             <p className="mt-3 text-sm text-slate-600">No Q&A questions yet.</p>
           )}
-        </div>
+        </div> */}
 
         <div>
           {/* <p className="text-sm font-semibold text-navy-900">Anonymous vs named</p>

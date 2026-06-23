@@ -33,10 +33,10 @@ export async function exportQaAnalyticsExcel(report) {
   summarySheet.columns = [{ width: 28 }, { width: 40 }]
   summarySheet.addRow(['Session', report.session.title])
   summarySheet.addRow(['Total asked', report.summary.total_asked])
-  summarySheet.addRow(['Approval rate %', report.summary.approval_rate_percent])
-  summarySheet.addRow(['Unanswered', report.summary.unanswered_count])
-  summarySheet.addRow(['Anonymous submissions', report.submission_ratio.anonymous])
-  summarySheet.addRow(['Named submissions', report.submission_ratio.named])
+  // summarySheet.addRow(['Approval rate %', report.summary.approval_rate_percent])
+  // summarySheet.addRow(['Unanswered', report.summary.unanswered_count])
+  // summarySheet.addRow(['Anonymous submissions', report.submission_ratio.anonymous])
+  // summarySheet.addRow(['Named submissions', report.submission_ratio.named])
   summarySheet.addRow([])
 
   const logSheet = workbook.addWorksheet('Q&A Log')
@@ -51,10 +51,10 @@ export async function exportQaAnalyticsExcel(report) {
   const header = logSheet.addRow([
     'Question text',
     'Submitter',
-    'Upvotes',
-    'Status',
+    // 'Upvotes',
+    // 'Status',
     'Submitted at',
-    'Answered at',
+    // 'Answered at',
   ])
   styleHeaderRow(logSheet, header.number, 6)
 
@@ -62,10 +62,10 @@ export async function exportQaAnalyticsExcel(report) {
     logSheet.addRow([
       row.question_text,
       row.submitter,
-      row.upvotes,
-      row.status,
+      // row.upvotes,
+      // row.status,
       formatDateTime(row.submitted_at),
-      formatDateTime(row.answered_at),
+      // formatDateTime(row.answered_at),
     ])
   }
 
