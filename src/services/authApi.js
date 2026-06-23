@@ -9,21 +9,25 @@ async function parseJson(response) {
 }
 
 async function request(path, options = {}) {
+  const { headers, ...rest } = options
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...rest,
     headers: {
       'Content-Type': 'application/json',
-      ...(options.headers || {}),
+      ...headers,
     },
-    ...options,
   })
 
   const payload = await parseJson(response)
 
   if (!response.ok) {
-    const message = payload?.message || 'Request failed'
+    const details = Array.isArray(payload?.errors) ? payload.errors : null
+    const message = details?.length
+      ? details.join('. ')
+      : payload?.message || 'Request failed'
     const error = new Error(message)
     error.status = response.status
-    error.details = payload?.errors || null
+    error.details = details
     throw error
   }
 
@@ -34,6 +38,32 @@ export async function loginApi({ email, password }) {
   return request('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+  })
+}
+
+export async function forgotPasswordApi({ email }) {
+  return request('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+export async function changePasswordApi({ currentPassword, newPassword }, accessToken) {
+  if (!newPassword) {
+    throw new Error('New password is required')
+  }
+
+  const body = { new_password: newPassword }
+  if (currentPassword) {
+    body.current_password = currentPassword
+  }
+
+  return request('/auth/change-password', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
   })
 }
 

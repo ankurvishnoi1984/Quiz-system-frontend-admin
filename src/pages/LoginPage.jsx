@@ -1,5 +1,6 @@
 import { Eye, EyeOff, LoaderCircle, Lock, User } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 function LoginPage() {
@@ -26,6 +27,7 @@ function LoginPage() {
       await login({
         email: identifier,
         password,
+        rememberMe,
       })
     } catch (error) {
       setSubmitError(error.message || 'Unable to login')
@@ -107,9 +109,9 @@ function LoginPage() {
               />
               Remember Me
             </label>
-            <a href="#" className="text-sm font-medium text-navy-700 transition hover:text-navy-900">
+            <Link to="/forgot-password" className="text-sm font-medium text-navy-700 transition hover:text-navy-900">
               Forgot password?
-            </a>
+            </Link>
           </div>
 
           <button type="submit" disabled={loading} className="btn-gradient mt-2">

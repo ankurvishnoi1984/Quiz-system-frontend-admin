@@ -1,6 +1,35 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import { loginApi, meApi, refreshApi } from '../services/authApi'
+import {
+  changePasswordApi,
+  loginApi,
+  meApi,
+  refreshApi,
+} from '../services/authApi'
+
+const AUTH_STORAGE_KEY = 'auth-storage'
+const REMEMBER_ME_KEY = 'auth-remember-me'
+
+function getPersistStorage() {
+  if (typeof window === 'undefined') {
+    return localStorage
+  }
+  return localStorage.getItem(REMEMBER_ME_KEY) === 'true' ? localStorage : sessionStorage
+}
+
+const authPersistStorage = createJSONStorage(() => ({
+  getItem: (name) => getPersistStorage().getItem(name),
+  setItem: (name, value) => getPersistStorage().setItem(name, value),
+  removeItem: (name) => {
+    localStorage.removeItem(name)
+    sessionStorage.removeItem(name)
+  },
+}))
+
+function clearAuthStorage() {
+  localStorage.removeItem(AUTH_STORAGE_KEY)
+  sessionStorage.removeItem(AUTH_STORAGE_KEY)
+}
 
 export const useAuthStore = create(
   persist(
@@ -25,7 +54,10 @@ export const useAuthStore = create(
           refreshToken: null,
           error: null,
         }),
-      login: async ({ email, password }) => {
+      login: async ({ email, password, rememberMe = false }) => {
+        localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? 'true' : 'false')
+        clearAuthStorage()
+
         set({ isLoading: true, error: null })
         try {
           const response = await loginApi({ email, password })
@@ -45,6 +77,40 @@ export const useAuthStore = create(
           set({
             isLoading: false,
             error: error.message || 'Login failed',
+          })
+          throw error
+        }
+      },
+      changePassword: async ({ currentPassword, newPassword }) => {
+        const { accessToken } = get()
+        if (!accessToken) {
+          const error = new Error('Not authenticated')
+          error.status = 401
+          throw error
+        }
+
+        set({ isLoading: true, error: null })
+        try {
+          const response = await changePasswordApi(
+            { currentPassword, newPassword },
+            accessToken,
+          )
+          const user = response?.data?.user || null
+          const tokens = response?.data?.tokens || {}
+
+          set({
+            user,
+            accessToken: tokens.access_token || accessToken,
+            refreshToken: tokens.refresh_token || get().refreshToken,
+            isLoading: false,
+            error: null,
+          })
+
+          return user
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error.message || 'Password change failed',
           })
           throw error
         }
@@ -115,17 +181,20 @@ export const useAuthStore = create(
           })
         }
       },
-      logout: () =>
+      logout: () => {
+        clearAuthStorage()
+        localStorage.removeItem(REMEMBER_ME_KEY)
         set({
           user: null,
           accessToken: null,
           refreshToken: null,
           error: null,
-        }),
+        })
+      },
     }),
     {
-      name: 'auth-storage',
-      storage: createJSONStorage(() => localStorage),
+      name: AUTH_STORAGE_KEY,
+      storage: authPersistStorage,
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
