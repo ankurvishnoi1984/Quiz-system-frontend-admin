@@ -1,3 +1,5 @@
+import { ReportPrintHeader } from '../reports/ReportPrintHeader'
+
 function formatDate(value) {
   if (!value) return '—'
   return new Date(value).toLocaleString(undefined, {
@@ -15,20 +17,18 @@ export function SessionSummaryPrintReport({ report }) {
   const maxTimelineCount = Math.max(1, ...(timeline || []).map((row) => row.count))
 
   return (
-    <div className="analytics-print-only hidden bg-white p-8 text-slate-900">
-      <header className="border-b border-slate-300 pb-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">Session Summary Report</p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900">{session.title}</h1>
-        <p className="mt-1 text-sm text-slate-600">
+    <div className="host-print-only hidden bg-white text-slate-900">
+      <ReportPrintHeader reportLabel="Session Summary Report" title={session.title}>
+        <p>
           Host {session.host_name} · {session.department_name} · {formatDate(session.date)} ·{' '}
           {session.duration_label}
         </p>
-        <p className="mt-1 text-sm text-slate-600">
+        <p>
           Session {session.session_id} · {session.status} · Generated {generatedAt}
         </p>
-      </header>
+      </ReportPrintHeader>
 
-      <section className="mt-6">
+      <section className="report-print-section">
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Summary</h2>
         <div className="mt-3 grid grid-cols-2 gap-3">
           {[
@@ -49,7 +49,7 @@ export function SessionSummaryPrintReport({ report }) {
       </section>
 
       {quizStats?.has_quiz_mode ? (
-        <section className="mt-6">
+        <section className="report-print-section">
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Quiz scores</h2>
           <div className="mt-3 grid grid-cols-2 gap-3">
             {[
@@ -66,7 +66,7 @@ export function SessionSummaryPrintReport({ report }) {
       ) : null}
 
       {report.survey_question_breakdowns?.length ? (
-        <section className="mt-6">
+        <section className="report-print-section">
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Survey Responses</h2>
           <table className="mt-3 w-full border-collapse text-sm">
             <thead>
@@ -100,7 +100,7 @@ export function SessionSummaryPrintReport({ report }) {
       ) : null}
 
       {report.standalone_question_breakdowns?.length ? (
-        <section className="mt-6">
+        <section className="report-print-section">
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Quiz, Poll & Other Questions</h2>
           <table className="mt-3 w-full border-collapse text-sm">
             <thead>
@@ -133,7 +133,7 @@ export function SessionSummaryPrintReport({ report }) {
         </section>
       ) : null}
 
-      <section className="mt-6">
+      <section className="report-print-section">
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Response timeline</h2>
         {timeline?.length ? (
           <table className="mt-3 w-full border-collapse text-sm">

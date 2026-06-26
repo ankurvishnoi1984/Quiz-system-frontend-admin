@@ -460,7 +460,7 @@ function AnalyticsPage() {
         />
       )}
 
-      <section className="analytics-screen-only space-y-6">
+      <section className="host-screen-only analytics-screen-only space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Session Analytics</p>

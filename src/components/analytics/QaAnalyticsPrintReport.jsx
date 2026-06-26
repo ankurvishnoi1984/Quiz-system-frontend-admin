@@ -1,3 +1,5 @@
+import { ReportPrintHeader } from '../reports/ReportPrintHeader'
+
 function formatDate(value) {
   if (!value) return '—'
   return new Date(value).toLocaleString(undefined, {
@@ -21,16 +23,15 @@ export function QaAnalyticsPrintReport({ report }) {
   const totalSubmissions = (submissionRatio?.anonymous || 0) + (submissionRatio?.named || 0)
 
   return (
-    <div className="analytics-print-only hidden bg-white p-8 text-slate-900">
-      <header className="border-b border-slate-300 pb-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">Q&A Analytics Report</p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900">{session.title}</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Session {session.session_id} · {session.status} · Generated {generatedAt}
+    <div className="host-print-only hidden bg-white text-slate-900">
+      <ReportPrintHeader reportLabel="Q&A Analytics Report" title={session.title}>
+        <p>
+          Session {session.session_id} · {session.status}
         </p>
-      </header>
+        <p>Generated {generatedAt}</p>
+      </ReportPrintHeader>
 
-      <section className="mt-6">
+      <section className="report-print-section">
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Summary</h2>
         <div className="mt-3 grid grid-cols-3 gap-3">
           {[
@@ -46,7 +47,7 @@ export function QaAnalyticsPrintReport({ report }) {
         </div>
       </section>
 
-      <section className="mt-6">
+      <section className="report-print-section">
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Anonymous vs named</h2>
         <div className="mt-3 grid grid-cols-2 gap-3">
           {[
@@ -68,7 +69,7 @@ export function QaAnalyticsPrintReport({ report }) {
         </div>
       </section>
 
-      <section className="mt-6">
+      <section className="report-print-section">
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Top 5 by upvotes</h2>
         {topQuestions?.length ? (
           <table className="mt-3 w-full border-collapse text-sm">
@@ -96,7 +97,7 @@ export function QaAnalyticsPrintReport({ report }) {
         )}
       </section>
 
-      <section className="mt-6">
+      <section className="report-print-section">
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Q&A log</h2>
         <p className="mt-1 text-xs text-slate-500">Approved, answered, and pending questions (rejected excluded)</p>
         {visibleLog.length ? (

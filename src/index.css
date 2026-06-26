@@ -77,7 +77,7 @@
 /* Host shell: hide sidebar/navbar and screen UI when printing */
 @media print {
   @page {
-    margin: 12mm;
+    margin: 14mm 12mm 16mm;
     size: A4;
   }
 
@@ -112,12 +112,124 @@
     padding: 0 !important;
   }
 
-  .analytics-screen-only {
+  .analytics-screen-only,
+  .host-screen-only {
     display: none !important;
   }
 
-  .analytics-print-only {
+  .analytics-print-only,
+  .host-print-only {
     display: block !important;
     width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+  }
+
+  .report-print-header {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 6mm;
+    padding-bottom: 4mm;
+    border-bottom: 1px solid #cbd5e1;
+  }
+
+  .report-print-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6mm;
+  }
+
+  .report-print-header-meta {
+    text-align: right;
+  }
+
+  .report-print-portal {
+    margin: 0;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  .report-print-label {
+    margin: 2px 0 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #475569;
+  }
+
+  .report-print-logo {
+    display: block;
+    height: 36px;
+    width: auto;
+    max-width: 160px;
+    object-fit: contain;
+    object-position: left center;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .report-print-title {
+    margin: 5mm 0 0;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #0f172a;
+  }
+
+  .report-print-subtitle {
+    margin-top: 2mm;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #475569;
+  }
+
+  .report-print-subtitle p {
+    margin: 0;
+  }
+
+  .report-print-subtitle p + p {
+    margin-top: 1mm;
+  }
+
+  .report-print-section {
+    margin-top: 5mm;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .report-print-section > h2 {
+    margin: 0 0 3mm;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #334155;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  table thead {
+    display: table-header-group;
+  }
+
+  table tfoot {
+    display: table-footer-group;
+  }
+
+  table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

@@ -1,3 +1,5 @@
+import { ReportPrintHeader } from '../reports/ReportPrintHeader'
+
 function formatRankingTopOption(question) {
   const top = question.rankingAnalytics?.rankings?.[0]
   if (!top) return '—'
@@ -10,16 +12,15 @@ export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leader
   const generatedAt = new Date().toLocaleString()
 
   return (
-    <div className="analytics-print-only hidden bg-white p-8 text-slate-900">
-      <header className="border-b border-slate-300 pb-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">Session Analytics Report</p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900">{sessionMeta.title}</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Session {sessionMeta.id} · {sessionMeta.status} · Generated {generatedAt}
+    <div className="host-print-only hidden bg-white text-slate-900">
+      <ReportPrintHeader reportLabel="Session Analytics Report" title={sessionMeta.title}>
+        <p>
+          Session {sessionMeta.id} · {sessionMeta.status}
         </p>
-      </header>
+        <p>Generated {generatedAt}</p>
+      </ReportPrintHeader>
 
-      <section className="mt-6">
+      <section className="report-print-section">
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Summary</h2>
         <div className="mt-3 grid grid-cols-2 gap-3">
           {[
@@ -36,7 +37,7 @@ export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leader
         </div>
       </section>
 
-      <section className="mt-6">
+      <section className="report-print-section">
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Questions</h2>
         <table className="mt-3 w-full border-collapse text-sm">
           <thead>
@@ -77,7 +78,7 @@ export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leader
         </table>
       </section>
 
-      <section className="mt-6">
+      <section className="report-print-section">
         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Top participants</h2>
         {leaderboard.length ? (
           <table className="mt-3 w-full border-collapse text-sm">

@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Search, ShieldCheck } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ReportsPrintReport } from '../components/reports/ReportsPrintReport'
 import KebabMenu from '../components/ui/KebabMenu'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
@@ -197,6 +198,22 @@ function ReportsPage() {
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = totalCount === 0 ? 0 : Math.min(page * PAGE_SIZE, totalCount)
 
+  const printFilters = useMemo(() => {
+    const dateRange =
+      fromDate && toDate
+        ? `${fromDate} to ${toDate}`
+        : fromDate
+          ? `from ${fromDate}`
+          : toDate
+            ? `until ${toDate}`
+            : ''
+    return {
+      status,
+      search: debounced || '',
+      dateRange,
+    }
+  }, [status, debounced, fromDate, toDate])
+
   const handleExportAll = async () => {
     if (!filtered.length) return
     setExportAllLoading(true)
@@ -210,7 +227,10 @@ function ReportsPage() {
   }
 
   return (
-    <section className="space-y-6">
+    <>
+      <ReportsPrintReport sessions={filtered} filters={printFilters} />
+
+      <section className="host-screen-only space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">Reports</p>
@@ -392,6 +412,7 @@ function ReportsPage() {
         )}
       </div>
     </section>
+    </>
   )
 }
 
