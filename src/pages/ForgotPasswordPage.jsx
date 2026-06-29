@@ -18,9 +18,7 @@ function ForgotPasswordPage() {
     try {
       const response = await forgotPasswordApi({ email: email.trim() })
       setSuccessMessage(
-        response?.message ||
-          response?.data?.message ||
-          'If an account exists for that email, a new temporary password has been sent.',
+        response?.message || response?.data?.message || 'Reset credentials have been sent to your email. Please check your inbox.',
       )
       setEmail('')
     } catch (error) {
@@ -74,7 +72,7 @@ function ForgotPasswordPage() {
                 Sending...
               </>
             ) : (
-              'Send temporary password'
+              'Submit'
             )}
           </button>
 
