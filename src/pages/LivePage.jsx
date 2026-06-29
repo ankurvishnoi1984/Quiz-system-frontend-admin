@@ -51,7 +51,7 @@ import {
 } from '../utils/leaderboard'
 import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
 import { getSessionQaReportApi } from '../services/analyticsApi'
-import { useAuthStore } from '../store/authStore'
+import { useAuthStore, syncAuthForNewBrowserTab } from '../store/authStore'
 import {
   getQuestionResultsApi,
   getSessionDetailApi,
@@ -665,7 +665,8 @@ function LivePage() {
             <button
               type="button"
               onClick={() => {
-                const url = `${window.location.origin}/present?session=${encodeURIComponent(sessionId)}`
+                syncAuthForNewBrowserTab()
+                const url = `${window.location.origin}/present?session=${encodeURIComponent(sessionId)}&present=1`
                 window.open(url, '_blank', 'noopener,noreferrer')
               }}
               className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-navy-900/20 transition hover:brightness-110"
