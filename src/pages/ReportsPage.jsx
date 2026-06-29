@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Search, Sh
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPrintReport } from '../components/reports/ReportsPrintReport'
+import { ReportPreviewModal } from '../components/reports/ReportPreviewModal'
 import KebabMenu from '../components/ui/KebabMenu'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
@@ -163,6 +164,7 @@ function ReportsPage() {
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
   const [exportAllLoading, setExportAllLoading] = useState(false)
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false)
   const debounced = useDebouncedValue(query, 250).trim().toLowerCase()
 
   const filtered = useMemo(() => {
@@ -228,7 +230,14 @@ function ReportsPage() {
 
   return (
     <>
-      <ReportsPrintReport sessions={filtered} filters={printFilters} />
+      <ReportPreviewModal
+        open={pdfPreviewOpen}
+        onClose={() => setPdfPreviewOpen(false)}
+        title="Session reports"
+        filename="session-reports.pdf"
+      >
+        <ReportsPrintReport sessions={filtered} filters={printFilters} />
+      </ReportPreviewModal>
 
       <section className="host-screen-only space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -252,11 +261,12 @@ function ReportsPage() {
           </button>
           <button
             type="button"
-            onClick={() => window.print()}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 shadow-sm shadow-blue-900/5 transition hover:bg-blue-50"
+            disabled={!filtered.length}
+            onClick={() => setPdfPreviewOpen(true)}
+            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 shadow-sm shadow-blue-900/5 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <FileText className="size-4" />
-            Print page
+            PDF Report
           </button>
         </div>
       </div>
@@ -359,7 +369,6 @@ function ReportsPage() {
                     icon: FileText,
                     onClick: () => {
                       navigate(`/analytics?session=${encodeURIComponent(s.id)}`)
-                      setTimeout(() => window.print(), 50)
                     },
                   },
                   { id: 'builder', label: 'Open Builder', onClick: () => navigate(`/builder?session=${encodeURIComponent(s.id)}`) },

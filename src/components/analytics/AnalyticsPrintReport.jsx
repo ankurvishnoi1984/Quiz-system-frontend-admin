@@ -12,7 +12,7 @@ export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leader
   const generatedAt = new Date().toLocaleString()
 
   return (
-    <div className="host-print-only hidden bg-white text-slate-900">
+    <>
       <ReportPrintHeader reportLabel="Session Analytics Report" title={sessionMeta.title}>
         <p>
           Session {sessionMeta.id} · {sessionMeta.status}
@@ -21,42 +21,42 @@ export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leader
       </ReportPrintHeader>
 
       <section className="report-print-section">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Summary</h2>
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <h2>Summary</h2>
+        <div className="report-print-grid">
           {[
             ['Total joined', summary.joined.toLocaleString()],
             ['Total responded', summary.responded.toLocaleString()],
             ['Avg response rate', `${summary.avg}%`],
             ['Session duration', summary.duration],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-lg border border-slate-200 p-3">
-              <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-              <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+            <div key={label} className="report-print-card">
+              <p className="report-print-card-label">{label}</p>
+              <p className="report-print-card-value">{value}</p>
             </div>
           ))}
         </div>
       </section>
 
       <section className="report-print-section">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Questions</h2>
-        <table className="mt-3 w-full border-collapse text-sm">
+        <h2>Questions</h2>
+        <table className="report-print-table">
           <thead>
-            <tr className="border-b border-slate-300 text-left">
-              <th className="py-2 pr-3 font-semibold">#</th>
-              <th className="py-2 pr-3 font-semibold">Type</th>
-              <th className="py-2 pr-3 font-semibold">Question</th>
-              <th className="py-2 pr-3 font-semibold">Responses</th>
-              <th className="py-2 font-semibold">Insight</th>
+            <tr>
+              <th>#</th>
+              <th>Type</th>
+              <th>Question</th>
+              <th>Responses</th>
+              <th>Insight</th>
             </tr>
           </thead>
           <tbody>
             {perQuestion.map((q) => (
-              <tr key={q.id} className="border-b border-slate-100 align-top">
-                <td className="py-2 pr-3 font-semibold">Q{q.index}</td>
-                <td className="py-2 pr-3">{q.typeLabel || q.type}</td>
-                <td className="py-2 pr-3">{q.text || 'Untitled'}</td>
-                <td className="py-2 pr-3">{q.responseCount}</td>
-                <td className="py-2">
+              <tr key={q.id}>
+                <td>Q{q.index}</td>
+                <td>{q.typeLabel || q.type}</td>
+                <td>{q.text || 'Untitled'}</td>
+                <td>{q.responseCount}</td>
+                <td>
                   {(q.chartRawType || q.rawType) === 'ranking'
                     ? formatRankingTopOption(q)
                     : (q.chartRawType || q.rawType) === 'rating' && q.averageRating != null
@@ -69,7 +69,7 @@ export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leader
             ))}
             {!perQuestion.length ? (
               <tr>
-                <td colSpan={5} className="py-4 text-slate-500">
+                <td colSpan={5} className="report-print-empty">
                   No questions in this session.
                 </td>
               </tr>
@@ -79,30 +79,30 @@ export function AnalyticsPrintReport({ sessionMeta, summary, perQuestion, leader
       </section>
 
       <section className="report-print-section">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Top participants</h2>
+        <h2>Top participants</h2>
         {leaderboard.length ? (
-          <table className="mt-3 w-full border-collapse text-sm">
+          <table className="report-print-table">
             <thead>
-              <tr className="border-b border-slate-300 text-left">
-                <th className="py-2 pr-3 font-semibold">Rank</th>
-                <th className="py-2 pr-3 font-semibold">Name</th>
-                <th className="py-2 font-semibold">Score</th>
+              <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Score</th>
               </tr>
             </thead>
             <tbody>
               {leaderboard.map((row, idx) => (
-                <tr key={`${row.name}-${idx}`} className="border-b border-slate-100">
-                  <td className="py-2 pr-3">{idx + 1}</td>
-                  <td className="py-2 pr-3">{row.name}</td>
-                  <td className="py-2">{row.score}</td>
+                <tr key={`${row.name}-${idx}`}>
+                  <td>{idx + 1}</td>
+                  <td>{row.name}</td>
+                  <td>{row.score}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         ) : (
-          <p className="mt-3 text-sm text-slate-500">No scored responses.</p>
+          <p className="report-print-empty">No scored responses.</p>
         )}
       </section>
-    </div>
+    </>
   )
 }

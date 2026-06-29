@@ -1,0 +1,212 @@
+/* Hex/rgb-only styles for report PDF export (html2canvas compatible). */
+.report-document {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.report-document .report-print-header {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.report-document .report-print-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.report-document .report-print-header-meta {
+  text-align: right;
+}
+
+.report-document .report-print-portal {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.report-document .report-print-label {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.report-document .report-print-logo {
+  display: block;
+  height: 36px;
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.report-document .report-print-title {
+  margin: 18px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #0f172a;
+}
+
+.report-document .report-print-subtitle {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.report-document .report-print-subtitle p {
+  margin: 0;
+}
+
+.report-document .report-print-subtitle p + p {
+  margin-top: 4px;
+}
+
+.report-document .report-print-section {
+  margin-top: 18px;
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+.report-document .report-print-section > h2 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #334155;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.report-document .report-print-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.report-document .report-print-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.report-document .report-print-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.report-document .report-print-card-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.report-document .report-print-card-value {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.report-document .report-print-card-hint {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.report-document .report-print-table {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.report-document .report-print-table thead {
+  display: table-header-group;
+}
+
+.report-document .report-print-table tfoot {
+  display: table-footer-group;
+}
+
+.report-document .report-print-table tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.report-document .report-print-table th {
+  padding: 8px 12px 8px 0;
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+
+.report-document .report-print-table td {
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  color: #0f172a;
+  vertical-align: top;
+}
+
+.report-document .report-print-capitalize {
+  text-transform: capitalize;
+}
+
+.report-document .report-print-empty,
+.report-document .report-print-note {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.report-document .report-print-note {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.report-document .report-print-cell-title {
+  margin: 0;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.report-document .report-print-cell-sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.report-document .report-print-bar {
+  height: 12px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+
+.report-document .report-print-bar-fill {
+  height: 12px;
+  border-radius: 4px;
+  background: #334155;
+}

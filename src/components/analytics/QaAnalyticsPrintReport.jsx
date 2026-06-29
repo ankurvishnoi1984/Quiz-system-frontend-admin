@@ -23,7 +23,7 @@ export function QaAnalyticsPrintReport({ report }) {
   const totalSubmissions = (submissionRatio?.anonymous || 0) + (submissionRatio?.named || 0)
 
   return (
-    <div className="host-print-only hidden bg-white text-slate-900">
+    <>
       <ReportPrintHeader reportLabel="Q&A Analytics Report" title={session.title}>
         <p>
           Session {session.session_id} · {session.status}
@@ -32,34 +32,34 @@ export function QaAnalyticsPrintReport({ report }) {
       </ReportPrintHeader>
 
       <section className="report-print-section">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Summary</h2>
-        <div className="mt-3 grid grid-cols-3 gap-3">
+        <h2>Summary</h2>
+        <div className="report-print-grid report-print-grid--3">
           {[
             ['Total asked', summary.total_asked],
             ['Approval rate', `${summary.approval_rate_percent}%`],
             ['Unanswered', summary.unanswered_count],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-lg border border-slate-200 p-3">
-              <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-              <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+            <div key={label} className="report-print-card">
+              <p className="report-print-card-label">{label}</p>
+              <p className="report-print-card-value">{value}</p>
             </div>
           ))}
         </div>
       </section>
 
       <section className="report-print-section">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Anonymous vs named</h2>
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <h2>Anonymous vs named</h2>
+        <div className="report-print-grid">
           {[
             ['Anonymous submissions', submissionRatio.anonymous],
             ['Named submissions', submissionRatio.named],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-lg border border-slate-200 p-3">
-              <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-              <p className="mt-1 text-lg font-bold text-slate-900">
+            <div key={label} className="report-print-card">
+              <p className="report-print-card-label">{label}</p>
+              <p className="report-print-card-value">
                 {value}
                 {totalSubmissions > 0 ? (
-                  <span className="ml-2 text-sm font-medium text-slate-600">
+                  <span className="report-print-card-hint">
                     ({Math.round((value / totalSubmissions) * 100)}%)
                   </span>
                 ) : null}
@@ -70,65 +70,65 @@ export function QaAnalyticsPrintReport({ report }) {
       </section>
 
       <section className="report-print-section">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Top 5 by upvotes</h2>
+        <h2>Top 5 by upvotes</h2>
         {topQuestions?.length ? (
-          <table className="mt-3 w-full border-collapse text-sm">
+          <table className="report-print-table">
             <thead>
-              <tr className="border-b border-slate-300 text-left">
-                <th className="py-2 pr-3 font-semibold">#</th>
-                <th className="py-2 pr-3 font-semibold">Question</th>
-                <th className="py-2 pr-3 font-semibold">Upvotes</th>
-                <th className="py-2 font-semibold">Status</th>
+              <tr>
+                <th>#</th>
+                <th>Question</th>
+                <th>Upvotes</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {topQuestions.map((question, index) => (
-                <tr key={question.qa_id} className="border-b border-slate-100 align-top">
-                  <td className="py-2 pr-3 font-semibold">{index + 1}</td>
-                  <td className="py-2 pr-3">{question.question_text}</td>
-                  <td className="py-2 pr-3">{question.upvotes}</td>
-                  <td className="py-2 capitalize">{formatStatus(question.status)}</td>
+                <tr key={question.qa_id}>
+                  <td>{index + 1}</td>
+                  <td>{question.question_text}</td>
+                  <td>{question.upvotes}</td>
+                  <td className="report-print-capitalize">{formatStatus(question.status)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         ) : (
-          <p className="mt-3 text-sm text-slate-500">No Q&A questions yet.</p>
+          <p className="report-print-empty">No Q&A questions yet.</p>
         )}
       </section>
 
       <section className="report-print-section">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Q&A log</h2>
-        <p className="mt-1 text-xs text-slate-500">Approved, answered, and pending questions (rejected excluded)</p>
+        <h2>Q&A log</h2>
+        <p className="report-print-note">Approved, answered, and pending questions (rejected excluded)</p>
         {visibleLog.length ? (
-          <table className="mt-3 w-full border-collapse text-sm">
+          <table className="report-print-table">
             <thead>
-              <tr className="border-b border-slate-300 text-left">
-                <th className="py-2 pr-3 font-semibold">Question</th>
-                <th className="py-2 pr-3 font-semibold">Submitter</th>
-                <th className="py-2 pr-3 font-semibold">Upvotes</th>
-                <th className="py-2 pr-3 font-semibold">Status</th>
-                <th className="py-2 pr-3 font-semibold">Submitted</th>
-                <th className="py-2 font-semibold">Answered</th>
+              <tr>
+                <th>Question</th>
+                <th>Submitter</th>
+                <th>Upvotes</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th>Answered</th>
               </tr>
             </thead>
             <tbody>
               {visibleLog.map((row) => (
-                <tr key={row.qa_id} className="border-b border-slate-100 align-top">
-                  <td className="py-2 pr-3">{row.question_text}</td>
-                  <td className="py-2 pr-3">{row.submitter}</td>
-                  <td className="py-2 pr-3">{row.upvotes}</td>
-                  <td className="py-2 pr-3 capitalize">{formatStatus(row.status)}</td>
-                  <td className="py-2 pr-3">{formatDate(row.submitted_at)}</td>
-                  <td className="py-2">{formatDate(row.answered_at)}</td>
+                <tr key={row.qa_id}>
+                  <td>{row.question_text}</td>
+                  <td>{row.submitter}</td>
+                  <td>{row.upvotes}</td>
+                  <td className="report-print-capitalize">{formatStatus(row.status)}</td>
+                  <td>{formatDate(row.submitted_at)}</td>
+                  <td>{formatDate(row.answered_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         ) : (
-          <p className="mt-3 text-sm text-slate-500">No Q&A questions yet.</p>
+          <p className="report-print-empty">No Q&A questions yet.</p>
         )}
       </section>
-    </div>
+    </>
   )
 }

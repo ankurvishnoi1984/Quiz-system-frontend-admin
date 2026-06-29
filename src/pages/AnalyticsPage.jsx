@@ -29,6 +29,7 @@ import {
 } from '../services/analyticsApi'
 import { listSessionQuestionsApi } from '../services/builderApi'
 import { getQuestionResultsApi, getSessionResponsesApi } from '../services/liveApi'
+import { ReportPreviewModal } from '../components/reports/ReportPreviewModal'
 import { useAuthStore } from '../store/authStore'
 
 function downloadText(filename, text, mime = 'text/plain') {
@@ -94,6 +95,7 @@ function AnalyticsPage() {
   const [activeReportView, setActiveReportView] = useState('summary')
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [exportingReportId, setExportingReportId] = useState(null)
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false)
 
   const defaultSessionId =
     sessionId ||
@@ -345,19 +347,6 @@ function AnalyticsPage() {
     downloadText(`session-${sessionMeta.id}-responses.csv`, csv, 'text/csv')
   }
 
-  const printPdf = async () => {
-    if (activeReportView === 'summary' && !summaryReport && accessToken && numericSessionId) {
-      await summaryReportQuery.refetch()
-    }
-    if (activeReportView === 'question-breakdown' && !questionsReport && accessToken && numericSessionId) {
-      await questionsReportQuery.refetch()
-    }
-    if (activeReportView === 'qa-analytics' && !qaReport && accessToken && numericSessionId) {
-      await qaReportQuery.refetch()
-    }
-    window.print()
-  }
-
   const exportParticipantReport = async () => {
     const report =
       participantsReportQuery.data ||
@@ -420,6 +409,50 @@ function AnalyticsPage() {
   const qaReport = qaReportQuery.data
   const qaReportLoading = qaReportQuery.isLoading
 
+  const openPdfPreview = async () => {
+    if (activeReportView === 'summary' && !summaryReport && accessToken && numericSessionId) {
+      await summaryReportQuery.refetch()
+    }
+    if (activeReportView === 'question-breakdown' && !questionsReport && accessToken && numericSessionId) {
+      await questionsReportQuery.refetch()
+    }
+    if (activeReportView === 'qa-analytics' && !qaReport && accessToken && numericSessionId) {
+      await qaReportQuery.refetch()
+    }
+
+    setPdfPreviewOpen(true)
+  }
+
+  const reportSlug =
+    activeReportView === 'summary'
+      ? 'summary'
+      : activeReportView === 'qa-analytics'
+        ? 'qa-analytics'
+        : 'analytics'
+
+  const pdfFilename = `session-${sessionMeta?.id || numericSessionId}-${reportSlug}-report.pdf`
+
+  const pdfPreviewTitle =
+    activeReportView === 'summary'
+      ? 'Session summary report'
+      : activeReportView === 'qa-analytics'
+        ? 'Q&A analytics report'
+        : 'Session analytics report'
+
+  const pdfPreviewContent =
+    activeReportView === 'summary' ? (
+      <SessionSummaryPrintReport report={summaryReport} />
+    ) : activeReportView === 'qa-analytics' ? (
+      <QaAnalyticsPrintReport report={qaReport} />
+    ) : (
+      <AnalyticsPrintReport
+        sessionMeta={sessionMeta}
+        summary={summary}
+        perQuestion={perQuestion}
+        leaderboard={leaderboard}
+      />
+    )
+
   const loadError =
     reportQuery.error ||
     questionsQuery.error ||
@@ -447,18 +480,14 @@ function AnalyticsPage() {
 
   return (
     <>
-      {activeReportView === 'summary' ? (
-        <SessionSummaryPrintReport report={summaryReport} />
-      ) : activeReportView === 'qa-analytics' ? (
-        <QaAnalyticsPrintReport report={qaReport} />
-      ) : (
-        <AnalyticsPrintReport
-          sessionMeta={sessionMeta}
-          summary={summary}
-          perQuestion={perQuestion}
-          leaderboard={leaderboard}
-        />
-      )}
+      <ReportPreviewModal
+        open={pdfPreviewOpen}
+        onClose={() => setPdfPreviewOpen(false)}
+        title={pdfPreviewTitle}
+        filename={pdfFilename}
+      >
+        {pdfPreviewContent}
+      </ReportPreviewModal>
 
       <section className="host-screen-only analytics-screen-only space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -515,8 +544,9 @@ function AnalyticsPage() {
           </button>
           <button
             type="button"
-            onClick={printPdf}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
+            onClick={openPdfPreview}
+            disabled={isLoading}
+            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110 disabled:opacity-50"
           >
             <Printer className="size-4" />
             PDF Report

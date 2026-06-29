@@ -17,7 +17,7 @@ export function SessionSummaryPrintReport({ report }) {
   const maxTimelineCount = Math.max(1, ...(timeline || []).map((row) => row.count))
 
   return (
-    <div className="host-print-only hidden bg-white text-slate-900">
+    <>
       <ReportPrintHeader reportLabel="Session Summary Report" title={session.title}>
         <p>
           Host {session.host_name} · {session.department_name} · {formatDate(session.date)} ·{' '}
@@ -29,8 +29,8 @@ export function SessionSummaryPrintReport({ report }) {
       </ReportPrintHeader>
 
       <section className="report-print-section">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Summary</h2>
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <h2>Summary</h2>
+        <div className="report-print-grid">
           {[
             ['Total joined', summary.total_joined.toLocaleString()],
             ['Total responded', summary.total_responded.toLocaleString()],
@@ -40,9 +40,9 @@ export function SessionSummaryPrintReport({ report }) {
             ['Q&A approved', qaSummary.approved],
             ['Q&A answered', qaSummary.answered],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-lg border border-slate-200 p-3">
-              <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-              <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+            <div key={label} className="report-print-card">
+              <p className="report-print-card-label">{label}</p>
+              <p className="report-print-card-value">{value}</p>
             </div>
           ))}
         </div>
@@ -50,15 +50,15 @@ export function SessionSummaryPrintReport({ report }) {
 
       {quizStats?.has_quiz_mode ? (
         <section className="report-print-section">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Quiz scores</h2>
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <h2>Quiz scores</h2>
+          <div className="report-print-grid">
             {[
               ['Top score', quizStats.top_score],
               ['Average score', quizStats.avg_score],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-lg border border-slate-200 p-3">
-                <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-                <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+              <div key={label} className="report-print-card">
+                <p className="report-print-card-label">{label}</p>
+                <p className="report-print-card-value">{value}</p>
               </div>
             ))}
           </div>
@@ -67,29 +67,29 @@ export function SessionSummaryPrintReport({ report }) {
 
       {report.survey_question_breakdowns?.length ? (
         <section className="report-print-section">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Survey Responses</h2>
-          <table className="mt-3 w-full border-collapse text-sm">
+          <h2>Survey Responses</h2>
+          <table className="report-print-table">
             <thead>
-              <tr className="border-b border-slate-300 text-left">
-                <th className="py-2 pr-3 font-semibold">Q#</th>
-                <th className="py-2 pr-3 font-semibold">Format</th>
-                <th className="py-2 pr-3 font-semibold">Question</th>
-                <th className="py-2 pr-3 font-semibold">Item</th>
-                <th className="py-2 pr-3 font-semibold">Count</th>
-                <th className="py-2 font-semibold">%</th>
+              <tr>
+                <th>Q#</th>
+                <th>Format</th>
+                <th>Question</th>
+                <th>Item</th>
+                <th>Count</th>
+                <th>%</th>
               </tr>
             </thead>
             <tbody>
               {report.survey_question_breakdowns.map((question) =>
                 (question.options?.length ? question.options : [{ option_text: '—', count: 0, percent: 0 }]).map(
                   (option, index) => (
-                    <tr key={`${question.question_id}-${option.option_text}-${index}`} className="border-b border-slate-100">
-                      <td className="py-2 pr-3">{index === 0 ? question.question_index : ''}</td>
-                      <td className="py-2 pr-3">{index === 0 ? question.type_label || question.chart_type : ''}</td>
-                      <td className="py-2 pr-3">{index === 0 ? question.question_text : ''}</td>
-                      <td className="py-2 pr-3">{option.option_text}</td>
-                      <td className="py-2 pr-3">{option.count}</td>
-                      <td className="py-2">{option.percent}%</td>
+                    <tr key={`${question.question_id}-${option.option_text}-${index}`}>
+                      <td>{index === 0 ? question.question_index : ''}</td>
+                      <td>{index === 0 ? question.type_label || question.chart_type : ''}</td>
+                      <td>{index === 0 ? question.question_text : ''}</td>
+                      <td>{option.option_text}</td>
+                      <td>{option.count}</td>
+                      <td>{option.percent}%</td>
                     </tr>
                   ),
                 ),
@@ -101,29 +101,29 @@ export function SessionSummaryPrintReport({ report }) {
 
       {report.standalone_question_breakdowns?.length ? (
         <section className="report-print-section">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Quiz, Poll & Other Questions</h2>
-          <table className="mt-3 w-full border-collapse text-sm">
+          <h2>Quiz, Poll & Other Questions</h2>
+          <table className="report-print-table">
             <thead>
-              <tr className="border-b border-slate-300 text-left">
-                <th className="py-2 pr-3 font-semibold">Q#</th>
-                <th className="py-2 pr-3 font-semibold">Type</th>
-                <th className="py-2 pr-3 font-semibold">Question</th>
-                <th className="py-2 pr-3 font-semibold">Option</th>
-                <th className="py-2 pr-3 font-semibold">Count</th>
-                <th className="py-2 font-semibold">%</th>
+              <tr>
+                <th>Q#</th>
+                <th>Type</th>
+                <th>Question</th>
+                <th>Option</th>
+                <th>Count</th>
+                <th>%</th>
               </tr>
             </thead>
             <tbody>
               {report.standalone_question_breakdowns.map((question) =>
                 (question.options?.length ? question.options : [{ option_text: '—', count: 0, percent: 0 }]).map(
                   (option, index) => (
-                    <tr key={`${question.question_id}-${option.option_text}-${index}`} className="border-b border-slate-100">
-                      <td className="py-2 pr-3">{index === 0 ? question.question_index : ''}</td>
-                      <td className="py-2 pr-3">{index === 0 ? question.type_label || question.chart_type : ''}</td>
-                      <td className="py-2 pr-3">{index === 0 ? question.question_text : ''}</td>
-                      <td className="py-2 pr-3">{option.option_text}</td>
-                      <td className="py-2 pr-3">{option.count}</td>
-                      <td className="py-2">{option.percent}%</td>
+                    <tr key={`${question.question_id}-${option.option_text}-${index}`}>
+                      <td>{index === 0 ? question.question_index : ''}</td>
+                      <td>{index === 0 ? question.type_label || question.chart_type : ''}</td>
+                      <td>{index === 0 ? question.question_text : ''}</td>
+                      <td>{option.option_text}</td>
+                      <td>{option.count}</td>
+                      <td>{option.percent}%</td>
                     </tr>
                   ),
                 ),
@@ -134,27 +134,27 @@ export function SessionSummaryPrintReport({ report }) {
       ) : null}
 
       <section className="report-print-section">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Response timeline</h2>
+        <h2>Response timeline</h2>
         {timeline?.length ? (
-          <table className="mt-3 w-full border-collapse text-sm">
+          <table className="report-print-table">
             <thead>
-              <tr className="border-b border-slate-300 text-left">
-                <th className="py-2 pr-3 font-semibold">Time</th>
-                <th className="py-2 pr-3 font-semibold">Responses</th>
-                <th className="py-2 font-semibold">Activity</th>
+              <tr>
+                <th>Time</th>
+                <th>Responses</th>
+                <th>Activity</th>
               </tr>
             </thead>
             <tbody>
               {timeline.map((row) => {
                 const barWidth = Math.round((row.count / maxTimelineCount) * 100)
                 return (
-                  <tr key={row.bucket_start} className="border-b border-slate-100">
-                    <td className="py-2 pr-3">{row.bucket_label}</td>
-                    <td className="py-2 pr-3 font-semibold">{row.count}</td>
-                    <td className="py-2">
-                      <div className="h-3 rounded bg-slate-100">
+                  <tr key={row.bucket_start}>
+                    <td>{row.bucket_label}</td>
+                    <td>{row.count}</td>
+                    <td>
+                      <div className="report-print-bar">
                         <div
-                          className="h-3 rounded bg-slate-700"
+                          className="report-print-bar-fill"
                           style={{ width: `${barWidth}%`, minWidth: row.count > 0 ? '4px' : 0 }}
                         />
                       </div>
@@ -165,9 +165,9 @@ export function SessionSummaryPrintReport({ report }) {
             </tbody>
           </table>
         ) : (
-          <p className="mt-3 text-sm text-slate-500">No response activity recorded for this session.</p>
+          <p className="report-print-empty">No response activity recorded for this session.</p>
         )}
       </section>
-    </div>
+    </>
   )
 }
