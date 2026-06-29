@@ -5,7 +5,7 @@ import { LeaderboardLimitSelect } from './LeaderboardLimitSelect'
 export function LeaderboardModalShell({
   open,
   onClose,
-  eyebrow = 'Leaderboard',
+  eyebrow = 'Rankings',
   title,
   limit,
   onLimitChange,
@@ -30,7 +30,7 @@ export function LeaderboardModalShell({
         type="button"
         className="absolute inset-0 bg-navy-950/20 backdrop-blur-sm"
         onClick={onClose}
-        aria-label="Close leaderboard"
+        aria-label="Close rankings"
       />
       <div
         role="dialog"

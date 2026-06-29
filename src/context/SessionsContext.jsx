@@ -35,7 +35,7 @@ function createDefaultQuestions() {
 
 function createDefaultQa() {
   return [
-    { id: uid('qa'), text: 'Will the leaderboard update after every question?', moderationStatus: 'pending', answerStatus: 'pending', pinned: false },
+    { id: uid('qa'), text: 'Will the rankings update after every question?', moderationStatus: 'pending', answerStatus: 'pending', pinned: false },
     { id: uid('qa'), text: 'Can we extend time for this question?', moderationStatus: 'pending', answerStatus: 'pending', pinned: false },
     { id: uid('qa'), text: 'Is anonymous mode enabled?', moderationStatus: 'pending', answerStatus: 'pending', pinned: false },
   ]

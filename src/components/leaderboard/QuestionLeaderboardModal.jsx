@@ -18,7 +18,7 @@ export function QuestionLeaderboardModal({
     <LeaderboardModalShell
       open={open}
       onClose={onClose}
-      eyebrow="Question leaderboard"
+      eyebrow="Question rankings"
       title={`Top ${limit}`}
       limit={limit}
       onLimitChange={onLimitChange}
@@ -26,7 +26,7 @@ export function QuestionLeaderboardModal({
     >
       {!isQuizQuestion ? (
         <p className="py-6 text-center text-sm text-slate-500">
-          Leaderboard is only available for quiz-mode questions. Select a quiz question to view
+          Rankings are only available for quiz-mode questions. Select a quiz question to view
           rankings.
         </p>
       ) : (

@@ -60,8 +60,8 @@ function PresentModePage() {
     onError: () => {
       setHostAlert({
         variant: 'error',
-        title: 'Could not update leaderboard',
-        message: 'Unable to update the overall leaderboard setting. Please try again.',
+        title: 'Could not update rankings',
+        message: 'Unable to update the overall rankings setting. Please try again.',
         confirmLabel: 'Close',
       })
     },
@@ -244,13 +244,13 @@ function PresentModePage() {
                     sessionLeaderboardMutation.isPending
                       ? 'Updating…'
                       : session?.leaderboard_enabled
-                        ? 'Overall leaderboard'
-                        : 'Overall leaderboard'
+                        ? 'Overall rankings'
+                        : 'Overall rankings'
                   }
                   title={
                     session?.leaderboard_enabled
-                      ? 'Hide session-wide leaderboard from participants'
-                      : 'Show session-wide leaderboard to participants on its own tab'
+                      ? 'Hide session-wide rankings from participants'
+                      : 'Show session-wide rankings to participants on its own tab'
                   }
                   active={Boolean(session?.leaderboard_enabled)}
                   tone="amber"

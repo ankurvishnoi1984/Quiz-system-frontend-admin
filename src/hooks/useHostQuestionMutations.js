@@ -67,7 +67,7 @@ export function useHostQuestionMutations(
       setQuestionLeaderboardVisibleApi(accessToken, questionId, visible),
     onSuccess: invalidateQuestions,
     onError: (error) =>
-      onMutationError?.(error.message || 'Unable to update question leaderboard'),
+      onMutationError?.(error.message || 'Unable to update question rankings'),
   })
 
   const answerRevealMutation = useMutation({

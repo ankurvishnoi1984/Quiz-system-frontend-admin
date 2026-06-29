@@ -112,10 +112,10 @@ export function HostQuestionControls({
               })
             }
             icon={Trophy}
-            label="Leaderboard"
+            label="Rankings"
             title={
               !isActiveQuestion
-                ? 'Activate this question before showing its leaderboard'
+                ? 'Activate this question before showing its rankings'
                 : question.showLeaderboard
                   ? 'Hide ranking for this question'
                   : 'Show ranking for this question only'

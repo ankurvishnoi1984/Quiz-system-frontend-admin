@@ -9,7 +9,7 @@ export function LeaderboardModal({ open, leaderboard, onClose }) {
     <LeaderboardModalShell
       open={open}
       onClose={onClose}
-      eyebrow="Leaderboard"
+      eyebrow="Rankings"
       title="Top Participants"
     >
       <LeaderboardTable entries={entries} emptyMessage="No scores yet." />

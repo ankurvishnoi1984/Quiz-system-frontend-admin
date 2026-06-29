@@ -6,7 +6,7 @@ export function SessionLeaderboardModal({ open, onClose, entries, limit, onLimit
     <LeaderboardModalShell
       open={open}
       onClose={onClose}
-      eyebrow="Leaderboard"
+      eyebrow="Rankings"
       title={`Top ${limit}`}
       limit={limit}
       onLimitChange={onLimitChange}
@@ -14,7 +14,7 @@ export function SessionLeaderboardModal({ open, onClose, entries, limit, onLimit
     >
       <LeaderboardTable
         entries={entries}
-        emptyMessage="Leaderboard will appear once responses start coming in."
+        emptyMessage="Rankings will appear once responses start coming in."
       />
     </LeaderboardModalShell>
   )

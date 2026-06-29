@@ -79,7 +79,7 @@ function LeaderboardRow({ row, rank, maxScore, highlight }) {
 export function PresentLeaderboardList({
   entries,
   emptyMessage = 'Scores will appear once participants submit answers.',
-  title = 'Leaderboard',
+  title = 'Rankings',
   showTitle = true,
 }) {
   const rows = normalizeLeaderboardEntries(entries)

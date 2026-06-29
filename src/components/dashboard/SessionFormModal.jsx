@@ -217,16 +217,16 @@ function SessionFormModal({
           </>
         ) : (
           <p className="md:col-span-2 rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            This session is live or completed. Only the title and overall leaderboard setting can be
+            This session is live or completed. Only the title and overall rankings setting can be
             changed here.
           </p>
         )}
         <div className="md:col-span-2">
           <label className="flex items-center justify-between gap-3 rounded-xl border border-blue-200/70 bg-white px-3 py-3">
             <div>
-              <p className="text-sm font-semibold text-slate-700">Overall leaderboard (Q&A)</p>
+              <p className="text-sm font-semibold text-slate-700">Overall rankings (Q&A)</p>
               <p className="text-xs text-slate-500">
-                Show session-wide rankings to participants on the Overall Leaderboard tab
+                Show session-wide rankings to participants on the Overall Rankings tab
               </p>
             </div>
             <input

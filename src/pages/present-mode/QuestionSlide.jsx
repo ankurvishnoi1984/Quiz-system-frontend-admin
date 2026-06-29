@@ -177,7 +177,7 @@ export function QuestionSlide({
       showQuestionLeaderboard
         ? [
             { id: 'overview', label: 'Results & responses', icon: BarChart3 },
-            { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+            { id: 'leaderboard', label: 'Rankings', icon: Trophy },
           ]
         : [],
     [showQuestionLeaderboard],
@@ -304,7 +304,7 @@ export function QuestionSlide({
           {showRevealUi ? <PresentAnswerRevealBadge /> : null}
           {showQuestionLeaderboard ? (
             <span className="rounded-full bg-amber-100 px-4 py-1.5 text-[clamp(0.75rem,1.4vw,0.9rem)] font-semibold text-amber-900">
-              Leaderboard on
+              Rankings on
             </span>
           ) : null}
           <span className="text-[clamp(0.9rem,1.6vw,1.1rem)] font-semibold text-slate-500">
@@ -340,7 +340,7 @@ export function QuestionSlide({
         {viewMode === 'leaderboard' ? (
           <PresentLeaderboardList
             entries={questionLeaderboard}
-            title="Question leaderboard"
+            title="Question rankings"
             emptyMessage="Rankings will appear as participants answer this question."
           />
         ) : showSplitLayout ? (

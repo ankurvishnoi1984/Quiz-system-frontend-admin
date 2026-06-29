@@ -1917,7 +1917,7 @@ function ParticipantSessionPage() {
             <h2 className="text-xl font-bold text-navy-900">Session ended</h2>
             <p className="text-sm text-slate-600">
               The host has ended this session. Switch to Q&amp;A or{' '}
-              {showOverallLeaderboardTab ? 'Overall Leaderboard ' : ''}
+              {showOverallLeaderboardTab ? 'Overall Rankings ' : ''}
               to review past activity.
             </p>
           </section>

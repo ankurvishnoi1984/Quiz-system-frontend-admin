@@ -1270,7 +1270,7 @@ function BuilderPage() {
       setSaveError('')
     },
     onError: (error) => {
-      setSaveError(error.message || 'Unable to update question leaderboard')
+      setSaveError(error.message || 'Unable to update question rankings')
     },
   })
 
@@ -2035,7 +2035,7 @@ function BuilderPage() {
                       })
                     }
                     icon={Trophy}
-                    label="Leaderboard"
+                    label="Rankings"
                     title={
                       selected.showLeaderboard
                         ? 'Hide ranking for this question'
@@ -2289,8 +2289,8 @@ function BuilderPage() {
 
               <label className="flex items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white p-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-700">Overall leaderboard (Q&A)</p>
-                  <p className="text-xs text-slate-500">Session-wide rankings on the Overall Leaderboard tab</p>
+                  <p className="text-sm font-semibold text-slate-700">Overall rankings (Q&A)</p>
+                  <p className="text-xs text-slate-500">Session-wide rankings on the Overall Rankings tab</p>
                 </div>
                 <input
                   type="checkbox"
@@ -2309,7 +2309,7 @@ function BuilderPage() {
               </label>
 
               <div className="rounded-2xl border border-blue-200/70 bg-sky-50/80 p-3 text-xs text-slate-600">
-                Per-question leaderboard visibility is controlled from the question editor (or Live page) for each
+                Per-question rankings visibility is controlled from the question editor (or Live page) for each
                 quiz question while the session is live.
               </div>
 

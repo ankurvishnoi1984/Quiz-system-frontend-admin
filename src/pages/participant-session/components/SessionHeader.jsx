@@ -38,7 +38,7 @@ export function SessionHeader({
             onClick={() => onStepChange('leaderboard')}
             className={`rounded-xl px-3 py-2 text-sm font-semibold ${step === 'leaderboard' ? 'bg-blue-100 text-blue-900' : 'border border-blue-200/70 bg-white text-slate-700'}`}
           >
-            Overall Leaderboard
+            Overall Rankings
           </button>
         ) : null}
       </div>

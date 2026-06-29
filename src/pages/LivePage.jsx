@@ -280,7 +280,7 @@ function LivePage() {
       queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
     },
     onError: (error) =>
-      setErrorMessage(error.message || 'Unable to update overall leaderboard setting'),
+      setErrorMessage(error.message || 'Unable to update overall rankings setting'),
   })
 
 
@@ -625,7 +625,7 @@ function LivePage() {
               }`}
             >
               <Trophy className="size-4" />
-              Leaderboard
+              Rankings
             </button>
           ) : null}
           {canLaunchSession ? (
@@ -716,13 +716,13 @@ function LivePage() {
                   sessionLeaderboardMutation.isPending
                     ? 'Updating…'
                     : session?.leaderboard_enabled
-                      ? 'Overall leaderboard'
-                      : 'Overall leaderboard'
+                      ? 'Overall rankings'
+                      : 'Overall rankings'
                 }
                 title={
                   session?.leaderboard_enabled
-                    ? 'Hide session-wide leaderboard from participants'
-                    : 'Show session-wide leaderboard to participants on its own tab'
+                    ? 'Hide session-wide rankings from participants'
+                    : 'Show session-wide rankings to participants on its own tab'
                 }
                 active={Boolean(session?.leaderboard_enabled)}
                 tone="amber"

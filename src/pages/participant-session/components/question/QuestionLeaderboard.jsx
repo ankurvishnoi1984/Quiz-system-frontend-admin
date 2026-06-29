@@ -5,7 +5,7 @@ export function QuestionLeaderboard({ entries }) {
     <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
       <p className="text-sm font-bold text-amber-900">
         <Trophy className="mr-2 inline size-4" />
-        Question leaderboard
+        Question rankings
       </p>
       {entries.length > 0 ? (
         <div className="mt-2 space-y-1">
