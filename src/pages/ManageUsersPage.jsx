@@ -12,7 +12,7 @@ import { filterUsersByShell } from '../utils/shellFilterPaths'
 import { getStoredUserPasswords, setStoredUserPassword } from '../utils/userPasswordVault'
 
 const ROLE_OPTIONS = [
-  { value: 'super_admin', label: 'Super admin' },
+  // { value: 'super_admin', label: 'Super admin' },
   { value: 'client_admin', label: 'Client admin' },
   { value: 'dept_admin', label: 'Department admin' },
   { value: 'host', label: 'Host' },
