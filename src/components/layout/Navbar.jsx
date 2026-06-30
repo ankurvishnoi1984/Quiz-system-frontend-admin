@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useShell } from '../../context/ShellContext'
 import { useAuthStore } from '../../store/authStore'
+import { canSwitchShellDepartment } from '../../utils/adminRoles'
 import { isShellFilterDisabled } from '../../utils/shellFilterPaths'
 
 const pageTitles = {
@@ -26,7 +27,7 @@ function Navbar() {
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const shellFiltersDisabled = isShellFilterDisabled(pathname)
-  const canSwitchDepartment = user?.role === 'super_admin'
+  const canSwitchDepartment = canSwitchShellDepartment(user?.role)
   const departmentLabel =
     department ||
     departments.find((d) => String(d.dept_id) === String(departmentId))?.name ||
