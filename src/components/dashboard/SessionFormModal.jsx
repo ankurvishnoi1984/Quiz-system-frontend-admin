@@ -75,7 +75,8 @@ function SessionFormModal({
 
   return (
     <Modal open={open} title={modalTitle} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto overscroll-contain pr-1 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className="text-sm font-semibold text-slate-700">Title</label>
           <input
@@ -237,7 +238,8 @@ function SessionFormModal({
             />
           </label>
         </div>
-        <div className="flex items-end gap-2 md:col-span-2 md:justify-end">
+        </div>
+        <div className="mt-4 flex shrink-0 items-end gap-2 border-t border-blue-100/80 pt-4 md:justify-end">
           <button
             type="button"
             onClick={onClose}
