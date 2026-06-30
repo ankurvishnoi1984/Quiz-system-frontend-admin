@@ -23,7 +23,14 @@ function SessionInfoRow({ icon: Icon, label, value }) {
   )
 }
 
-export function ParticipantsSlide({ session, participantCount, isSessionLive, onParticipantsClick }) {
+export function ParticipantsSlide({
+  session,
+  participantCount,
+  qaCount,
+  isSessionLive,
+  onParticipantsClick,
+  onQaClick,
+}) {
   const sessionTitle = session?.title || 'Live session'
   const dateLabel =
     formatScheduledDateForDisplay(session?.scheduled_date) ||
@@ -38,8 +45,10 @@ export function ParticipantsSlide({ session, participantCount, isSessionLive, on
       <PresentSlideHeader
         sessionTitle={sessionTitle}
         participantCount={participantCount}
+        qaCount={qaCount}
         isSessionLive={isSessionLive}
         onParticipantsClick={onParticipantsClick}
+        onQaClick={onQaClick}
       />
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-[clamp(0.5rem,2vw,1.5rem)]">

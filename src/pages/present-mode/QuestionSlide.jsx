@@ -116,8 +116,10 @@ export function QuestionSlide({
   questionNumber,
   allResponses,
   participantCount,
+  qaCount,
   isSessionLive,
   onParticipantsClick,
+  onQaClick,
 }) {
   const [viewMode, setViewMode] = useState('overview')
 
@@ -287,8 +289,10 @@ export function QuestionSlide({
       <PresentSlideHeader
         sessionTitle={sessionTitle}
         participantCount={participantCount}
+        qaCount={qaCount}
         isSessionLive={isSessionLive}
         onParticipantsClick={onParticipantsClick}
+        onQaClick={onQaClick}
       />
 
       <div className="mb-[clamp(0.75rem,2vh,1.25rem)] shrink-0">

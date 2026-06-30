@@ -6,16 +6,20 @@ export function LeaderboardSlide({
   sessionTitle,
   leaderboard,
   participantCount,
+  qaCount,
   isSessionLive,
   onParticipantsClick,
+  onQaClick,
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PresentSlideHeader
         sessionTitle={sessionTitle}
         participantCount={participantCount}
+        qaCount={qaCount}
         isSessionLive={isSessionLive}
         onParticipantsClick={onParticipantsClick}
+        onQaClick={onQaClick}
       />
 
       <div className="mb-[clamp(0.75rem,2vh,1.25rem)] flex shrink-0 items-center justify-center gap-3">

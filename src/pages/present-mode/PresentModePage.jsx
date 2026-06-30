@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Maximize2, Minimize2, Trophy } from 'lucide-react'
 import { HostAlertModal } from '../../components/live/HostAlertModal'
 import { HostQuestionActionButton } from '../../components/live/HostQuestionActionButton'
@@ -8,13 +8,14 @@ import { HostQuestionControls } from '../../components/live/HostQuestionControls
 import { useAuthStore } from '../../store/authStore'
 import { useHostQuestionMutations } from '../../hooks/useHostQuestionMutations'
 import { useLiveSession } from '../../hooks/useLiveSession'
-import { updateSessionApi } from '../../services/liveApi'
+import { listQaQuestionsApi, updateSessionApi } from '../../services/liveApi'
 import { sessionSupportsOverallLeaderboard } from '../../utils/livePresentation'
 import { isSessionQuizTotalTimeEnabled } from '../../utils/sessionFlags'
 import { LeaderboardSlide } from './LeaderboardSlide'
 import { ParticipantsSlide } from './ParticipantsSlide'
 import { PresentNavButton, PresentShell } from './PresentShell'
 import { PresentParticipantsModal } from './PresentParticipantsModal'
+import { PresentQaModal } from './PresentQaModal'
 import { QuestionSlide } from './QuestionSlide'
 
 function PresentModePage() {
@@ -30,8 +31,20 @@ function PresentModePage() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [hostAlert, setHostAlert] = useState(null)
   const [participantsModalOpen, setParticipantsModalOpen] = useState(false)
+  const [qaModalOpen, setQaModalOpen] = useState(false)
 
   const openParticipantsModal = useCallback(() => setParticipantsModalOpen(true), [])
+  const openQaModal = useCallback(() => setQaModalOpen(true), [])
+
+  const qaQuery = useQuery({
+    queryKey: ['live-qa', sessionId],
+    queryFn: () => listQaQuestionsApi(accessToken, sessionId),
+    enabled: Boolean(accessToken && sessionId),
+    refetchInterval: session?.status === 'live' ? 5000 : false,
+  })
+
+  const qaQuestions = qaQuery.data || []
+  const qaCount = qaQuestions.length
 
   const canEditLive = session?.status === 'live'
   const showSessionControls = session?.status === 'live' || session?.status === 'paused'
@@ -292,8 +305,10 @@ function PresentModePage() {
           <ParticipantsSlide
             session={session}
             participantCount={participantCount}
+            qaCount={qaCount}
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
+            onQaClick={openQaModal}
           />
         ) : null}
 
@@ -306,8 +321,10 @@ function PresentModePage() {
             questionNumber={currentSlide.questionNumber}
             allResponses={responses}
             participantCount={participantCount}
+            qaCount={qaCount}
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
+            onQaClick={openQaModal}
           />
         ) : null}
 
@@ -316,8 +333,10 @@ function PresentModePage() {
             sessionTitle={sessionTitle}
             leaderboard={leaderboard}
             participantCount={participantCount}
+            qaCount={qaCount}
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
+            onQaClick={openQaModal}
           />
         ) : null}
       </div>
@@ -326,6 +345,13 @@ function PresentModePage() {
         open={participantsModalOpen}
         onClose={() => setParticipantsModalOpen(false)}
         participants={participants}
+        isSessionLive={isSessionLive}
+      />
+
+      <PresentQaModal
+        open={qaModalOpen}
+        onClose={() => setQaModalOpen(false)}
+        questions={qaQuestions}
         isSessionLive={isSessionLive}
       />
 

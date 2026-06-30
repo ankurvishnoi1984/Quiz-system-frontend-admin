@@ -1,4 +1,4 @@
-import { Info } from 'lucide-react'
+import { Info, MessageSquare } from 'lucide-react'
 
 export function PresentShell({ children, footer }) {
   return (
@@ -19,60 +19,106 @@ export function PresentShell({ children, footer }) {
   )
 }
 
+function PresentHeaderStatButton({
+  label,
+  count,
+  onClick,
+  ariaLabel,
+  icon: Icon = Info,
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group cursor-pointer rounded-2xl border border-blue-200/80 bg-white/90 px-4 py-2.5 text-right shadow-sm transition hover:border-sky-300 hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+      aria-label={ariaLabel}
+    >
+      <div className="flex items-center justify-end gap-2">
+        <Icon
+          className="size-[clamp(0.9rem,1.6vw,1.1rem)] shrink-0 text-sky-600 transition group-hover:text-sky-700"
+          aria-hidden
+        />
+        <p className="text-[clamp(0.7rem,1.3vw,0.85rem)] font-semibold uppercase tracking-wider text-slate-500">
+          {label}
+        </p>
+      </div>
+      <p className="mt-1 text-[clamp(1.25rem,2.4vw,1.75rem)] font-bold tabular-nums text-navy-700">
+        {count}
+      </p>
+    </button>
+  )
+}
+
+function PresentLiveIndicator({ isSessionLive }) {
+  if (isSessionLive) {
+    return (
+      <span className="relative flex size-2.5 shrink-0" aria-hidden>
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+        <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
+      </span>
+    )
+  }
+
+  return <span className="inline-flex size-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden />
+}
+
 export function PresentSlideHeader({
   sessionTitle,
   participantCount = 0,
+  qaCount = 0,
   isSessionLive = false,
   onParticipantsClick,
+  onQaClick,
 }) {
-  const participantControl = (
-    <>
-      <div className="flex items-center justify-end gap-2">
-        {isSessionLive ? (
-          <span className="relative flex size-2.5 shrink-0" aria-hidden>
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
-          </span>
-        ) : (
-          <span className="inline-flex size-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden />
-        )}
-        <p className="text-[clamp(0.7rem,1.3vw,0.85rem)] font-semibold uppercase tracking-wider text-slate-500">
-          Participants
-        </p>
-      </div>
-      <div className="flex items-center justify-end gap-2">
-        <p className="text-[clamp(1.25rem,2.4vw,1.75rem)] font-bold tabular-nums text-navy-700">
-          {participantCount}
-        </p>
-        {onParticipantsClick ? (
-          <Info
-            className="size-[clamp(0.9rem,1.6vw,1.1rem)] shrink-0 text-sky-600 transition group-hover:text-sky-700"
-            aria-hidden
-          />
-        ) : null}
-      </div>
-    </>
-  )
+  const showParticipantsTile = Boolean(onParticipantsClick)
+  const showQaTile = Boolean(onQaClick)
+  const showStatTiles = showParticipantsTile || showQaTile
 
   return (
     <header className="mb-[clamp(1rem,3vh,2rem)] flex shrink-0 flex-wrap items-end justify-between gap-4">
-      <div>
-        <p className="text-[clamp(0.65rem,1.2vw,0.8rem)] font-semibold uppercase tracking-[0.35em] text-navy-600/80">
-          Present mode
-        </p>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <PresentLiveIndicator isSessionLive={isSessionLive} />
+          <p className="text-[clamp(0.65rem,1.2vw,0.8rem)] font-semibold uppercase tracking-[0.35em] text-navy-600/80">
+            Present mode
+          </p>
+        </div>
         <h1 className="mt-1 text-[clamp(1.1rem,2.5vw,1.75rem)] font-bold text-navy-900">{sessionTitle}</h1>
       </div>
-      {onParticipantsClick ? (
-        <button
-          type="button"
-          onClick={onParticipantsClick}
-          className="group cursor-pointer rounded-2xl border border-blue-200/80 bg-white/90 px-4 py-2.5 text-right shadow-sm transition hover:border-sky-300 hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-          aria-label={`${participantCount} participants joined. View participant list.`}
-        >
-          {participantControl}
-        </button>
+
+      {showStatTiles ? (
+        <div className="flex flex-wrap items-stretch justify-end gap-2">
+          {showQaTile ? (
+            <PresentHeaderStatButton
+              label="Q&A"
+              count={qaCount}
+              onClick={onQaClick}
+              icon={MessageSquare}
+              ariaLabel={`${qaCount} Q&A questions. View question list.`}
+            />
+          ) : null}
+          {showParticipantsTile ? (
+            <PresentHeaderStatButton
+              label="Participants"
+              count={participantCount}
+              onClick={onParticipantsClick}
+              icon={Info}
+              ariaLabel={`${participantCount} participants joined. View participant list.`}
+            />
+          ) : null}
+        </div>
       ) : (
-        <div className="text-right">{participantControl}</div>
+        <div className="text-right">
+          <div className="flex items-center justify-end gap-2">
+            <PresentLiveIndicator isSessionLive={isSessionLive} />
+            <p className="text-[clamp(0.7rem,1.3vw,0.85rem)] font-semibold uppercase tracking-wider text-slate-500">
+              Participants
+            </p>
+          </div>
+          <p className="text-[clamp(1.25rem,2.4vw,1.75rem)] font-bold tabular-nums text-navy-700">
+            {participantCount}
+          </p>
+        </div>
       )}
     </header>
   )
