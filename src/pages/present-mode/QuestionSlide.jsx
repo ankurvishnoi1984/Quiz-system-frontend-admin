@@ -301,7 +301,7 @@ export function QuestionSlide({
               Live
             </span>
           ) : null}
-          {showRevealUi ? <PresentAnswerRevealBadge /> : null}
+          {/* {showRevealUi ? <PresentAnswerRevealBadge /> : null} */}
           {showQuestionLeaderboard ? (
             <span className="rounded-full bg-amber-100 px-4 py-1.5 text-[clamp(0.75rem,1.4vw,0.9rem)] font-semibold text-amber-900">
               Rankings on
