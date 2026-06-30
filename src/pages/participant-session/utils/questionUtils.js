@@ -370,17 +370,19 @@ export function canShowPreviousForUntimedMultiNav(activeQuestions) {
 }
 
 /**
- * Multi-nav + quiz total time: Previous only after the final question was submitted
- * via Submit or when the personal session timer expires.
+ * Multi-nav + quiz total time: Previous after the final question was submitted,
+ * when the personal session timer expires, or when the host closes all questions.
  */
 export function canShowPreviousForQuizTotalTimeMultiNav(
   activeQuestions,
   explicitSubmittedIds = {},
   sessionTimerExpired = false,
+  allQuestionsClosedByHost = false,
 ) {
   if (!activeQuestions?.length || activeQuestions.length <= 1) return false
   return (
     isMultiNavLastQuestionFinalized(activeQuestions, explicitSubmittedIds) ||
-    sessionTimerExpired
+    sessionTimerExpired ||
+    allQuestionsClosedByHost
   )
 }

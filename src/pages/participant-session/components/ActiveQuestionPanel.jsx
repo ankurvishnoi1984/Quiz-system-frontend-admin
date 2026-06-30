@@ -77,9 +77,11 @@ export function ActiveQuestionPanel({
         )}
         {navigationEnabled && sessionQuizTotalTimeEnabled && canShowPreviousQuestion && (
           <p className="max-w-[min(100%,20rem)] text-right text-[11px] font-medium leading-snug text-slate-500">
-            {lastQuestionFinalized
-              ? 'Answers are locked — use Previous and Next to review only.'
-              : 'Quiz timer: use Previous and Next to review your answers.'}
+            {allQuestionsClosedByHost
+              ? 'Questions closed by the host — use Previous and Next to review your answers.'
+              : lastQuestionFinalized
+                ? 'Answers are locked — use Previous and Next to review only.'
+                : 'Quiz timer: use Previous and Next to review your answers.'}
           </p>
         )}
         {navigationEnabled && hasCountdown && !sessionQuizTotalTimeEnabled && !canGoToNextQuestion && (

@@ -1028,6 +1028,7 @@ function ParticipantSessionPage() {
         mappedQuestions,
         quizExplicitSubmittedQuestionIds,
         sessionTimerExpired,
+        allQuestionsClosedByHost,
       )
     }
     if (multiNavTimedSession) {
@@ -1041,6 +1042,7 @@ function ParticipantSessionPage() {
     navigationEnabled,
     sessionQuizTotalTimeEnabled,
     sessionTimerExpired,
+    allQuestionsClosedByHost,
     mappedQuestions,
     multiNavTimedSession,
     activeQuestions,
