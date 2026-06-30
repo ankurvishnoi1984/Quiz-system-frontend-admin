@@ -12,8 +12,9 @@ export function QuestionLeaderboard({ entries }) {
           {entries.slice(0, 5).map((entry, idx) => (
             <div key={entry.participant_id} className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2 text-slate-700">
-                {idx === 0 ? <Crown className="size-4 text-amber-500" /> : `${idx + 1}.`}
-                {entry.name || entry.nickname || 'Anonymous'}
+                <span>{idx + 1}.</span>
+                <span>{entry.name || entry.nickname || 'Anonymous'}</span>
+                {idx === 0 ? <Crown className="size-4 shrink-0 text-amber-500" aria-hidden /> : null}
               </span>
               <span className="font-semibold text-amber-700">{entry.score}</span>
             </div>
