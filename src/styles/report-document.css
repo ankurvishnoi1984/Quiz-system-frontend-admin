@@ -1,12 +1,28 @@
-/* Hex/rgb-only styles for report PDF export (html2canvas compatible). */
+/* Hex/rgb-only styles for report preview + PDF export (html2canvas compatible). */
 .report-document {
   width: 100%;
-  max-width: 100%;
-  padding: 0;
-  margin: 0;
+  max-width: 697px;
+  margin: 0 auto;
+  padding: 32px 40px;
+  box-sizing: border-box;
   background: #ffffff;
   color: #0f172a;
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.report-document.report-document--export {
+  width: 697px;
+  max-width: 697px;
+}
+
+.report-document h1,
+.report-document h2,
+.report-document p {
+  margin: 0;
+  padding: 0;
 }
 
 .report-document .report-print-header {
@@ -17,15 +33,32 @@
   border-bottom: 1px solid #cbd5e1;
 }
 
+/* Flex layout — html2canvas does not render CSS grid correctly. */
 .report-document .report-print-header-top {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px;
+  width: 100%;
+}
+
+.report-document .report-print-header-top > img,
+.report-document .report-print-logo {
+  display: block;
+  flex: 0 0 auto;
+  height: 36px;
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .report-document .report-print-header-meta {
+  flex: 1 1 auto;
+  min-width: 0;
   text-align: right;
+  word-break: break-word;
 }
 
 .report-document .report-print-portal {
@@ -46,17 +79,8 @@
   color: #475569;
 }
 
-.report-document .report-print-logo {
-  display: block;
-  height: 36px;
-  width: auto;
-  max-width: 160px;
-  object-fit: contain;
-  object-position: left center;
-}
-
-.report-document .report-print-title {
-  margin: 18px 0 0;
+.report-document h1.report-print-title {
+  margin-top: 18px;
   font-size: 20px;
   font-weight: 700;
   line-height: 1.25;
@@ -68,6 +92,7 @@
   font-size: 12px;
   line-height: 1.45;
   color: #475569;
+  word-break: break-word;
 }
 
 .report-document .report-print-subtitle p {
@@ -95,15 +120,21 @@
   page-break-after: avoid;
 }
 
+/* Flex instead of grid — html2canvas does not lay out CSS grid correctly. */
 .report-document .report-print-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
 }
 
-.report-document .report-print-grid--3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.report-document .report-print-grid .report-print-card {
+  width: calc(50% - 6px);
+  box-sizing: border-box;
+}
+
+.report-document .report-print-grid--3 .report-print-card {
+  width: calc(33.333% - 8px);
 }
 
 .report-document .report-print-card {
@@ -140,6 +171,7 @@
   margin-top: 12px;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
 }
 
 .report-document .report-print-table thead {
@@ -156,18 +188,20 @@
 }
 
 .report-document .report-print-table th {
-  padding: 8px 12px 8px 0;
+  padding: 8px 8px 8px 0;
   font-weight: 600;
   text-align: left;
   border-bottom: 1px solid #cbd5e1;
   color: #0f172a;
+  word-break: break-word;
 }
 
 .report-document .report-print-table td {
-  padding: 8px 12px 8px 0;
+  padding: 8px 8px 8px 0;
   border-bottom: 1px solid #f1f5f9;
   color: #0f172a;
   vertical-align: top;
+  word-break: break-word;
 }
 
 .report-document .report-print-capitalize {

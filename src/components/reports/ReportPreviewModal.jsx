@@ -1,6 +1,7 @@
 import { Download, Loader2, Printer, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { downloadReportPdf } from '../../utils/printReportPdf'
+import { ReportPagedPreview } from './ReportPagedPreview'
 
 export function ReportPreviewModal({ open, onClose, title = 'Report preview', filename, children }) {
   const contentRef = useRef(null)
@@ -90,12 +91,13 @@ export function ReportPreviewModal({ open, onClose, title = 'Report preview', fi
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-slate-100/90 p-4 sm:p-8">
-        <div className="report-preview-sheet mx-auto max-w-4xl rounded-lg bg-white p-6 shadow-xl shadow-slate-900/10 sm:p-10">
-          <div ref={contentRef} className="report-document">
-            {children}
-          </div>
+      <div className="report-preview-scroll min-h-0 flex-1 overflow-y-auto bg-slate-200/80 p-4 sm:p-8">
+        {/* Single DOM tree for PDF export + page count measurement */}
+        <div ref={contentRef} className="report-document report-document--measure" aria-hidden="true">
+          {children}
         </div>
+
+        <ReportPagedPreview measureRef={contentRef}>{children}</ReportPagedPreview>
       </div>
     </div>
   )
