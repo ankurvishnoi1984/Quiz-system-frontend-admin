@@ -141,7 +141,7 @@ export function QuestionSlide({
   const ratingData = enrichRatingChartDataWithColors(buildRatingChartData(currentResponses, question))
   const showRevealUi = shouldShowAnswerRevealUi(question)
   const wordCloudWords = buildWordCloudData(question, questionResultsQuery.data, currentResponses)
-  const responseRows = buildResponseRows(currentResponses)
+  const responseRows = buildResponseRows(currentResponses, question)
   const questionLeaderboard = useMemo(
     () => buildQuestionLeaderboardForQuestion(allResponses, question.id, 30),
     [allResponses, question.id],

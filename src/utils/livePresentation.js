@@ -306,7 +306,8 @@ export function buildWordCloudData(question, questionResults, currentResponses) 
   return wordCountsFromResponses(currentResponses)
 }
 
-export function buildResponseRows(currentResponses) {
+export function buildResponseRows(currentResponses, question = null) {
+  const ratingMax = Number(question?.rating_max ?? question?.ratingMax ?? 5)
   return currentResponses
     .map((row) => ({
       id: row.response_id,
@@ -314,7 +315,7 @@ export function buildResponseRows(currentResponses) {
       response:
         row.question_option?.option_text ||
         row.text_response ||
-        (row.rating_value != null ? `${row.rating_value} / 5` : '—'),
+        (row.rating_value != null ? `${row.rating_value} / ${ratingMax}` : '—'),
       responseTimeMs: row.response_time_ms != null ? Number(row.response_time_ms) : null,
     }))
     .sort((a, b) => {
