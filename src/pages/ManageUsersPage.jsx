@@ -14,7 +14,7 @@ import { getStoredUserPasswords, setStoredUserPassword } from '../utils/userPass
 const ROLE_OPTIONS = [
   // { value: 'super_admin', label: 'Super admin' },
   { value: 'client_admin', label: 'Client admin' },
-  { value: 'dept_admin', label: 'Department admin' },
+  // { value: 'dept_admin', label: 'Department admin' },
   { value: 'host', label: 'Host' },
 ]
 
