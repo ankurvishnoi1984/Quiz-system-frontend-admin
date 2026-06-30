@@ -14,6 +14,7 @@ import {
   mapSessionParticipants,
   mergeParticipantLists,
 } from '../utils/livePresentation'
+import { SESSION_LEADERBOARD_TOP_N } from '../utils/leaderboard'
 
 export function useLiveSession(accessToken, sessionId) {
   const queryClient = useQueryClient()
@@ -64,7 +65,10 @@ export function useLiveSession(accessToken, sessionId) {
       ),
     [participantsQuery.data, responses],
   )
-  const leaderboard = useMemo(() => buildLeaderboard(responses, 20), [responses])
+  const leaderboard = useMemo(
+    () => buildLeaderboard(responses, SESSION_LEADERBOARD_TOP_N),
+    [responses],
+  )
 
   useEffect(() => {
     const sessionCode = sessionQuery.data?.session_code

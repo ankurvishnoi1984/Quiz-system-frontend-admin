@@ -230,7 +230,7 @@ export function mergeParticipantLists(...lists) {
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
 
-export function buildLeaderboard(responses, limit = 20) {
+export function buildLeaderboard(responses, limit = 10) {
   const scoreByParticipant = new Map()
   for (const row of responses || []) {
     const key = row.participant_id

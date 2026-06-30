@@ -1,6 +1,7 @@
 /** @typedef {{ participant_id: number|string, name: string, score: number, attempts?: number }} LeaderboardEntry */
 
 export const LEADERBOARD_LIMIT_OPTIONS = [10, 20, 30, 40, 50]
+export const SESSION_LEADERBOARD_TOP_N = 10
 
 export function participantDisplayName(row, participantId) {
   const p = row?.participant

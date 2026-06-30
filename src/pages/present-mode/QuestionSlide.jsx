@@ -32,8 +32,6 @@ function PresentResponsesPanel({
   responseRows,
   showRevealUi,
   correctLabels,
-  visibleRowLimit = null,
-  rowHeightRem = 5.25,
 }) {
   const [search, setSearch] = useState('')
 
@@ -51,13 +49,8 @@ function PresentResponsesPanel({
     ? `No responses match "${search.trim()}".`
     : 'Waiting for responses…'
 
-  const listMaxHeight =
-    visibleRowLimit != null && visibleRowLimit > 0
-      ? `calc(${visibleRowLimit} * ${rowHeightRem}rem + ${Math.max(0, visibleRowLimit - 1)} * 0.75rem)`
-      : null
-
   return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-blue-200/70 bg-white/90 shadow-xl shadow-navy-900/10">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-blue-200/70 bg-white/90 shadow-xl shadow-navy-900/10">
       <div className="shrink-0 border-b border-blue-100/80 px-[clamp(0.85rem,2vw,1.25rem)] py-[clamp(0.65rem,1.5vh,0.85rem)]">
         <p className="text-[clamp(0.65rem,1.2vw,0.75rem)] font-semibold uppercase tracking-wider text-slate-500">
           Responses
@@ -83,16 +76,13 @@ function PresentResponsesPanel({
             />
           </div>
         ) : null}
-        <div
-          className={listMaxHeight ? 'min-h-0 shrink-0 overflow-hidden' : 'flex min-h-0 flex-1 flex-col'}
-          style={listMaxHeight ? { maxHeight: listMaxHeight } : undefined}
-        >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <PresentResponsesList
             rows={filteredRows}
             showRevealUi={showRevealUi}
             correctLabels={correctLabels}
             emptyLabel={emptyLabel}
-            constrained={Boolean(listMaxHeight)}
+            constrained
           />
         </div>
       </div>
@@ -345,14 +335,12 @@ export function QuestionSlide({
             </div>
           </div>
         ) : showTextList ? (
-          <div className="flex min-h-0 w-full flex-1 flex-col">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:max-h-[min(52vh,560px)]">
             <PresentResponsesPanel
               key={question.id}
               responseRows={responseRows}
               showRevealUi={showRevealUi}
               correctLabels={correctLabels}
-              visibleRowLimit={3}
-              rowHeightRem={7}
             />
           </div>
         ) : (
