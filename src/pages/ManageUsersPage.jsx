@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { Eye, EyeOff, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Modal from '../components/ui/Modal'
@@ -34,6 +34,7 @@ function ManageUsersPage() {
   const { clientId, departmentId } = useShell()
   const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [alert, setAlert] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [passwordVault, setPasswordVault] = useState(() => getStoredUserPasswords())
@@ -96,6 +97,7 @@ function ManageUsersPage() {
       }
       queryClient.invalidateQueries({ queryKey: ['manage-users'] })
       setCreateOpen(false)
+      setShowPassword(false)
       setForm(emptyForm)
       setAlert({
         variant: 'success',
@@ -148,6 +150,7 @@ function ManageUsersPage() {
               client_id: clientId || '',
               dept_id: departmentId || '',
             })
+            setShowPassword(false)
             setCreateOpen(true)
           }}
           className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110"
@@ -230,7 +233,11 @@ function ManageUsersPage() {
       <Modal
         open={createOpen}
         title="New User"
-        onClose={() => !createMutation.isPending && setCreateOpen(false)}
+        onClose={() => {
+          if (createMutation.isPending) return
+          setCreateOpen(false)
+          setShowPassword(false)
+        }}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -256,15 +263,25 @@ function ManageUsersPage() {
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700">Password</label>
-            <input
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-              className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-              placeholder="Minimum 8 characters"
-              minLength={8}
-              required
-            />
+            <div className="relative mt-1">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={form.password}
+                onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                className="h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 pr-11 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                placeholder="Minimum 8 characters"
+                minLength={8}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700">Role</label>
@@ -334,7 +351,10 @@ function ManageUsersPage() {
             <button
               type="button"
               disabled={createMutation.isPending}
-              onClick={() => setCreateOpen(false)}
+              onClick={() => {
+                setCreateOpen(false)
+                setShowPassword(false)
+              }}
               className="h-11 rounded-xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-60"
             >
               Cancel
