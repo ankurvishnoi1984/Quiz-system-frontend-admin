@@ -73,15 +73,8 @@ import {
   questionSupportsLeaderboard,
   questionUsesOptionChart,
   sessionSupportsOverallLeaderboard,
+  buildRankingResponseLabel,
 } from '../utils/livePresentation'
-
-function buildRankingResponseLabel(row, optionsById) {
-  const order = Array.isArray(row?.ranking_order) ? row.ranking_order.map(Number).filter(Boolean) : []
-  if (!order.length) return null
-  return order
-    .map((optionId, idx) => `${idx + 1}. ${optionsById.get(optionId) || `Option ${optionId}`}`)
-    .join(' | ')
-}
 
 function LivePage() {
   const [searchParams] = useSearchParams()

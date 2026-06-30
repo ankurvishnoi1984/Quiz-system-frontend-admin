@@ -306,14 +306,29 @@ export function buildWordCloudData(question, questionResults, currentResponses) 
   return wordCountsFromResponses(currentResponses)
 }
 
+export function buildRankingResponseLabel(row, optionsById) {
+  const order = Array.isArray(row?.ranking_order) ? row.ranking_order.map(Number).filter(Boolean) : []
+  if (!order.length) return null
+  return order
+    .map((optionId, idx) => `${idx + 1}. ${optionsById.get(optionId) || `Option ${optionId}`}`)
+    .join(' | ')
+}
+
 export function buildResponseRows(currentResponses, question = null) {
   const ratingMax = Number(question?.rating_max ?? question?.ratingMax ?? 5)
+  const chartRawType = question ? question.chartRawType ?? getQuestionChartRawType(question) : null
+  const isRanking = chartRawType === 'ranking'
+  const optionsById = isRanking
+    ? new Map((question?.options || []).map((opt) => [Number(opt.option_id), opt.option_text]))
+    : null
+
   return currentResponses
     .map((row) => ({
       id: row.response_id,
       participant: row.participant?.nickname || `Participant ${row.participant_id}`,
       response:
         row.question_option?.option_text ||
+        (isRanking && optionsById ? buildRankingResponseLabel(row, optionsById) : null) ||
         row.text_response ||
         (row.rating_value != null ? `${row.rating_value} / ${ratingMax}` : '—'),
       responseTimeMs: row.response_time_ms != null ? Number(row.response_time_ms) : null,
