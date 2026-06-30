@@ -375,9 +375,10 @@ function ParticipantSessionPage() {
   )
 
   const submittedAtSeconds =
-    !sessionQuizTotalTimeEnabled &&
-    questionLockedBySubmission &&
-    countdownFrozen != null
+    countdownFrozen != null &&
+    (sessionQuizTotalTimeEnabled
+      ? lastQuestionFinalized
+      : questionLockedBySubmission)
       ? countdownFrozen
       : null
 
@@ -1424,6 +1425,16 @@ function ParticipantSessionPage() {
       }
       if (hadCountdown && !sessionQuizTotalTimeEnabled && question?.id) {
         freezeCountdownAfterSubmit(question.id)
+      }
+      if (
+        hadCountdown &&
+        sessionQuizTotalTimeEnabled &&
+        navigationEnabled &&
+        sessionLastQuestionId != null &&
+        question?.id != null &&
+        Number(question.id) === Number(sessionLastQuestionId)
+      ) {
+        freezeQuizSessionCountdown()
       }
       if (dbSessionId) {
         queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
