@@ -65,9 +65,9 @@ export function LiveQaPanel({
             <div key={q.qa_id} className="rounded-xl border border-blue-200 bg-white p-3">
               <p className="text-sm font-semibold text-navy-900">{q.question_text}</p>
               <p className="mt-1 text-xs text-slate-600">
-                Status: {q.status} · {q.upvotes ?? 0} upvotes
+                {/* Status: {q.status} · {q.upvotes ?? 0} upvotes */}
               </p>
-              <div className="mt-2 flex gap-2">
+              {/* <div className="mt-2 flex gap-2">
                 <button
                   type="button"
                   onClick={() => onModerate(q.qa_id, 'approve')}
@@ -84,7 +84,7 @@ export function LiveQaPanel({
                 >
                   <ThumbsDown className="size-4" />
                 </button>
-              </div>
+              </div> */}
             </div>
           ))}
           {!moderationQuestions.length ? (
