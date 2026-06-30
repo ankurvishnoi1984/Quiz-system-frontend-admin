@@ -14,17 +14,24 @@ function Modal({ open, title, children, onClose }) {
   if (!open) return null
 
   return (
-    <div className="host-print-hide fixed inset-0 z-50">
+    <div className="host-print-hide fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <button
         type="button"
         className="absolute inset-0 bg-navy-950/25 backdrop-blur-sm"
         aria-label="Close modal"
         onClick={onClose}
       />
-      <div className="relative mx-auto mt-20 w-[min(92vw,680px)] rounded-2xl border border-blue-200/70 bg-white p-5 shadow-2xl shadow-blue-900/20">
-        <div className="flex items-start justify-between gap-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? 'modal-title' : undefined}
+        className="relative flex w-[min(92vw,680px)] max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-2xl border border-blue-200/70 bg-white p-5 shadow-2xl shadow-blue-900/20"
+      >
+        <div className="flex shrink-0 items-start justify-between gap-4">
           <div>
-            <h3 className="text-xl font-bold text-navy-900">{title}</h3>
+            <h3 id="modal-title" className="text-xl font-bold text-navy-900">
+              {title}
+            </h3>
           </div>
           <button
             type="button"
@@ -36,7 +43,9 @@ function Modal({ open, title, children, onClose }) {
           </button>
         </div>
 
-        <div className="mt-4">{children}</div>
+        <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+          {children}
+        </div>
       </div>
     </div>
   )
