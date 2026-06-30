@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Maximize2, Minimize2, Trophy } from 'lucide-react'
+import { Layers, Maximize2, Minimize2, Play, Trophy } from 'lucide-react'
 import { HostAlertModal } from '../../components/live/HostAlertModal'
 import { HostQuestionActionButton } from '../../components/live/HostQuestionActionButton'
 import { HostQuestionControls } from '../../components/live/HostQuestionControls'
@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/authStore'
 import { useHostQuestionMutations } from '../../hooks/useHostQuestionMutations'
 import { useLiveSession } from '../../hooks/useLiveSession'
 import { listQaQuestionsApi, updateSessionApi } from '../../services/liveApi'
+import { canHostActivateAllQuestions, canHostCloseAllQuestions } from '../../utils/hostQuestionControls'
 import { sessionSupportsOverallLeaderboard } from '../../utils/livePresentation'
 import { isSessionQuizTotalTimeEnabled } from '../../utils/sessionFlags'
 import { LeaderboardSlide } from './LeaderboardSlide'
@@ -52,6 +53,25 @@ function PresentModePage() {
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
   const sessionQuizTotalTimeEnabled = isSessionQuizTotalTimeEnabled(session)
 
+  const showActivateAllQuestionsButton = useMemo(
+    () =>
+      canHostActivateAllQuestions(mappedQuestions, {
+        canEditLive,
+        singleActiveQuestionMode,
+        sessionQuizTotalTimeEnabled,
+      }),
+    [mappedQuestions, canEditLive, singleActiveQuestionMode, sessionQuizTotalTimeEnabled],
+  )
+
+  const showCloseAllQuestionsButton = useMemo(
+    () =>
+      canHostCloseAllQuestions(mappedQuestions, {
+        canEditLive,
+        singleActiveQuestionMode,
+      }),
+    [mappedQuestions, canEditLive, singleActiveQuestionMode],
+  )
+
   const sessionLeaderboardMutation = useMutation({
     mutationFn: (enabled) =>
       updateSessionApi(accessToken, sessionId, { leaderboard_enabled: enabled }),
@@ -85,9 +105,13 @@ function PresentModePage() {
     questionLeaderboardMutation,
     answerRevealMutation,
     closeQuestionMutation,
+    closeAllQuestionsMutation,
+    activateAllQuestionsMutation,
     reattemptMutation,
     openForReattempt,
     closeQuestion,
+    closeAllQuestions,
+    activateAllQuestions,
   } = useHostQuestionMutations(accessToken, sessionId, {
     onCloseQuestionSuccess: (questionText) => {
       const preview = String(questionText || '').trim()
@@ -104,6 +128,44 @@ function PresentModePage() {
       setHostAlert({
         variant: 'error',
         title: 'Could not close question',
+        message: error.message || 'Something went wrong. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
+    onCloseAllQuestionsSuccess: (closedCount) => {
+      setHostAlert({
+        variant: 'success',
+        title: 'All questions closed',
+        message:
+          closedCount > 0
+            ? `All ${closedCount} live question${closedCount === 1 ? '' : 's'} ${closedCount === 1 ? 'was' : 'were'} successfully closed.`
+            : 'All questions were successfully closed.',
+        confirmLabel: 'OK',
+      })
+    },
+    onCloseAllQuestionsError: (error) => {
+      setHostAlert({
+        variant: 'error',
+        title: 'Could not close all questions',
+        message: error.message || 'Something went wrong. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
+    onActivateAllQuestionsSuccess: (activatedCount) => {
+      setHostAlert({
+        variant: 'success',
+        title: 'All questions activated',
+        message:
+          activatedCount > 0
+            ? `${activatedCount} question${activatedCount === 1 ? '' : 's'} ${activatedCount === 1 ? 'is' : 'are'} now live.`
+            : 'All questions are now live.',
+        confirmLabel: 'OK',
+      })
+    },
+    onActivateAllQuestionsError: (error) => {
+      setHostAlert({
+        variant: 'error',
+        title: 'Could not activate all questions',
         message: error.message || 'Something went wrong. Please try again.',
         confirmLabel: 'Close',
       })
@@ -256,9 +318,7 @@ function PresentModePage() {
                   label={
                     sessionLeaderboardMutation.isPending
                       ? 'Updating…'
-                      : session?.leaderboard_enabled
-                        ? 'Overall rankings'
-                        : 'Overall rankings'
+                      : 'Overall rankings'
                   }
                   title={
                     session?.leaderboard_enabled
@@ -270,6 +330,30 @@ function PresentModePage() {
                   onClick={() =>
                     sessionLeaderboardMutation.mutate(!session?.leaderboard_enabled)
                   }
+                />
+              ) : null}
+              {showActivateAllQuestionsButton ? (
+                <HostQuestionActionButton
+                  disabled={activateAllQuestionsMutation.isPending}
+                  icon={Play}
+                  size="compact"
+                  label={
+                    activateAllQuestionsMutation.isPending ? 'Activating…' : 'Activate all questions'
+                  }
+                  title="Make all questions live at once (timed questions share the same start time)"
+                  tone="emerald"
+                  onClick={activateAllQuestions}
+                />
+              ) : null}
+              {showCloseAllQuestionsButton ? (
+                <HostQuestionActionButton
+                  disabled={closeAllQuestionsMutation.isPending}
+                  icon={Layers}
+                  size="compact"
+                  label={closeAllQuestionsMutation.isPending ? 'Closing…' : 'Close all questions'}
+                  title="Stop accepting responses on all live untimed questions"
+                  tone="rose"
+                  onClick={closeAllQuestions}
                 />
               ) : null}
               <button
