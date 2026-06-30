@@ -6,17 +6,26 @@ export function PresentResponsesList({
   showRevealUi = false,
   correctLabels = new Set(),
   emptyLabel = 'Waiting for responses…',
+  constrained = false,
 }) {
   if (!rows.length) {
     return (
-      <p className="flex h-full items-center justify-center text-center text-[clamp(1.1rem,2.5vw,1.75rem)] text-slate-500">
+      <p
+        className={`flex items-center justify-center text-center text-[clamp(1.1rem,2.5vw,1.75rem)] text-slate-500 ${
+          constrained ? 'h-full min-h-[8rem]' : 'h-full'
+        }`}
+      >
         {emptyLabel}
       </p>
     )
   }
 
   return (
-    <ul className="present-lb-list grid min-h-0 flex-1 auto-rows-min gap-3 overflow-y-auto pr-1">
+    <ul
+      className={`present-lb-list grid auto-rows-min gap-3 overflow-y-auto pr-1 ${
+        constrained ? 'h-full max-h-full' : 'min-h-0 flex-1'
+      }`}
+    >
       {rows.map((row, idx) => {
         const responseKey = String(row.response).trim().toLowerCase()
         const isCorrect = showRevealUi && correctLabels.has(responseKey)

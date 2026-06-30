@@ -28,33 +28,13 @@ import { PresentResponsesList } from './PresentResponsesList'
 import { PresentSlideHeader } from './PresentShell'
 import { PresentViewSwitcher } from './PresentViewSwitcher'
 
-function TextResponsesPanel({ rows }) {
-  if (!rows.length) {
-    return (
-      <p className="flex h-full items-center justify-center text-center text-[clamp(1.1rem,2.5vw,1.75rem)] text-slate-500">
-        Waiting for responses…
-      </p>
-    )
-  }
-  return (
-    <ul className="present-lb-list grid h-full auto-rows-min gap-3 overflow-y-auto pr-2">
-      {rows.slice(0, 24).map((row, idx) => (
-        <li
-          key={row.id}
-          className="present-lb-row rounded-2xl border border-blue-200/70 bg-white/95 px-6 py-4 shadow-sm"
-          style={{ animationDelay: `${idx * 40}ms` }}
-        >
-          <p className="text-[clamp(0.9rem,1.6vw,1rem)] font-semibold text-navy-600">{row.participant}</p>
-          <p className="mt-1 text-[clamp(1.25rem,3vw,2rem)] font-medium leading-snug text-navy-900">
-            {row.response}
-          </p>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-function PresentResponsesPanel({ responseRows, showRevealUi, correctLabels }) {
+function PresentResponsesPanel({
+  responseRows,
+  showRevealUi,
+  correctLabels,
+  visibleRowLimit = null,
+  rowHeightRem = 5.25,
+}) {
   const [search, setSearch] = useState('')
 
   const filteredRows = useMemo(() => {
@@ -70,6 +50,11 @@ function PresentResponsesPanel({ responseRows, showRevealUi, correctLabels }) {
   const emptyLabel = search.trim()
     ? `No responses match "${search.trim()}".`
     : 'Waiting for responses…'
+
+  const listMaxHeight =
+    visibleRowLimit != null && visibleRowLimit > 0
+      ? `calc(${visibleRowLimit} * ${rowHeightRem}rem + ${Math.max(0, visibleRowLimit - 1)} * 0.75rem)`
+      : null
 
   return (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-blue-200/70 bg-white/90 shadow-xl shadow-navy-900/10">
@@ -98,12 +83,18 @@ function PresentResponsesPanel({ responseRows, showRevealUi, correctLabels }) {
             />
           </div>
         ) : null}
-        <PresentResponsesList
-          rows={filteredRows}
-          showRevealUi={showRevealUi}
-          correctLabels={correctLabels}
-          emptyLabel={emptyLabel}
-        />
+        <div
+          className={listMaxHeight ? 'min-h-0 shrink-0 overflow-hidden' : 'flex min-h-0 flex-1 flex-col'}
+          style={listMaxHeight ? { maxHeight: listMaxHeight } : undefined}
+        >
+          <PresentResponsesList
+            rows={filteredRows}
+            showRevealUi={showRevealUi}
+            correctLabels={correctLabels}
+            emptyLabel={emptyLabel}
+            constrained={Boolean(listMaxHeight)}
+          />
+        </div>
       </div>
     </div>
   )
@@ -211,14 +202,6 @@ export function QuestionSlide({
             className={compact ? 'min-h-0 flex-1' : 'h-full min-h-[40vh]'}
             emptyLabel="Waiting for words…"
           />
-        </div>
-      )
-    }
-
-    if (showTextList) {
-      return (
-        <div className={panelClass}>
-          <TextResponsesPanel rows={responseRows} />
         </div>
       )
     }
@@ -360,6 +343,17 @@ export function QuestionSlide({
                 correctLabels={correctLabels}
               />
             </div>
+          </div>
+        ) : showTextList ? (
+          <div className="flex min-h-0 w-full flex-1 flex-col">
+            <PresentResponsesPanel
+              key={question.id}
+              responseRows={responseRows}
+              showRevealUi={showRevealUi}
+              correctLabels={correctLabels}
+              visibleRowLimit={3}
+              rowHeightRem={7}
+            />
           </div>
         ) : (
           renderResultsPanel()
