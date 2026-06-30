@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import SessionCard from '../components/dashboard/SessionCard'
+import { DashboardChartsPanel } from '../components/dashboard/DashboardChartsPanel'
 import SessionFormModal from '../components/dashboard/SessionFormModal'
 import ShareSessionPanel from '../components/dashboard/ShareSessionPanel'
 import StatCard from '../components/dashboard/StatCard'
@@ -22,18 +23,9 @@ import {
   updateSessionApi,
 } from '../services/dashboardApi'
 import { toDateInputValue, toTimeInputValue } from '../utils/sessionSchedule'
+import { buildDashboardStats, formatTrendLabel } from '../utils/dashboardMetrics'
 
 const tabItems = ['All', 'Draft', 'Live', 'Completed']
-
-function randomSparkline(seed = 4, len = 10) {
-  const points = []
-  let v = seed * 7 + 12
-  for (let i = 0; i < len; i++) {
-    v = (v * 9301 + 49297) % 233280
-    points.push(10 + Math.round((v / 233280) * 90))
-  }
-  return points
-}
 
 function DashboardPage() {
   const accessToken = useAuthStore((state) => state.accessToken)
@@ -276,25 +268,7 @@ function DashboardPage() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [sessions, tab, debouncedSearch, fromDate, toDate])
 
-  const stats = useMemo(() => {
-    const month = new Date().getMonth()
-    const year = new Date().getFullYear()
-    const sessionsThisMonth = sessions.filter((s) => {
-      const d = new Date(s.date)
-      return d.getMonth() === month && d.getFullYear() === year
-    })
-
-    const totalParticipants = sessions.reduce((sum, s) => sum + (s.participants ?? 0), 0)
-    const activeSessions = sessions.filter((s) => s.status === 'Live').length
-    const responseRate = sessions.length ? Math.round(70 + (activeSessions * 5) % 25) : 0
-
-    return {
-      totalSessions: sessionsThisMonth.length,
-      totalParticipants,
-      avgResponseRate: `${responseRate}%`,
-      activeSessions,
-    }
-  }, [sessions])
+  const stats = useMemo(() => buildDashboardStats(sessions), [sessions])
 
   const handleAction = (action, session) => {
     if (action === 'delete') {
@@ -468,33 +442,35 @@ function DashboardPage() {
         <StatCard
           label="Total sessions (this month)"
           value={String(stats.totalSessions)}
-          trendLabel="Up 12% vs last month"
-          sparkline={randomSparkline(2)}
+          trendLabel={formatTrendLabel(stats.sessionsTrendPercent)}
+          sparkline={stats.sessionSparkline}
           accent="navy"
         />
         <StatCard
           label="Total participants"
           value={stats.totalParticipants.toLocaleString()}
-          trendLabel="Last 7 days: +348"
-          sparkline={randomSparkline(3)}
+          trendLabel={formatTrendLabel(stats.participantsTrendPercent)}
+          sparkline={stats.participantSparkline}
           accent="blue"
         />
         <StatCard
-          label="Avg response rate"
-          value={stats.avgResponseRate}
-          trendLabel="Stable • variance 2.1%"
-          sparkline={randomSparkline(5)}
+          label="Avg completion rate"
+          value={`${stats.avgCompletionRate}%`}
+          trendLabel="Across live and completed sessions"
+          sparkline={stats.completionSparkline}
           accent="indigo"
         />
         <StatCard
           label="Active sessions right now"
           value={String(stats.activeSessions)}
           trendLabel="Real-time live count"
-          sparkline={randomSparkline(7)}
+          sparkline={stats.liveSparkline}
           accent="cyan"
           pulse={stats.activeSessions > 0}
         />
       </div>
+
+      <DashboardChartsPanel sessions={sessions} isLoading={sessionsQuery.isLoading} />
 
       {dashboardError ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
