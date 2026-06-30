@@ -84,6 +84,7 @@ export function QuestionTimer({ timer, timeLimit, submittedAtSeconds = null }) {
             </span>
           )}
         </div>
+        {/* Seconds countdown text — hidden; mm:ss clock in the ring above is sufficient.
         <p className="mt-0.5 text-xs text-slate-500">
           {submitted
             ? urgent
@@ -93,6 +94,7 @@ export function QuestionTimer({ timer, timeLimit, submittedAtSeconds = null }) {
               ? 'Time is up'
               : `${timer} second${timer === 1 ? '' : 's'} remaining`}
         </p>
+        */}
       </div>
     </div>
   )
