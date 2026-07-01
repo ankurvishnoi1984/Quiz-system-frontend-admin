@@ -67,6 +67,16 @@ export function mapDepartmentSessionsForHost(apiSessions, departmentName = '') {
   }))
 }
 
+export function getPreferredAnalyticsSessionId(mappedSessions) {
+  if (!mappedSessions?.length) return null
+  return (
+    mappedSessions.find((s) => s.status === 'Completed')?.id ||
+    mappedSessions.find((s) => s.status === 'Live')?.id ||
+    mappedSessions[0]?.id ||
+    null
+  )
+}
+
 export function useDepartmentSessionsList() {
   const { departmentId, department, departments } = useShell()
   const query = useHostNavSessions()

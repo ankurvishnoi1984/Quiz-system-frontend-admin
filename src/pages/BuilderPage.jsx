@@ -32,7 +32,6 @@ import {
   createQuestionApi,
   deleteQuestionApi,
   getSessionDetailApi,
-  listDepartmentSessionsApi,
   listSessionQuestionsApi,
   reorderQuestionsApi,
   updateQuestionApi,
@@ -46,7 +45,8 @@ import {
 } from '../utils/questionMedia'
 import { questionSupportsAnswerReveal } from '../utils/answerReveal'
 import { HostNoSessionsEmpty } from '../components/layout/HostNoSessionsEmpty'
-import { useHostNavSessions } from '../hooks/useHostNavSessions'
+import { useHostNavSessions, getLatestSessionId } from '../hooks/useHostNavSessions'
+import { useShell } from '../context/ShellContext'
 
 function InlineEditableSessionTitle({ title, onSave, isSaving }) {
   const [editing, setEditing] = useState(false)
@@ -1009,6 +1009,7 @@ function BuilderPage() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session') || ''
   const navSessionsQuery = useHostNavSessions()
+  const { departmentId } = useShell()
   const navigate = useNavigate()
   const accessToken = useAuthStore((state) => state.accessToken)
   const queryClient = useQueryClient()
@@ -1034,6 +1035,7 @@ function BuilderPage() {
   const [saveSuccess, setSaveSuccess] = useState('')
   const [lastSavedLabel, setLastSavedLabel] = useState('Never')
   const [initialQuestionIds, setInitialQuestionIds] = useState([])
+  const prevDepartmentIdRef = useRef(departmentId)
 
   const sessionQuery = useQuery({
     queryKey: ['builder-session', sessionId],
@@ -1047,11 +1049,59 @@ function BuilderPage() {
     enabled: Boolean(accessToken && sessionId),
   })
 
-  const deptSessionsQuery = useQuery({
-    queryKey: ['builder-dept-sessions', sessionQuery.data?.dept_id],
-    queryFn: () => listDepartmentSessionsApi(accessToken, sessionQuery.data?.dept_id),
-    enabled: Boolean(accessToken && sessionQuery.data?.dept_id),
-  })
+  const deptSessionsQuery = navSessionsQuery
+
+  useEffect(() => {
+    if (!departmentId) return
+    if (navSessionsQuery.isFetching) return
+
+    const sessions = navSessionsQuery.data ?? []
+    const departmentChanged = prevDepartmentIdRef.current !== departmentId
+
+    if (departmentChanged) {
+      prevDepartmentIdRef.current = departmentId
+      setQuestions([])
+      setSelectedId(null)
+      setDirty(false)
+      setSaveError('')
+      setSaveSuccess('')
+
+      const nextSessionId = getLatestSessionId(sessions)
+      if (nextSessionId && String(sessionId) !== nextSessionId) {
+        navigate(`/builder?session=${encodeURIComponent(nextSessionId)}`, { replace: true })
+        return
+      }
+      if (!nextSessionId && sessionId) {
+        navigate('/builder', { replace: true })
+      }
+      return
+    }
+
+    if (!sessionId && sessions.length > 0) {
+      const nextSessionId = getLatestSessionId(sessions)
+      if (nextSessionId) {
+        navigate(`/builder?session=${encodeURIComponent(nextSessionId)}`, { replace: true })
+      }
+      return
+    }
+
+    if (
+      sessionId &&
+      sessions.length > 0 &&
+      !sessions.some((item) => String(item.session_id) === String(sessionId))
+    ) {
+      const nextSessionId = getLatestSessionId(sessions)
+      if (nextSessionId) {
+        navigate(`/builder?session=${encodeURIComponent(nextSessionId)}`, { replace: true })
+      }
+    }
+  }, [
+    departmentId,
+    sessionId,
+    navSessionsQuery.data,
+    navSessionsQuery.isFetching,
+    navigate,
+  ])
 
   const apiToUiType = (apiType) => {
     const mapping = {
@@ -1148,6 +1198,12 @@ function BuilderPage() {
   }
 
   useEffect(() => {
+    if (!sessionId) {
+      setQuestions([])
+      setSelectedId(null)
+      setInitialQuestionIds([])
+      return
+    }
     if (!questionsQuery.data) return
     const mapped = questionsQuery.data.map(mapQuestionFromApi)
     setQuestions(mapped)
@@ -1155,7 +1211,7 @@ function BuilderPage() {
     setInitialQuestionIds(mapped.map((item) => item.questionId))
     setDirty(false)
     setSaveError('')
-  }, [questionsQuery.data])
+  }, [sessionId, questionsQuery.data])
 
   useEffect(() => {
     if (!sessionQuery.data) return
@@ -1234,7 +1290,7 @@ function BuilderPage() {
           old ? { ...old, title: updated.title } : old,
         )
       }
-      queryClient.invalidateQueries({ queryKey: ['builder-dept-sessions'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
       queryClient.invalidateQueries({ queryKey: ['builder-session', sessionId] })
       setSaveError('')
     },
@@ -2178,7 +2234,7 @@ function BuilderPage() {
 
               <QuestionMediaUpload
                 media={selected.media}
-                deptId={sessionQuery.data?.dept_id}
+                deptId={departmentId || sessionQuery.data?.dept_id}
                 onChange={(media) => updateQuestion({ ...selected, media })}
                 disabled={!isDraftSession}
               />

@@ -65,7 +65,11 @@ const SORT_KEYS = {
 
 function DepartmentAnalyticsPage() {
   const accessToken = useAuthStore((s) => s.accessToken)
-  const { department, departmentId } = useShell()
+  const { department, departmentId, departments } = useShell()
+  const departmentLabel =
+    department ||
+    departments.find((d) => String(d.dept_id) === String(departmentId))?.name ||
+    'Department'
   const defaults = useMemo(() => defaultDateRange(), [])
   const [fromDate, setFromDate] = useState(defaults.from)
   const [toDate, setToDate] = useState(defaults.to)
@@ -84,7 +88,11 @@ function DepartmentAnalyticsPage() {
     enabled: Boolean(accessToken && departmentId),
   })
 
-  const report = reportQuery.data
+  const report =
+    reportQuery.data &&
+    String(reportQuery.data.department?.dept_id) === String(departmentId)
+      ? reportQuery.data
+      : undefined
 
   const sortedSessions = useMemo(() => {
     const rows = [...(report?.sessions || [])]
@@ -160,7 +168,9 @@ function DepartmentAnalyticsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy-700">
             Department Analytics
           </p>
-          <h2 className="mt-1 text-2xl font-bold text-navy-900">{department || 'Department'} report</h2>
+          <h2 className="mt-1 text-2xl font-bold text-navy-900">
+            {report?.department?.name || departmentLabel} report
+          </h2>
           <p className="mt-1 text-sm text-slate-600">
             Admin-only overview · default range last 30 days
           </p>

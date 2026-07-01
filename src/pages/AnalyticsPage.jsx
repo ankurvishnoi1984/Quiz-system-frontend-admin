@@ -1,5 +1,5 @@
 import { Download, Loader2, Printer } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { AnalyticsExportModal } from '../components/analytics/AnalyticsExportModal'
@@ -19,7 +19,7 @@ import { exportPerParticipantExcel } from '../utils/perParticipantExcelExport'
 import { exportPerQuestionBreakdownExcel } from '../utils/perQuestionBreakdownExcelExport'
 import { exportSessionSummaryExcel } from '../utils/sessionSummaryExcelExport'
 import { useShell } from '../context/ShellContext'
-import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
+import { useDepartmentSessionsList, getPreferredAnalyticsSessionId } from '../hooks/useHostNavSessions'
 import {
   getSessionParticipantsReportApi,
   getSessionQuestionsReportApi,
@@ -86,7 +86,8 @@ function AnalyticsPage() {
   const navigate = useNavigate()
   const accessToken = useAuthStore((s) => s.accessToken)
   const { departmentId } = useShell()
-  const { sessions } = useDepartmentSessionsList()
+  const { sessions, isFetching: sessionsFetching } = useDepartmentSessionsList()
+  const prevDepartmentIdRef = useRef(departmentId)
 
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -97,12 +98,7 @@ function AnalyticsPage() {
   const [exportingReportId, setExportingReportId] = useState(null)
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false)
 
-  const defaultSessionId =
-    sessionId ||
-    sessions.find((s) => s.status === 'Completed')?.id ||
-    sessions.find((s) => s.status === 'Live')?.id ||
-    sessions[0]?.id ||
-    null
+  const defaultSessionId = getPreferredAnalyticsSessionId(sessions)
 
   useEffect(() => {
     if (!sessionId && defaultSessionId) {
@@ -111,21 +107,47 @@ function AnalyticsPage() {
   }, [sessionId, defaultSessionId, navigate])
 
   useEffect(() => {
-    if (!departmentId || !sessions.length) return
+    if (!departmentId) return
+    if (sessionsFetching) return
+
+    const departmentChanged = prevDepartmentIdRef.current !== departmentId
+
+    if (departmentChanged) {
+      prevDepartmentIdRef.current = departmentId
+      setSelectedQuestionId(null)
+      setActiveReportView('summary')
+
+      const next = getPreferredAnalyticsSessionId(sessions)
+      if (next && String(sessionId) !== String(next)) {
+        navigate(`/analytics?session=${encodeURIComponent(next)}`, { replace: true })
+        return
+      }
+      if (!next && sessionId) {
+        navigate('/analytics', { replace: true })
+      }
+      return
+    }
+
+    if (!sessions.length) return
     if (!sessionId) return
     const inDept = sessions.some((s) => String(s.id) === String(sessionId))
     if (inDept) return
-    const next =
-      sessions.find((s) => s.status === 'Completed')?.id ||
-      sessions.find((s) => s.status === 'Live')?.id ||
-      sessions[0]?.id
+    const next = getPreferredAnalyticsSessionId(sessions)
     if (next) {
       navigate(`/analytics?session=${encodeURIComponent(next)}`, { replace: true })
     }
-  }, [departmentId, sessions, sessionId, navigate])
+  }, [departmentId, sessions, sessionId, sessionsFetching, navigate])
 
   const activeSessionId = sessionId || defaultSessionId
-  const numericSessionId = isBackendSessionId(activeSessionId) ? activeSessionId : null
+  const sessionInCurrentDepartment = useMemo(
+    () =>
+      !activeSessionId || !sessions.length
+        ? true
+        : sessions.some((s) => String(s.id) === String(activeSessionId)),
+    [activeSessionId, sessions],
+  )
+  const numericSessionId =
+    sessionInCurrentDepartment && isBackendSessionId(activeSessionId) ? activeSessionId : null
 
   const reportQuery = useQuery({
     queryKey: ['analytics-session-report', numericSessionId],

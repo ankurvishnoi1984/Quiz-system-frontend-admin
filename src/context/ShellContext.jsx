@@ -9,11 +9,16 @@ export function ShellProvider({ children }) {
   const accessToken = useAuthStore((state) => state.accessToken)
   const user = useAuthStore((state) => state.user)
   const isSuperAdmin = user?.role === 'super_admin'
+  const isClientAdmin = user?.role === 'client_admin'
 
   const [client, setClient] = useState('')
   const [clientId, setClientId] = useState('')
   const [department, setDepartment] = useState('')
   const [departmentId, setDepartmentId] = useState('')
+
+  const resolvedClientId = isSuperAdmin
+    ? clientId || user?.client_id || null
+    : user?.client_id || null
 
   const clientsQuery = useQuery({
     queryKey: ['shell-clients'],
@@ -22,9 +27,9 @@ export function ShellProvider({ children }) {
   })
 
   const departmentsQuery = useQuery({
-    queryKey: ['shell-departments', clientId || user?.client_id],
-    queryFn: () => listDepartmentsApi(accessToken, clientId || user?.client_id || null),
-    enabled: Boolean(accessToken),
+    queryKey: ['shell-departments', resolvedClientId, user?.role],
+    queryFn: () => listDepartmentsApi(accessToken, resolvedClientId || null),
+    enabled: Boolean(accessToken && (!isClientAdmin || resolvedClientId)),
   })
 
   useEffect(() => {
@@ -38,7 +43,8 @@ export function ShellProvider({ children }) {
 
   useEffect(() => {
     if (!departmentsQuery.data?.length) return
-    const isValidDept = departmentId && departmentsQuery.data.some(d => String(d.dept_id) === String(departmentId))
+    const isValidDept =
+      departmentId && departmentsQuery.data.some((d) => String(d.dept_id) === String(departmentId))
     if (!isValidDept) {
       const firstDept = departmentsQuery.data[0]
       setDepartmentId(String(firstDept.dept_id))
@@ -52,9 +58,14 @@ export function ShellProvider({ children }) {
       setClientId(String(user.client_id))
     }
     if (!departmentId && user?.dept_id) {
-      setDepartmentId(String(user.dept_id))
+      const matchesClient = departmentsQuery.data?.some(
+        (d) => String(d.dept_id) === String(user.dept_id),
+      )
+      if (!departmentsQuery.data?.length || matchesClient) {
+        setDepartmentId(String(user.dept_id))
+      }
     }
-  }, [user?.client_id, user?.dept_id, isSuperAdmin, clientId, departmentId])
+  }, [user?.client_id, user?.dept_id, isSuperAdmin, clientId, departmentId, departmentsQuery.data])
 
   const value = useMemo(
     () => ({
@@ -72,7 +83,17 @@ export function ShellProvider({ children }) {
       clientsLoading: clientsQuery.isLoading,
       departmentsLoading: departmentsQuery.isLoading,
     }),
-    [client, clientId, department, departmentId, clientsQuery.data, departmentsQuery.data, isSuperAdmin, clientsQuery.isLoading, departmentsQuery.isLoading],
+    [
+      client,
+      clientId,
+      department,
+      departmentId,
+      clientsQuery.data,
+      departmentsQuery.data,
+      isSuperAdmin,
+      clientsQuery.isLoading,
+      departmentsQuery.isLoading,
+    ],
   )
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>

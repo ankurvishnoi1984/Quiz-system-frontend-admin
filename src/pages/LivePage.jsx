@@ -22,7 +22,7 @@ import {
   Trophy,
   Users,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import WordCloudChart from '../components/charts/WordCloudChart'
@@ -35,7 +35,8 @@ import { HostQuestionActionButton } from '../components/live/HostQuestionActionB
 import { canHostActivateAllQuestions, canHostCloseAllQuestions } from '../utils/hostQuestionControls'
 import { isSessionQuizTotalTimeEnabled } from '../utils/sessionFlags'
 import { HostNoSessionsEmpty } from '../components/layout/HostNoSessionsEmpty'
-import { useHostNavSessions } from '../hooks/useHostNavSessions'
+import { useHostNavSessions, getLivePresenterSessionId } from '../hooks/useHostNavSessions'
+import { useShell } from '../context/ShellContext'
 import { HostQuestionControls } from '../components/live/HostQuestionControls'
 import { LiveChartViewToggle } from '../components/live/LiveChartViewToggle'
 import { RankingLiveChartPanel } from '../components/live/RankingLiveChartPanel'
@@ -56,7 +57,6 @@ import {
   getQuestionResultsApi,
   getSessionDetailApi,
   getSessionResponsesApi,
-  listDepartmentSessionsApi,
   listQaQuestionsApi,
   listSessionQuestionsApi,
   qaModerateApi,
@@ -83,6 +83,9 @@ function LivePage() {
   const accessToken = useAuthStore((state) => state.accessToken)
   const sessionId = searchParams.get('session') || ''
   const navSessionsQuery = useHostNavSessions()
+  const { departmentId } = useShell()
+  const prevDepartmentIdRef = useRef(departmentId)
+  const deptSessionsQuery = navSessionsQuery
 
 
   const [questionIndex, setQuestionIndex] = useState(0)
@@ -139,11 +142,37 @@ function LivePage() {
   })
 
 
-  const deptSessionsQuery = useQuery({
-    queryKey: ['live-dept-sessions', sessionQuery.data?.dept_id],
-    queryFn: () => listDepartmentSessionsApi(accessToken, sessionQuery.data?.dept_id),
-    enabled: Boolean(accessToken && sessionQuery.data?.dept_id),
-  })
+  useEffect(() => {
+    if (!departmentId) return
+    if (navSessionsQuery.isFetching) return
+
+    const sessions = navSessionsQuery.data ?? []
+    const departmentChanged = prevDepartmentIdRef.current !== departmentId
+
+    if (departmentChanged) {
+      prevDepartmentIdRef.current = departmentId
+      const nextSessionId = getLivePresenterSessionId(sessions)
+      if (nextSessionId && String(sessionId) !== nextSessionId) {
+        navigate(`/live?session=${encodeURIComponent(nextSessionId)}`, { replace: true })
+        return
+      }
+      if (!nextSessionId && sessionId) {
+        navigate('/live', { replace: true })
+      }
+      return
+    }
+
+    if (
+      sessionId &&
+      sessions.length > 0 &&
+      !sessions.some((item) => String(item.session_id) === String(sessionId))
+    ) {
+      const nextSessionId = getLivePresenterSessionId(sessions)
+      if (nextSessionId) {
+        navigate(`/live?session=${encodeURIComponent(nextSessionId)}`, { replace: true })
+      }
+    }
+  }, [departmentId, sessionId, navSessionsQuery.data, navSessionsQuery.isFetching, navigate])
 
 
   const mappedQuestions = useMemo(
