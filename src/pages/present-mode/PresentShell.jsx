@@ -69,7 +69,9 @@ export function PresentSlideHeader({
   isSessionLive = false,
   onParticipantsClick,
   onQaClick,
+  readOnly = false,
 }) {
+  const modeLabel = readOnly ? 'View display' : 'Present mode'
   const showParticipantsTile = Boolean(onParticipantsClick)
   const showQaTile = Boolean(onQaClick)
   const showStatTiles = showParticipantsTile || showQaTile
@@ -80,7 +82,7 @@ export function PresentSlideHeader({
         <div className="flex items-center gap-2">
           <PresentLiveIndicator isSessionLive={isSessionLive} />
           <p className="text-[clamp(0.65rem,1.2vw,0.8rem)] font-semibold uppercase tracking-[0.35em] text-navy-600/80">
-            Present mode
+            {modeLabel}
           </p>
         </div>
         <h1 className="mt-1 text-[clamp(1.1rem,2.5vw,1.75rem)] font-bold text-navy-900">{sessionTitle}</h1>

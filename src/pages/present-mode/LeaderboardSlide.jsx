@@ -10,6 +10,7 @@ export function LeaderboardSlide({
   isSessionLive,
   onParticipantsClick,
   onQaClick,
+  readOnly = false,
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -20,6 +21,7 @@ export function LeaderboardSlide({
         isSessionLive={isSessionLive}
         onParticipantsClick={onParticipantsClick}
         onQaClick={onQaClick}
+        readOnly={readOnly}
       />
 
       <div className="mb-[clamp(0.75rem,2vh,1.25rem)] flex shrink-0 flex-col items-center justify-center gap-1">

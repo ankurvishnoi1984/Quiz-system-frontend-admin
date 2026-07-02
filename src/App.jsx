@@ -17,6 +17,7 @@ import ManageDepartmentsPage from './pages/ManageDepartmentsPage'
 import ManageUsersPage from './pages/ManageUsersPage'
 import ParticipantSessionPage from './pages/participant-session'
 import PresentModePage from './pages/present-mode'
+import PresentViewPage from './pages/present-mode/PresentViewPage'
 import { SessionsProvider } from './context/SessionsContext'
 import { useAuthStore } from './store/authStore'
 import HostLayout from './layouts/HostLayout'
@@ -28,11 +29,21 @@ function getPostLoginPath(user) {
   return '/dashboard'
 }
 
+function isPublicAppPath(pathname) {
+  return (
+    pathname.startsWith('/join') ||
+    pathname.startsWith('/present/view') ||
+    pathname === '/login' ||
+    pathname === '/forgot-password'
+  )
+}
+
 function App() {
   const user = useAuthStore((state) => state.user)
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping)
   const bootstrapAuth = useAuthStore((state) => state.bootstrapAuth)
   const [authHydrated, setAuthHydrated] = useState(() => useAuthStore.persist.hasHydrated())
+  const skipAuthGate = isPublicAppPath(window.location.pathname)
 
   useEffect(() => {
     const unsub = useAuthStore.persist.onFinishHydration(() => {
@@ -49,7 +60,7 @@ function App() {
     bootstrapAuth()
   }, [authHydrated, bootstrapAuth])
 
-  if (!authHydrated || isBootstrapping) {
+  if ((!authHydrated || isBootstrapping) && !skipAuthGate) {
     return (
       <div className="grid min-h-screen place-items-center bg-linear-to-br from-slate-100 via-blue-50 to-indigo-100/70">
         <p className="text-sm font-medium text-slate-600">Checking session...</p>
@@ -66,6 +77,7 @@ function App() {
         <Routes>
           <Route path="/join/:sessionId" element={<ParticipantSessionPage />} />
           <Route path="/join" element={<ParticipantSessionPage />} />
+          <Route path="/present/view" element={<PresentViewPage />} />
           <Route
             path="/present"
             element={

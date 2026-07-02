@@ -61,3 +61,9 @@ export async function transitionSessionApi(accessToken, sessionId, action) {
 export async function getSessionQrApi(accessToken, sessionId) {
   return authRequest(`/sessions/${sessionId}/qr`, accessToken)
 }
+
+export async function getPresentViewLinkApi(accessToken, sessionId) {
+  return authRequest(`/sessions/${sessionId}/present-view-link`, accessToken, {
+    method: 'POST',
+  })
+}

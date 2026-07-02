@@ -401,6 +401,7 @@ export const RealtimeEvent = {
   RANKING_RESPONSE_SUBMITTED: 'ranking-response-submitted',
   PARTICIPANT_JOINED: 'participant_joined',
   PARTICIPANT_LEFT: 'participant_left',
+  PRESENT_SLIDE_CHANGED: 'present_slide_changed',
 }
 
 export default RealtimeClient

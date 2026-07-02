@@ -105,3 +105,13 @@ export async function qaModerateApi(accessToken, qaId, action, body = null) {
   })
   return data?.qa_question || null
 }
+
+export async function setPresentSlideApi(accessToken, sessionId, { slideIndex, slideTotal }) {
+  return authRequest(`/sessions/${sessionId}/present-slide`, accessToken, {
+    method: 'PUT',
+    body: JSON.stringify({
+      slide_index: slideIndex,
+      slide_total: slideTotal,
+    }),
+  })
+}

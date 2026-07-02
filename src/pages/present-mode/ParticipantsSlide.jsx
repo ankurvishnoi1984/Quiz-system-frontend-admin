@@ -30,6 +30,7 @@ export function ParticipantsSlide({
   isSessionLive,
   onParticipantsClick,
   onQaClick,
+  readOnly = false,
 }) {
   const sessionTitle = session?.title || 'Live session'
   const dateLabel =
@@ -49,6 +50,7 @@ export function ParticipantsSlide({
         isSessionLive={isSessionLive}
         onParticipantsClick={onParticipantsClick}
         onQaClick={onQaClick}
+        readOnly={readOnly}
       />
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-[clamp(0.5rem,2vw,1.5rem)]">

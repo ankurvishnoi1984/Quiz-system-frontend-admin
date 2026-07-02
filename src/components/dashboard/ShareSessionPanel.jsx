@@ -1,7 +1,7 @@
-import { Check, Copy, Download, Hash, Link2, QrCode } from 'lucide-react'
+import { Check, Copy, Download, Hash, Link2, Monitor, QrCode } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
-import { getSessionQrApi } from '../../services/dashboardApi'
+import { getPresentViewLinkApi, getSessionQrApi } from '../../services/dashboardApi'
 import {
   buildGenericJoinUrl,
   buildSessionJoinUrl,
@@ -169,10 +169,33 @@ function CopyIconButton({
   )
 }
 
-export default function ShareSessionPanel({ session, accessToken, sessionDbId }) {
+function buildPresentViewShareText({ title, viewUrl }) {
+  return [
+    'Watch this live session display (view only):',
+    '',
+    `Session: ${title}`,
+    '',
+    `Display link: ${viewUrl}`,
+    '',
+    'Open on a projector, TV, or second screen. No login required.',
+  ].join('\n')
+}
+
+export default function ShareSessionPanel({
+  session,
+  accessToken,
+  sessionDbId,
+  showPresentViewShare = true,
+}) {
   const [shareTab, setShareTab] = useState('link')
   const [shareJoinUrl, setShareJoinUrl] = useState('')
   const [qrDataUrl, setQrDataUrl] = useState('')
+  const [presentViewUrl, setPresentViewUrl] = useState('')
+  const [presentViewQrDataUrl, setPresentViewQrDataUrl] = useState('')
+  const [presentViewError, setPresentViewError] = useState('')
+
+  const resolvedSessionDbId = sessionDbId ?? session?.session_id ?? session?.id
+  const canSharePresentView = showPresentViewShare && session?.status !== 'archived'
 
   const sessionCode = normalizeSessionCode(session?.session_code)
   const genericJoinUrl = buildGenericJoinUrl()
@@ -193,6 +216,23 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
     [session?.title, sessionDescription, scheduledLabel, shareJoinUrl],
   )
 
+  const presentViewShareText = useMemo(
+    () =>
+      buildPresentViewShareText({
+        title: session?.title || 'Quiz session',
+        viewUrl: presentViewUrl,
+      }),
+    [session?.title, presentViewUrl],
+  )
+
+  const shareTabs = useMemo(() => {
+    const tabs = [...SHARE_TABS]
+    if (canSharePresentView) {
+      tabs.push({ id: 'display', label: 'View display', icon: Monitor })
+    }
+    return tabs
+  }, [canSharePresentView])
+
   useEffect(() => {
     let cancelled = false
 
@@ -205,9 +245,9 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
 
       const code = sessionCode || String(session.id || '')
       let link = buildSessionJoinUrl(code)
-      if (accessToken && sessionDbId) {
+      if (accessToken && resolvedSessionDbId) {
         try {
-          const qrPayload = await getSessionQrApi(accessToken, sessionDbId)
+          const qrPayload = await getSessionQrApi(accessToken, resolvedSessionDbId)
           link = resolveSessionJoinUrl(qrPayload?.join_url, code)
         } catch {
           // Use local join URL when QR endpoint fails.
@@ -224,7 +264,50 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
     return () => {
       cancelled = true
     }
-  }, [session, accessToken, sessionDbId, sessionCode])
+  }, [session, accessToken, resolvedSessionDbId, sessionCode])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const resolvePresentView = async () => {
+      if (!canSharePresentView || !accessToken || !resolvedSessionDbId) {
+        setPresentViewUrl('')
+        setPresentViewQrDataUrl('')
+        setPresentViewError('')
+        return
+      }
+
+      try {
+        const payload = await getPresentViewLinkApi(accessToken, resolvedSessionDbId)
+        const link = payload?.view_url || ''
+        if (cancelled) return
+        setPresentViewUrl(link)
+        setPresentViewError('')
+        if (link) {
+          const data = await QRCode.toDataURL(link, { margin: 1, width: 280 })
+          if (!cancelled) setPresentViewQrDataUrl(data)
+        } else {
+          setPresentViewQrDataUrl('')
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPresentViewUrl('')
+          setPresentViewQrDataUrl('')
+          const message = err.message || 'Could not create display link'
+          setPresentViewError(
+            message === 'Route not found'
+              ? 'Display link is not available yet. Deploy the latest API, then try again.'
+              : message,
+          )
+        }
+      }
+    }
+
+    resolvePresentView()
+    return () => {
+      cancelled = true
+    }
+  }, [canSharePresentView, accessToken, resolvedSessionDbId])
 
   if (!session) return null
 
@@ -242,8 +325,8 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
         </div>
       )}
 
-      <div className="inline-flex rounded-xl border border-blue-200/70 bg-white p-0.5 shadow-sm">
-        {SHARE_TABS.map(({ id, label, icon: Icon }) => (
+      <div className="inline-flex flex-wrap rounded-xl border border-blue-200/70 bg-white p-0.5 shadow-sm">
+        {shareTabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
@@ -354,6 +437,69 @@ export default function ShareSessionPanel({ session, accessToken, sessionDbId })
             Share the join page link and session code separately. Participants open the join page, enter the code,
             then provide their name{session.join_type === 'name_email' ? ' and email' : ''} as required.
           </p>
+        </div>
+      )}
+
+      {shareTab === 'display' && (
+        <div className="space-y-3">
+          <label className="text-sm font-semibold text-slate-700">View-only display link</label>
+          <p className="text-xs leading-relaxed text-slate-600">
+            Share with co-hosts, moderators, or room displays. They can watch live results like Present
+            mode without host controls — before or during the session. No login required.
+          </p>
+          {presentViewError ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {presentViewError}
+            </p>
+          ) : null}
+          <div className="space-y-3 rounded-2xl border border-blue-200/70 bg-white p-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Session</p>
+              <p className="mt-1 text-base font-bold text-navy-900">{session.title}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Display link</p>
+              <div className="mt-1 flex overflow-hidden rounded-xl border border-blue-200/70 bg-white">
+                <input
+                  readOnly
+                  value={presentViewUrl || 'Generating link…'}
+                  className="h-11 min-w-0 flex-1 border-0 bg-transparent px-3 text-sm text-slate-700 outline-none"
+                  aria-label="View-only display link"
+                />
+                <CopyIconButton
+                  value={presentViewUrl}
+                  disabled={!presentViewUrl}
+                  attached
+                  showLabel
+                />
+              </div>
+            </div>
+          </div>
+          <CopyButton
+            value={presentViewShareText}
+            disabled={!presentViewUrl}
+            label="Copy all"
+            className="w-full"
+          />
+          <div className="mx-auto max-w-[304px] rounded-2xl border border-blue-200/70 bg-white p-3">
+            {presentViewQrDataUrl ? (
+              <>
+                <img
+                  src={presentViewQrDataUrl}
+                  alt="View display QR"
+                  className="mx-auto h-[240px] w-[240px]"
+                />
+                <QrImageActions
+                  dataUrl={presentViewQrDataUrl}
+                  filename={qrDownloadFilename(sessionCode, session.id).replace('quiz-qr', 'quiz-display')}
+                />
+              </>
+            ) : (
+              <div className="grid h-[240px] place-items-center text-sm text-slate-500">
+                {presentViewError ? 'QR unavailable' : 'Generating QR…'}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

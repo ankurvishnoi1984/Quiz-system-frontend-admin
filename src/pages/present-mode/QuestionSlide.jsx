@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart3, Search, Trophy } from 'lucide-react'
 import { getQuestionResultsApi } from '../../services/liveApi'
+import { getPresentViewQuestionResultsApi } from '../../services/presentViewApi'
 import WordCloudChart from '../../components/charts/WordCloudChart'
 import { buildQuestionLeaderboardForQuestion } from '../../utils/leaderboard'
 import { PresentBarChart } from './PresentBarChart'
@@ -101,14 +102,18 @@ export function QuestionSlide({
   isSessionLive,
   onParticipantsClick,
   onQaClick,
+  readOnly = false,
 }) {
   const [viewMode, setViewMode] = useState('overview')
 
   const currentResponses = filterResponsesForQuestion(allResponses, question.id)
 
   const questionResultsQuery = useQuery({
-    queryKey: ['live-question-results', question.id],
-    queryFn: () => getQuestionResultsApi(accessToken, question.id),
+    queryKey: ['live-question-results', question.id, readOnly ? 'viewer' : 'host'],
+    queryFn: () =>
+      readOnly
+        ? getPresentViewQuestionResultsApi(accessToken, question.id)
+        : getQuestionResultsApi(accessToken, question.id),
     enabled: Boolean(accessToken && question.id),
     refetchInterval: question.isLive ? 4000 : false,
   })
@@ -266,6 +271,7 @@ export function QuestionSlide({
         isSessionLive={isSessionLive}
         onParticipantsClick={onParticipantsClick}
         onQaClick={onQaClick}
+        readOnly={readOnly}
       />
 
       <div className="mb-[clamp(0.75rem,2vh,1.25rem)] shrink-0">
