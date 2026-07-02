@@ -9,6 +9,7 @@ import { RankingOptions } from './question/RankingOptions'
 import { TextResponse } from './question/TextResponse'
 import { TrueFalseOptions } from './question/TrueFalseOptions'
 import { WordCloudInput } from './question/WordCloudInput'
+import { EmojiReactionOptions } from './question/EmojiReactionOptions'
 
 export function ActiveQuestionPanel({
   question,
@@ -54,6 +55,7 @@ export function ActiveQuestionPanel({
   onSelectRating,
   onTextChange,
   onRankingChange,
+  onToggleEmojiOption,
   onPrevious,
   onNextOrSubmit,
   onGoToQa,
@@ -133,7 +135,11 @@ export function ActiveQuestionPanel({
         </p>
       ) : null}
 
-      <h2 className="text-2xl font-bold text-navy-900">{question.text || 'Untitled question'}</h2>
+      <h2 className="text-2xl font-bold text-navy-900">
+        {question.type === 'Emoji Reaction' && !String(question.text || '').trim()
+          ? 'Share your reaction'
+          : question.text || 'Untitled question'}
+      </h2>
 
       <QuestionMedia media={question.media} maxHeightClass="max-h-72" />
 
@@ -202,6 +208,16 @@ export function ActiveQuestionPanel({
         />
       )}
 
+      {question.type === 'Emoji Reaction' && (
+        <EmojiReactionOptions
+          question={question}
+          currentResponse={currentResponse}
+          inputsLocked={inputsLocked}
+          hasSubmitted={hasSubmittedQuestion}
+          onToggleOption={(emoji) => onToggleEmojiOption(question.id, emoji)}
+        />
+      )}
+
       {question.type === 'Word Cloud' && (
         <WordCloudInput
           tagsInput={tagsInput}
@@ -251,9 +267,10 @@ export function ActiveQuestionPanel({
               Go to Q&A
             </button>
           )}
+          {question.type !== 'Emoji Reaction' || hasFinalizePayload || useNextNav ? (
           <button
             type="button"
-            aria-label={useNextNav ? 'Next question' : 'Submit answer'}
+            aria-label={useNextNav ? 'Next question' : question.type === 'Emoji Reaction' ? 'Submit reaction' : 'Submit answer'}
             disabled={
               sessionEnded ||
               isSubmitting ||
@@ -287,8 +304,9 @@ export function ActiveQuestionPanel({
               highlightNextButton && useNextNav ? 'participant-next-highlight' : ''
             }`}
           >
-            {isSubmitting ? 'Submitting...' : useNextNav ? 'Next' : 'Submit'}
+            {isSubmitting ? 'Submitting...' : useNextNav ? 'Next' : question.type === 'Emoji Reaction' ? 'Submit reaction' : 'Submit'}
           </button>
+          ) : null}
         </div>
       </div>
 
@@ -327,9 +345,10 @@ export function ActiveQuestionPanel({
         </div>
       )}
 
-      {(question.type === 'Poll' || question.isSurvey) &&
+      {(question.type === 'Poll' || question.type === 'Emoji Reaction' || question.isSurvey) &&
         hasSubmittedQuestion &&
-        (!navigationEnabled || isLastDisplayedQuestion) && (
+        (!navigationEnabled || isLastDisplayedQuestion) &&
+        question.type !== 'Emoji Reaction' && (
         <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-center">
           <p className="text-sm font-semibold text-violet-800">Thanks for your response!</p>
         </div>

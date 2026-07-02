@@ -1,4 +1,5 @@
 import { BarChart3 } from 'lucide-react'
+import { EmojiBarChart } from '../../../../components/emoji/EmojiBarChart'
 import {
   buildParticipantSurveyResultsView,
   getParticipantResultsTitle,
@@ -70,6 +71,19 @@ export function QuestionSurveyResults({ question, results, isLoading }) {
               />
             ))}
           </div>
+        </div>
+      ) : view.kind === 'emoji_reaction' ? (
+        <div className="mt-4">
+          <EmojiBarChart
+            rows={view.rows.map((row) => ({
+              emoji: row.label,
+              count: row.count,
+              percent: row.percent,
+              optionId: row.label,
+            }))}
+            total={view.totalResponses}
+            size="sm"
+          />
         </div>
       ) : view.kind === 'text' ? (
         <p className="mt-3 text-sm text-sky-900/80">

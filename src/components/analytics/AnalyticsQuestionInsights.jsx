@@ -23,6 +23,29 @@ export function AnalyticsQuestionInsights({ question }) {
     )
   }
 
+  if (chartType === 'emoji_reaction') {
+    const top = (question.chart || []).reduce(
+      (best, row) => (Number(row.count) > Number(best?.count ?? -1) ? row : best),
+      null,
+    )
+    return (
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white p-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Leading reaction</p>
+          <p className="mt-1 text-3xl leading-none">{top?.emoji || top?.name || '—'}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</p>
+          <p className="mt-1 text-sm text-slate-600">
+            {top
+              ? `${top.count} votes · ${top.value}% of ${question.responseCount} responses`
+              : 'Emoji counts appear after participants react'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (chartType === 'rating') {
     return (
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white p-4">

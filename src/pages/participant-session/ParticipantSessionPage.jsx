@@ -391,6 +391,7 @@ function ParticipantSessionPage() {
     (navigationEnabled && allQuestionsClosedByHost && !openForReattempt) ||
     lastQuestionFinalized ||
     (sessionQuizTotalTimeEnabled && sessionTimerExpired) ||
+    (question?.type === 'Emoji Reaction' && questionLockedBySubmission) ||
     (!sessionQuizTotalTimeEnabled &&
       hasCountdown &&
       (questionLockedBySubmission || timer === 0))
@@ -1799,6 +1800,28 @@ function ParticipantSessionPage() {
     [canEditResponses, activeQuestions, setResponses, updateResponse],
   )
 
+  const handleToggleEmojiOption = useCallback(
+    (questionId, emoji) => {
+      if (!canEditResponses) return
+      const q = activeQuestions.find((item) => item.id === questionId)
+      if (!q || q.type !== 'Emoji Reaction') return
+      setResponses((prev) => {
+        const current = prev[questionId] || {}
+        const selected = String(current.selectedOption || '').trim()
+        const nextSelected = selected === emoji ? '' : emoji
+        return {
+          ...prev,
+          [questionId]: {
+            ...current,
+            selectedOption: nextSelected,
+            selectedOptions: nextSelected ? [nextSelected] : [],
+          },
+        }
+      })
+    },
+    [canEditResponses, activeQuestions, setResponses],
+  )
+
   const handleAddWordCloudTag = useCallback(
     (questionId) => {
       if (!canEditResponses) return
@@ -1978,6 +2001,7 @@ function ParticipantSessionPage() {
             onTagsInputChange={setTagsInput}
             onAddTag={handleAddWordCloudTag}
             onSelectOption={handleSelectOption}
+            onToggleEmojiOption={handleToggleEmojiOption}
             onSelectRating={(questionId, rating) => updateResponse(questionId, { rating })}
             onTextChange={(questionId, text) => updateResponse(questionId, { textResponse: text })}
             onRankingChange={(questionId, rankingOrder) =>

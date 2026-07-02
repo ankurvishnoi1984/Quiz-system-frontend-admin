@@ -5,6 +5,7 @@ import {
   mapLiveQuestionType,
   sortTrueFalseOptionData,
 } from './livePresentation'
+import { buildEmojiBarData } from './emojiReaction'
 
 export function apiQuestionTypeToUi(type) {
   const mapping = {
@@ -16,6 +17,7 @@ export function apiQuestionTypeToUi(type) {
     open_text: 'Text',
     true_false: 'True/False',
     ranking: 'Ranking',
+    emoji_reaction: 'Emoji Reaction',
     fill_blank: 'Text',
   }
   return mapping[type] || type || 'Text'
@@ -66,6 +68,16 @@ export function chartFromQuestionResults(results, question, questionResponses = 
       name: row.name,
       count: row.value,
       value: ratingTotal > 0 ? Math.round((row.value / ratingTotal) * 100) : 0,
+    }))
+  }
+
+  if (chartType === 'emoji_reaction') {
+    const { rows } = buildEmojiBarData(question, results, questionResponses)
+    return rows.map((row) => ({
+      name: row.emoji,
+      emoji: row.emoji,
+      count: row.count,
+      value: row.percent,
     }))
   }
 
@@ -130,6 +142,7 @@ export function buildAnalyticsCsvRows({ sessionMeta, sortedQuestions, allRespons
   return allResponses.map((r) => {
     const q = questionsById.get(Number(r.question_id))
     const isSurvey = q?.question_type === 'survey'
+    const isEmojiReaction = q?.question_type === 'emoji_reaction'
     const chartType = q ? getQuestionChartRawType(q) : ''
     const responseText =
       r.question_option?.option_text ||
@@ -146,8 +159,8 @@ export function buildAnalyticsCsvRows({ sessionMeta, sortedQuestions, allRespons
       (r.question?.question_text ?? q?.question_text ?? '').replaceAll('"', '""'),
       r.participant?.nickname ?? '',
       responseText,
-      isSurvey ? '' : String(r.points_earned ?? 0),
-      isSurvey ? '' : r.is_correct == null ? '' : r.is_correct ? 'yes' : 'no',
+      isSurvey || isEmojiReaction ? '' : String(r.points_earned ?? 0),
+      isSurvey || isEmojiReaction ? '' : r.is_correct == null ? '' : r.is_correct ? 'yes' : 'no',
     ]
   })
 }

@@ -26,6 +26,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import WordCloudChart from '../components/charts/WordCloudChart'
+import { EmojiBarChart } from '../components/emoji/EmojiBarChart'
+import { buildEmojiBarData } from '../utils/emojiReaction'
 import { renderPieLabel } from '../components/charts/renderPieLabel'
 import { CHART_COLORS, CHART_TOOLTIP_STYLE, getChartColor } from '../utils/chartColors'
 import ShareSessionPanel from '../components/dashboard/ShareSessionPanel'
@@ -72,6 +74,7 @@ import {
   mapLiveQuestions,
   questionSupportsLeaderboard,
   questionUsesOptionChart,
+  questionUsesEmojiChart,
   sessionSupportsOverallLeaderboard,
   buildRankingResponseLabel,
 } from '../utils/livePresentation'
@@ -461,6 +464,14 @@ function LivePage() {
     Array.isArray(rankingAnalytics?.rankings) &&
     rankingAnalytics.rankings.length > 0
   const showWordCloud = chartRawType === 'word_cloud'
+  const showEmojiReaction = questionUsesEmojiChart(chartRawType)
+  const emojiBarData = useMemo(
+    () =>
+      showEmojiReaction
+        ? buildEmojiBarData(activeQuestion, questionResultsQuery.data, currentResponses)
+        : { rows: [], total: 0 },
+    [showEmojiReaction, activeQuestion, questionResultsQuery.data, currentResponses],
+  )
   const showRating = chartRawType === 'rating'
   const showOptionBreakdown = usesOptionChart && optionData.length > 0
   const showRatingBreakdown = showRating && ratingData.length > 0
@@ -975,6 +986,11 @@ function LivePage() {
                     {wordCloudTotal} submission{wordCloudTotal === 1 ? '' : 's'}
                   </p>
                 )}
+                {showEmojiReaction && (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {emojiBarData.total} reaction{emojiBarData.total === 1 ? '' : 's'}
+                  </p>
+                )}
                 {(showOptionBreakdown || showRatingBreakdown) && (
                   <p className="mt-0.5 text-xs text-slate-500">
                     {optionTotal} response{optionTotal === 1 ? '' : 's'}
@@ -997,7 +1013,9 @@ function LivePage() {
               )}
             </div>
             <div className="mt-3 h-[300px] rounded-2xl border border-blue-200 bg-white p-3">
-              {showWordCloud ? (
+              {showEmojiReaction ? (
+                <EmojiBarChart rows={emojiBarData.rows} total={emojiBarData.total} size="md" className="h-full" />
+              ) : showWordCloud ? (
                 <WordCloudChart words={wordCloudWords} className="h-full" />
               ) : (
                 showRankingBreakdown ? (

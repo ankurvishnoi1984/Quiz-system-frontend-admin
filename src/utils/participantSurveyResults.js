@@ -54,6 +54,16 @@ export function buildParticipantSurveyResultsView(question, results) {
     }
   }
 
+  if (effectiveType === 'emoji_reaction') {
+    const { total, rows } = buildOptionRows(question, results)
+    return {
+      kind: 'emoji_reaction',
+      totalResponses: total,
+      rows,
+      topLabel: rows[0]?.count > 0 ? rows[0].label : null,
+    }
+  }
+
   if (effectiveType === 'rating') {
     const distribution = results.rating_distribution || {}
     const rows = Object.entries(distribution)

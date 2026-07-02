@@ -21,6 +21,7 @@ export function mapQuestionType(type) {
     open_text: 'Text',
     true_false: 'True/False',
     ranking: 'Ranking',
+    emoji_reaction: 'Emoji Reaction',
     survey: 'Survey',
   }
   return map[type] || type
@@ -57,7 +58,10 @@ export function mapParticipantQuestion(q) {
     rawType,
     isSurvey,
     surveySubType: isSurvey ? q.survey_subtype : null,
-    isQuizMode: rawType === 'poll' || isSurvey ? false : Boolean(q.is_quiz_mode),
+    isQuizMode:
+      rawType === 'poll' || rawType === 'emoji_reaction' || isSurvey
+        ? false
+        : Boolean(q.is_quiz_mode),
     allowMultipleSelect: Boolean(q.allow_multiple_select),
     ratingMin: Number(q.rating_min ?? 1),
     ratingMax: Number(q.rating_max ?? 5),
@@ -103,7 +107,7 @@ export function buildResponsePayloadForQuestion(q, res) {
 
   const payload = { question_id: q.id }
 
-  if (q.type === 'MCQ' || q.type === 'Poll' || q.type === 'True/False') {
+  if (q.type === 'MCQ' || q.type === 'Poll' || q.type === 'True/False' || q.type === 'Emoji Reaction') {
     if (q.allowMultipleSelect) {
       const selected = Array.isArray(res.selectedOptions) ? res.selectedOptions : []
       const optionIds = selected
@@ -296,7 +300,7 @@ export function shouldIncludeQuestionInFinalize(
 
 export function participantQuestionHasAnswer(question, response = {}) {
   if (!question) return false
-  if (question.type === 'MCQ' || question.type === 'Poll' || question.type === 'True/False') {
+  if (question.type === 'MCQ' || question.type === 'Poll' || question.type === 'True/False' || question.type === 'Emoji Reaction') {
     if (question.allowMultipleSelect) {
       return Array.isArray(response.selectedOptions) && response.selectedOptions.length > 0
     }

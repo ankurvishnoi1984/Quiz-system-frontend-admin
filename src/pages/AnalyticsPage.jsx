@@ -14,6 +14,7 @@ import { ParticipantLeaderboardTable } from '../components/analytics/Participant
 import { PerQuestionReportDetails } from '../components/analytics/PerQuestionReportDetails'
 import { SESSION_REPORT_VIEWS } from '../constants/sessionReportTypes'
 import { buildAnalyticsCsvRows, mapAnalyticsPerQuestion } from '../utils/analyticsQuestions'
+import { buildEmojiBarData } from '../utils/emojiReaction'
 import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
 import { exportPerParticipantExcel } from '../utils/perParticipantExcelExport'
 import { exportPerQuestionBreakdownExcel } from '../utils/perQuestionBreakdownExcelExport'
@@ -365,7 +366,51 @@ function AnalyticsPage() {
       ])
     }
 
-    const csv = [headers.join(','), ...rows.map((r) => r.map((x) => `"${String(x ?? '').replaceAll('"', '""')}"`).join(','))].join('\n')
+    const csvLines = [headers.join(','), ...rows.map((r) => r.map((x) => `"${String(x ?? '').replaceAll('"', '""')}"`).join(','))]
+
+    const emojiQuestions = (sortedQuestions || []).filter((q) => q.question_type === 'emoji_reaction')
+    if (emojiQuestions.length) {
+      const emojiHeaders = [
+        'sessionId',
+        'sessionTitle',
+        'questionIndex',
+        'questionText',
+        'emoji_1',
+        'emoji_2',
+        'emoji_3',
+        'emoji_4',
+        'emoji_5',
+        'count_1',
+        'count_2',
+        'count_3',
+        'count_4',
+        'count_5',
+      ]
+      csvLines.push('')
+      csvLines.push(emojiHeaders.join(','))
+      for (const question of emojiQuestions) {
+        const questionResponses = (allResponses || []).filter(
+          (row) => Number(row.question_id) === Number(question.question_id),
+        )
+        const { rows: emojiRows } = buildEmojiBarData(question, null, questionResponses)
+        const emojiCols = Array.from({ length: 5 }, (_, index) => emojiRows[index]?.emoji ?? '')
+        const countCols = Array.from({ length: 5 }, (_, index) => String(emojiRows[index]?.count ?? 0))
+        csvLines.push(
+          [
+            sessionMeta.id,
+            sessionMeta.title,
+            String(question.display_order ?? ''),
+            (question.question_text || '').replaceAll('"', '""'),
+            ...emojiCols,
+            ...countCols,
+          ]
+            .map((x) => `"${String(x ?? '').replaceAll('"', '""')}"`)
+            .join(','),
+        )
+      }
+    }
+
+    const csv = csvLines.join('\n')
     downloadText(`session-${sessionMeta.id}-responses.csv`, csv, 'text/csv')
   }
 

@@ -1,3 +1,5 @@
+import { emojiDistributionFromReport } from '../../utils/emojiReaction'
+
 function StatBlock({ label, value, hint }) {
   return (
     <div className="rounded-2xl border border-blue-200/70 bg-white p-3">
@@ -163,6 +165,24 @@ export function PerQuestionReportDetails({ questionReport }) {
             percent: `${row.percent}%`,
           }))}
           emptyMessage="No words submitted yet."
+        />
+      ) : null}
+
+      {chartType === 'emoji_reaction' ? (
+        <DistributionTable
+          title="Emoji reactions"
+          columns={[
+            { key: 'emoji', label: 'Emoji' },
+            { key: 'count', label: 'Count' },
+            { key: 'percent', label: 'Percent' },
+          ]}
+          rows={emojiDistributionFromReport(questionReport).map((row) => ({
+            key: row.emoji,
+            emoji: row.emoji,
+            count: row.count,
+            percent: `${row.percent}%`,
+          }))}
+          emptyMessage="No emoji reactions yet."
         />
       ) : null}
 

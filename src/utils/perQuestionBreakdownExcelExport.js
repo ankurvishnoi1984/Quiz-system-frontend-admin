@@ -97,28 +97,48 @@ export async function exportPerQuestionBreakdownExcel(report) {
     sheet.addRow(['Avg response time (s)', question.avg_response_time_seconds ?? '—'])
     sheet.addRow([])
 
-    const responseColumns = question.is_survey
-      ? ['Participant nickname', 'Answer', 'Response time (ms)', 'Submitted at']
-      : ['Participant nickname', 'Answer', 'Correct (T/F)', 'Response time (ms)', 'Submitted at']
+    const responseColumns =
+      question.is_survey || question.chart_type === 'emoji_reaction'
+        ? ['Participant nickname', 'Answer', 'Response time (ms)', 'Submitted at']
+        : ['Participant nickname', 'Answer', 'Correct (T/F)', 'Response time (ms)', 'Submitted at']
     const header = sheet.addRow(responseColumns)
     styleHeaderRow(sheet, header.number, responseColumns.length)
 
     for (const response of question.responses || []) {
-      const row = question.is_survey
-        ? [
-            response.nickname,
-            response.answer,
-            response.response_time_ms ?? '—',
-            formatDateTime(response.submitted_at),
-          ]
-        : [
-            response.nickname,
-            response.answer,
-            formatCorrect(response.is_correct),
-            response.response_time_ms ?? '—',
-            formatDateTime(response.submitted_at),
-          ]
+      const row =
+        question.is_survey || question.chart_type === 'emoji_reaction'
+          ? [
+              response.nickname,
+              response.answer,
+              response.response_time_ms ?? '—',
+              formatDateTime(response.submitted_at),
+            ]
+          : [
+              response.nickname,
+              response.answer,
+              formatCorrect(response.is_correct),
+              response.response_time_ms ?? '—',
+              formatDateTime(response.submitted_at),
+            ]
       sheet.addRow(row)
+    }
+
+    if (question.chart_type === 'emoji_reaction') {
+      const distribution = new Map()
+      for (const response of question.responses || []) {
+        const emoji = String(response.answer || '').trim()
+        if (!emoji) continue
+        distribution.set(emoji, (distribution.get(emoji) || 0) + 1)
+      }
+      if (distribution.size) {
+        sheet.addRow([])
+        sheet.addRow(['Emoji summary'])
+        const header = sheet.addRow(['Emoji', 'Count'])
+        styleHeaderRow(sheet, header.number, 2)
+        for (const [emoji, count] of distribution.entries()) {
+          sheet.addRow([emoji, count])
+        }
+      }
     }
   }
 

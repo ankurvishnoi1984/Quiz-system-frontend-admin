@@ -16,8 +16,9 @@ import { renderPieLabel } from '../charts/renderPieLabel'
 import { LiveChartViewToggle } from '../live/LiveChartViewToggle'
 import { RankingLiveChartPanel } from '../live/RankingLiveChartPanel'
 import { OpenTextResponsesList } from './OpenTextResponsesList'
+import { EmojiBarChart } from '../emoji/EmojiBarChart'
 import { CHART_TOOLTIP_STYLE, getChartColor, RESPONSE_RATE_PIE_COLORS } from '../../utils/chartColors'
-import { questionUsesOptionChart } from '../../utils/livePresentation'
+import { questionUsesEmojiChart, questionUsesOptionChart } from '../../utils/livePresentation'
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n))
@@ -137,6 +138,22 @@ function QuestionChartBody({ question, participantsJoined, chartView }) {
 
   if (chartType === 'rating' && question.chart.length > 0) {
     return <RatingAnalyticsBarChart question={question} />
+  }
+
+  if (questionUsesEmojiChart(chartType) && question.chart.length > 0) {
+    return (
+      <EmojiBarChart
+        rows={question.chart.map((row) => ({
+          emoji: row.emoji || row.name,
+          count: row.count,
+          percent: row.value,
+          optionId: row.name,
+        }))}
+        total={question.responseCount}
+        size="md"
+        className="h-full"
+      />
+    )
   }
 
   const hasOptionChart = question.chart.length > 0 && questionUsesOptionChart(chartType)

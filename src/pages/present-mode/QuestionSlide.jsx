@@ -4,6 +4,8 @@ import { BarChart3, Search, Trophy } from 'lucide-react'
 import { getQuestionResultsApi } from '../../services/liveApi'
 import { getPresentViewQuestionResultsApi } from '../../services/presentViewApi'
 import WordCloudChart from '../../components/charts/WordCloudChart'
+import { EmojiBarChart } from '../../components/emoji/EmojiBarChart'
+import { buildEmojiBarData } from '../../utils/emojiReaction'
 import { buildQuestionLeaderboardForQuestion } from '../../utils/leaderboard'
 import { PresentBarChart } from './PresentBarChart'
 import {
@@ -17,6 +19,7 @@ import {
   getCorrectOptionsForQuestion,
   getQuestionChartRawType,
   questionUsesOptionChart,
+  questionUsesEmojiChart,
 } from '../../utils/livePresentation'
 import {
   PresentAnswerRevealBadge,
@@ -136,6 +139,14 @@ export function QuestionSlide({
   const chartRawType = question.chartRawType ?? getQuestionChartRawType(question)
   const usesOptionChart = questionUsesOptionChart(chartRawType)
   const showWordCloud = chartRawType === 'word_cloud'
+  const showEmojiReaction = questionUsesEmojiChart(chartRawType)
+  const emojiBarData = useMemo(
+    () =>
+      showEmojiReaction
+        ? buildEmojiBarData(question, questionResultsQuery.data, currentResponses)
+        : { rows: [], total: 0 },
+    [showEmojiReaction, question, questionResultsQuery.data, currentResponses],
+  )
   const showRating = chartRawType === 'rating'
   const rankingAnalytics = questionResultsQuery.data?.ranking_analytics || null
   const showRanking =
@@ -185,6 +196,22 @@ export function QuestionSlide({
     const panelClass = compact
       ? 'flex min-h-0 flex-1 flex-col rounded-3xl border border-blue-200/70 bg-white/90 p-[clamp(0.65rem,1.5vw,1rem)] shadow-xl shadow-navy-900/10'
       : 'min-h-0 flex-1 rounded-3xl border border-blue-200/70 bg-white/90 p-6 shadow-xl shadow-navy-900/10'
+
+    if (showEmojiReaction) {
+      return (
+        <div className={panelClass}>
+          <p className="mb-2 shrink-0 text-[clamp(0.65rem,1.2vw,0.75rem)] font-semibold uppercase tracking-wider text-slate-500">
+            Emoji reactions
+          </p>
+          <EmojiBarChart
+            rows={emojiBarData.rows}
+            total={emojiBarData.total}
+            size="lg"
+            className={compact ? 'min-h-0 flex-1' : 'min-h-[40vh]'}
+          />
+        </div>
+      )
+    }
 
     if (showWordCloud) {
       return (

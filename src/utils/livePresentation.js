@@ -33,6 +33,7 @@ export function mapLiveQuestionType(type) {
     open_text: 'Text',
     true_false: 'True/False',
     ranking: 'Ranking',
+    emoji_reaction: 'Emoji Reaction',
   }
   return map[type] || type
 }
@@ -53,7 +54,8 @@ export function questionSupportsLeaderboard(question) {
     chartType !== 'open_text' &&
     chartType !== 'rating' &&
     chartType !== 'poll' &&
-    chartType !== 'word_cloud'
+    chartType !== 'word_cloud' &&
+    chartType !== 'emoji_reaction'
   )
 }
 
@@ -75,7 +77,7 @@ export function surveySupportsParticipantResults(question) {
 export function questionSupportsParticipantResults(question) {
   if (!question) return false
   const rawType = question.rawType ?? question.question_type
-  if (rawType === 'poll' || rawType === 'rating') return true
+  if (rawType === 'poll' || rawType === 'rating' || rawType === 'emoji_reaction') return true
   if (rawType === 'survey' || question.isSurvey) {
     return surveySupportsParticipantResults(question)
   }
@@ -93,6 +95,10 @@ export function sessionSupportsOverallLeaderboard(questions) {
       q.rawType !== 'poll' &&
       !q.isSurvey,
   )
+}
+
+export function questionUsesEmojiChart(chartRawType) {
+  return chartRawType === 'emoji_reaction'
 }
 
 export function questionUsesOptionChart(chartRawType) {
@@ -145,7 +151,10 @@ export function mapLiveQuestions(questions) {
       isLive: Boolean(q.is_live),
       timeLimit: isSurvey ? 0 : Number(q.time_limit_seconds) || 0,
       submissionsClosed: Boolean(q.submissions_closed),
-      isQuizMode: rawType === 'poll' || isSurvey ? false : Boolean(q.is_quiz_mode),
+      isQuizMode:
+        rawType === 'poll' || rawType === 'emoji_reaction' || isSurvey
+          ? false
+          : Boolean(q.is_quiz_mode),
       answerRevealed,
       showLeaderboard: Boolean(q.show_leaderboard),
       ratingMin: Number(q.rating_min ?? 1),

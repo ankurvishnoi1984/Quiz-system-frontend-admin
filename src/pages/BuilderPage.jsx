@@ -14,6 +14,7 @@ import {
   MessageSquareText,
   Pencil,
   Plus,
+  Smile,
   Star,
   Trophy,
   Trash2,
@@ -45,6 +46,8 @@ import {
 } from '../utils/questionMedia'
 import { questionSupportsAnswerReveal } from '../utils/answerReveal'
 import { HostNoSessionsEmpty } from '../components/layout/HostNoSessionsEmpty'
+import { EmojiReactionEditor } from '../components/builder/EmojiReactionEditor'
+import { createDefaultEmojiReactionOptions } from '../utils/emojiReaction'
 import { useHostNavSessions, getLatestSessionId } from '../hooks/useHostNavSessions'
 import { useShell } from '../context/ShellContext'
 
@@ -123,6 +126,7 @@ const QUESTION_TYPES = [
   { type: 'Poll', icon: Vote, description: 'Opinion poll — no right or wrong answers' },
   { type: 'Survey', icon: ClipboardList, description: 'Multi-question survey — mix formats, no timer' },
   { type: 'Word Cloud', icon: Cloud, description: 'Collect words, show cloud' },
+  { type: 'Emoji Reaction', icon: Smile, description: 'Quick emoji reactions — no scoring' },
   { type: 'Rating', icon: Star, description: '1–10 rating scale' },
   { type: 'Text', icon: MessageSquareText, description: 'Open-ended response' },
   { type: 'True/False', icon: BadgeCheck, description: 'Binary choice' },
@@ -276,7 +280,17 @@ function normalizeTrueFalseOptions(apiOptions = []) {
 }
 
 function questionTypeUsesOptions(type) {
-  return type === 'MCQ' || type === 'Poll' || type === 'True/False' || type === 'Ranking'
+  return (
+    type === 'MCQ' ||
+    type === 'Poll' ||
+    type === 'True/False' ||
+    type === 'Ranking' ||
+    type === 'Emoji Reaction'
+  )
+}
+
+function isEmojiReactionQuestionType(type) {
+  return type === 'Emoji Reaction'
 }
 
 function isPollQuestionType(type) {
@@ -303,6 +317,14 @@ function buildOptionsPayload(question) {
       ...(option.optionId != null ? { option_id: option.optionId } : {}),
       option_text: option.text || `Option ${optionIndex + 1}`,
       is_correct: question.type === 'Poll' ? false : Boolean(option.isCorrect),
+      display_order: optionIndex + 1,
+    }))
+  }
+  if (question.type === 'Emoji Reaction') {
+    return (question.options || []).slice(0, 5).map((option, optionIndex) => ({
+      ...(option.optionId != null ? { option_id: option.optionId } : {}),
+      option_text: option.text || `👍`,
+      is_correct: false,
       display_order: optionIndex + 1,
     }))
   }
@@ -919,6 +941,19 @@ function ParticipantPreview({ question, quizMode }) {
         </div>
       )}
 
+      {previewQuestion.type === 'Emoji Reaction' && (
+        <div className="flex flex-wrap justify-center gap-3">
+          {previewQuestion.options.map((o) => (
+            <span
+              key={o.id}
+              className="flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-200/70 bg-white text-3xl"
+            >
+              {o.text}
+            </span>
+          ))}
+        </div>
+      )}
+
       {previewQuestion.type === 'Ranking' && (
         <div className="grid gap-2">
           {previewQuestion.options.map((o, idx) => (
@@ -1113,6 +1148,7 @@ function BuilderPage() {
       open_text: 'Text',
       true_false: 'True/False',
       ranking: 'Ranking',
+      emoji_reaction: 'Emoji Reaction',
       fill_blank: 'Text',
     }
     return mapping[apiType] || 'Text'
@@ -1124,6 +1160,7 @@ function BuilderPage() {
       Poll: 'poll',
       Survey: 'survey',
       'Word Cloud': 'word_cloud',
+      'Emoji Reaction': 'emoji_reaction',
       Rating: 'rating',
       Text: 'open_text',
       'True/False': 'true_false',
@@ -1181,7 +1218,8 @@ function BuilderPage() {
       type: uiType,
       text: question.question_text || '',
       media: mapApiMediaToQuestionMedia(question),
-      points: question.points_value ?? 10,
+      points:
+        uiType === 'Poll' || uiType === 'Emoji Reaction' ? 0 : question.points_value ?? 10,
       ...(uiType === 'Rating'
         ? {
             ratingMin: question.rating_min ?? DEFAULT_RATING_MIN,
@@ -1372,7 +1410,7 @@ function BuilderPage() {
     () => questions.find((q) => q.id === selectedId) ?? questions[0],
     [questions, selectedId],
   )
-  const quizMode = selected?.type !== 'Poll' && selected?.type !== 'Survey'
+  const quizMode = selected?.type !== 'Poll' && selected?.type !== 'Survey' && selected?.type !== 'Emoji Reaction'
   const sessionAllUntimed = areAllQuestionsUntimed(questions)
   const selectedTimeLimitSeconds = selected
     ? normalizeTimeLimitSeconds(selected.timeLimitSeconds)
@@ -1451,14 +1489,16 @@ function BuilderPage() {
       type,
       text: '',
       media: null,
-      points: type === 'Survey' || type === 'Poll' ? 0 : 10,
+      points: type === 'Survey' || type === 'Poll' || type === 'Emoji Reaction' ? 0 : 10,
       timeLimitSeconds: sessionQuizTotalTimeEnabled
         ? 0
         : resolveDefaultTimeLimitForNewQuestion(questions),
       ...(type === 'Survey' ? createSurveyQuestionDefaults('MCQ') : {}),
       ...(type === 'Rating' ? createRatingQuestionDefaults() : {}),
       options:
-        type === 'MCQ' || type === 'Poll'
+        type === 'Emoji Reaction'
+          ? createDefaultEmojiReactionOptions(uid)
+          : type === 'MCQ' || type === 'Poll'
           ? [
               { id: uid('opt'), optionId: null, text: 'Option 1', isCorrect: false },
               { id: uid('opt'), optionId: null, text: 'Option 2', isCorrect: false },
@@ -1549,6 +1589,14 @@ function BuilderPage() {
             }
           }
         }
+        if (question.type === 'Emoji Reaction') {
+          const opts = (question.options || []).slice(0, 5)
+          if (opts.length !== 5 || opts.some((opt) => !String(opt.text || '').trim())) {
+            throw new Error(
+              `Question "${question.text || 'Untitled'}" must have exactly 5 emoji options.`,
+            )
+          }
+        }
         if (question.type === 'Rating') {
           const ratingError = validateRatingScale(
             question,
@@ -1613,13 +1661,14 @@ function BuilderPage() {
 
         const isPoll = isPollQuestionType(question.type)
         const isSurvey = isSurveyQuestionType(question.type)
+        const isEmojiReaction = isEmojiReactionQuestionType(question.type)
         const surveySubType = question.surveySubType || 'MCQ'
         const payload = {
           question_type: uiToApiType(question.type),
           question_text: question.text || 'Untitled question',
           ...buildQuestionMediaPayload(question.media),
-          is_quiz_mode: isPoll || isSurvey ? false : true,
-          points_value: isPoll || isSurvey ? 0 : Number(question.points || 0),
+          is_quiz_mode: isPoll || isSurvey || isEmojiReaction ? false : true,
+          points_value: isPoll || isSurvey || isEmojiReaction ? 0 : Number(question.points || 0),
           time_limit_seconds: isSurvey
             ? null
             : sessionQuizTotalTimeEnabled
@@ -2165,6 +2214,10 @@ function BuilderPage() {
                   <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900">
                     Survey — no timer or scoring
                   </span>
+                ) : selected?.type === 'Emoji Reaction' ? (
+                  <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900">
+                    Emoji reaction — no scoring
+                  </span>
                 ) : (
                   <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800">
                     Poll — no points or correct answer
@@ -2187,7 +2240,11 @@ function BuilderPage() {
                 <textarea
                   value={selected.text}
                   onChange={(e) => updateQuestion({ ...selected, text: e.target.value })}
-                  placeholder="Type your question..."
+                  placeholder={
+                    selected.type === 'Emoji Reaction'
+                      ? 'How are you feeling about this topic? (optional)'
+                      : 'Type your question...'
+                  }
                   className="mt-1 h-24 w-full resize-none rounded-2xl border border-blue-200/70 bg-white p-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
                 />
               </div>
@@ -2208,6 +2265,15 @@ function BuilderPage() {
                     structureLocked={!isDraftSession}
                   />
                 </div>
+              )}
+
+              {selected.type === 'Emoji Reaction' && (
+                <EmojiReactionEditor
+                  question={selected}
+                  onChange={updateQuestion}
+                  structureLocked={!isDraftSession}
+                  uid={uid}
+                />
               )}
 
               {(selected.type === 'MCQ' || selected.type === 'Poll' || selected.type === 'Ranking') && (
