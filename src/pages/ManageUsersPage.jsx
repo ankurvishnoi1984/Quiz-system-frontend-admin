@@ -3,13 +3,13 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Modal from '../components/ui/Modal'
 import { HostAlertModal } from '../components/live/HostAlertModal'
-import { PasswordRevealCell } from '../components/management/PasswordRevealCell'
+// import { PasswordRevealCell } from '../components/management/PasswordRevealCell'
 import { useShell } from '../context/ShellContext'
 import { useAuthStore } from '../store/authStore'
 import { listClientsApi, listDepartmentsApi } from '../services/dashboardApi'
-import { listUsersApi, registerUserApi } from '../services/managementApi'
+import { createUserApi, listUsersApi } from '../services/managementApi'
 import { filterUsersByShell } from '../utils/shellFilterPaths'
-import { getStoredUserPasswords, setStoredUserPassword } from '../utils/userPasswordVault'
+// import { getStoredUserPasswords, setStoredUserPassword } from '../utils/userPasswordVault'
 
 const ROLE_OPTIONS = [
   // { value: 'super_admin', label: 'Super admin' },
@@ -37,7 +37,7 @@ function ManageUsersPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [alert, setAlert] = useState(null)
   const [form, setForm] = useState(emptyForm)
-  const [passwordVault, setPasswordVault] = useState(() => getStoredUserPasswords())
+  // const [passwordVault, setPasswordVault] = useState(() => getStoredUserPasswords())
 
   const usersQuery = useQuery({
     queryKey: ['manage-users'],
@@ -88,21 +88,25 @@ function ManageUsersPage() {
   const needsDepartment = ['dept_admin', 'host'].includes(form.role)
 
   const createMutation = useMutation({
-    mutationFn: (payload) => registerUserApi(payload),
-    onSuccess: (result, variables) => {
-      const userId = result?.user?.user_id
-      if (userId && variables.password) {
-        setStoredUserPassword(userId, variables.password)
-        setPasswordVault(getStoredUserPasswords())
-      }
+    mutationFn: (payload) => createUserApi(accessToken, payload),
+    onSuccess: (result) => {
+      // Password vault storage disabled — credentials are emailed to the user instead.
+      // const userId = result?.user?.user_id
+      // if (userId && variables.password) {
+      //   setStoredUserPassword(userId, variables.password)
+      //   setPasswordVault(getStoredUserPasswords())
+      // }
       queryClient.invalidateQueries({ queryKey: ['manage-users'] })
       setCreateOpen(false)
       setShowPassword(false)
       setForm(emptyForm)
+      const emailSent = result?.email_sent
       setAlert({
-        variant: 'success',
-        title: 'User created',
-        message: `"${result?.user?.full_name || 'User'}" was registered successfully.`,
+        variant: emailSent ? 'success' : 'error',
+        title: emailSent ? 'User created' : 'User created — email not sent',
+        message: emailSent
+          ? `"${result?.user?.full_name || 'User'}" was created. A welcome email with sign-in details was sent`
+          : `"${result?.user?.full_name || 'User'}" was created, but the welcome email could not be sent.${result?.email_error ? ` ${result.email_error}` : ''}`,
         confirmLabel: 'OK',
       })
     },
@@ -178,7 +182,7 @@ function ManageUsersPage() {
             <tr>
               <th className="px-4 py-3 font-semibold text-slate-700">Name</th>
               <th className="px-4 py-3 font-semibold text-slate-700">Email</th>
-              <th className="px-4 py-3 font-semibold text-slate-700">Password</th>
+              {/* Password column hidden — credentials are emailed on create; vault UI may return later. */}
               <th className="px-4 py-3 font-semibold text-slate-700">Role</th>
               <th className="px-4 py-3 font-semibold text-slate-700">Client</th>
               <th className="px-4 py-3 font-semibold text-slate-700">Department</th>
@@ -190,9 +194,9 @@ function ManageUsersPage() {
               <tr key={user.user_id} className="border-b border-blue-50 last:border-b-0">
                 <td className="px-4 py-3 font-semibold text-navy-900">{user.full_name}</td>
                 <td className="px-4 py-3 text-slate-700">{user.email}</td>
-                <td className="px-4 py-3">
+                {/* <td className="px-4 py-3">
                   <PasswordRevealCell password={passwordVault[String(user.user_id)]} />
-                </td>
+                </td> */}
                 <td className="px-4 py-3 text-slate-700">{ROLE_LABELS[user.role] || user.role}</td>
                 <td className="px-4 py-3 text-slate-700">
                   {user.client_id
@@ -219,7 +223,7 @@ function ManageUsersPage() {
             ))}
             {!usersQuery.isLoading && !filteredUsers.length ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-slate-600">
+                <td colSpan={6} className="px-4 py-10 text-center text-slate-600">
                   {(usersQuery.data || []).length
                     ? 'No users match the selected client or department.'
                     : 'No users found.'}
