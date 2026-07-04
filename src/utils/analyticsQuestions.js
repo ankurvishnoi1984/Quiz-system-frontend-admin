@@ -160,7 +160,7 @@ export function buildAnalyticsCsvRows({ sessionMeta, sortedQuestions, allRespons
       r.participant?.nickname ?? '',
       responseText,
       isSurvey || isEmojiReaction ? '' : String(r.points_earned ?? 0),
-      isSurvey || isEmojiReaction ? '' : r.is_correct == null ? '' : r.is_correct ? 'yes' : 'no',
+      isSurvey || isEmojiReaction ? '' : r.is_correct == null ? '' : r.is_correct ? 'Yes' : 'No',
     ]
   })
 }

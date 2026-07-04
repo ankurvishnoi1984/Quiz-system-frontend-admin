@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs'
 
 function formatCorrect(value) {
   if (value == null) return '—'
-  return value ? 'T' : 'F'
+  return value ? 'Yes' : 'No'
 }
 
 function styleHeaderRow(sheet, rowNumber, columnCount) {
@@ -100,7 +100,7 @@ export async function exportPerParticipantExcel(report, { showScore = true } = {
         { width: 16 },
       ]
   const responsesColumns = showScore
-    ? ['Nickname', 'Question text', 'Answer', 'Correct (T/F)', 'Points earned', 'Response time (ms)']
+    ? ['Nickname', 'Question text', 'Answer', 'Correct', 'Points earned', 'Response time (ms)']
     : ['Nickname', 'Question text', 'Answer', 'Response time (ms)']
   const responsesHeader = responsesSheet.addRow(responsesColumns)
   styleHeaderRow(responsesSheet, responsesHeader.number, responsesColumns.length)

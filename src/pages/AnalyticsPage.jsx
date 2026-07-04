@@ -342,7 +342,7 @@ function AnalyticsPage() {
       'participant',
       'response',
       'points',
-      'isCorrect',
+      'Correct',
     ]
 
     let rows = buildAnalyticsCsvRows({

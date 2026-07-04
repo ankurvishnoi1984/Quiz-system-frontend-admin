@@ -26,7 +26,7 @@ function questionSheetName(index, type) {
 
 function formatCorrect(value) {
   if (value == null) return '—'
-  return value ? 'T' : 'F'
+  return value ? 'Yes' : 'No'
 }
 
 export async function exportPerQuestionBreakdownExcel(report) {
@@ -100,7 +100,7 @@ export async function exportPerQuestionBreakdownExcel(report) {
     const responseColumns =
       question.is_survey || question.chart_type === 'emoji_reaction'
         ? ['Participant nickname', 'Answer', 'Response time (ms)', 'Submitted at']
-        : ['Participant nickname', 'Answer', 'Correct (T/F)', 'Response time (ms)', 'Submitted at']
+        : ['Participant nickname', 'Answer', 'Correct', 'Response time (ms)', 'Submitted at']
     const header = sheet.addRow(responseColumns)
     styleHeaderRow(sheet, header.number, responseColumns.length)
 
