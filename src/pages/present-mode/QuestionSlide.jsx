@@ -13,6 +13,7 @@ import {
   buildRatingChartData,
   buildResponseRows,
   buildWordCloudData,
+  countResponseSubmissions,
   enrichOptionChartDataWithReveal,
   enrichRatingChartDataWithColors,
   filterResponsesForQuestion,
@@ -131,6 +132,7 @@ export function QuestionSlide({
   const showRevealUi = shouldShowAnswerRevealUi(question)
   const wordCloudWords = buildWordCloudData(question, questionResultsQuery.data, currentResponses)
   const responseRows = buildResponseRows(currentResponses, question)
+  const responseSubmissionCount = countResponseSubmissions(currentResponses, question)
   const questionLeaderboard = useMemo(
     () => buildQuestionLeaderboardForQuestion(allResponses, question.id, 30),
     [allResponses, question.id],
@@ -318,7 +320,7 @@ export function QuestionSlide({
             </span>
           ) : null}
           <span className="text-[clamp(0.9rem,1.6vw,1.1rem)] font-semibold text-slate-500">
-            {currentResponses.length} response{currentResponses.length === 1 ? '' : 's'}
+            {responseSubmissionCount} response{responseSubmissionCount === 1 ? '' : 's'}
           </span>
         </div>
         <div

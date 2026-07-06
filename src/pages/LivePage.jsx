@@ -76,7 +76,9 @@ import {
   questionUsesOptionChart,
   questionUsesEmojiChart,
   sessionSupportsOverallLeaderboard,
-  buildRankingResponseLabel,
+  buildResponseRows,
+  buildResponseCountByQuestionId,
+  countResponseSubmissions,
 } from '../utils/livePresentation'
 
 function LivePage() {
@@ -422,21 +424,16 @@ function LivePage() {
   }, [responsesQuery.data])
 
 
-  const responseCountByQuestionId = useMemo(() => {
-    const counts = {}
-    for (const row of responsesQuery.data || []) {
-      const qid = Number(row.question_id)
-      if (!qid) continue
-      counts[qid] = (counts[qid] || 0) + 1
-    }
-    return counts
-  }, [responsesQuery.data])
+  const responseCountByQuestionId = useMemo(
+    () => buildResponseCountByQuestionId(responsesQuery.data, mappedQuestions),
+    [responsesQuery.data, mappedQuestions],
+  )
 
   const currentResponses = useMemo(
     () => (responsesQuery.data || []).filter((r) => Number(r.question_id) === Number(activeQuestion?.id)),
     [responsesQuery.data, activeQuestion?.id],
   )
-  const responded = currentResponses.length
+  const responded = countResponseSubmissions(currentResponses, activeQuestion)
   const responseRate = participants ? Math.round((responded / participants) * 100) : 0
 
 
@@ -482,38 +479,13 @@ function LivePage() {
 
 
   const attemptsRows = useMemo(() => {
-    const rows = currentResponses.map((row) => {
-      const responseTimeMs =
-        row.response_time_ms != null ? Number(row.response_time_ms) : null
-      return {
-        id: row.response_id,
-        participant: row.participant?.nickname || `Participant ${row.participant_id}`,
-        response:
-          row.question_option?.option_text ||
-          (chartRawType === 'ranking'
-            ? buildRankingResponseLabel(
-                row,
-                new Map((activeQuestion?.options || []).map((opt) => [Number(opt.option_id), opt.option_text])),
-              )
-            : null) ||
-          row.text_response ||
-          (row.rating_value !== null && row.rating_value !== undefined
-            ? String(row.rating_value)
-            : '—'),
-        responseTimeMs,
-        quizTimeLabel: formatQuizSubmitTimeCompact(responseTimeMs),
-      }
-    })
-
-    rows.sort((a, b) => {
-      if (a.responseTimeMs == null && b.responseTimeMs == null) return 0
-      if (a.responseTimeMs == null) return 1
-      if (b.responseTimeMs == null) return -1
-      return a.responseTimeMs - b.responseTimeMs
-    })
-
-    return rows.slice(0, 100)
-  }, [currentResponses])
+    return buildResponseRows(currentResponses, activeQuestion)
+      .map((row) => ({
+        ...row,
+        quizTimeLabel: formatQuizSubmitTimeCompact(row.responseTimeMs),
+      }))
+      .slice(0, 100)
+  }, [currentResponses, activeQuestion])
 
 
   const sessionResponses = responsesQuery.data || []

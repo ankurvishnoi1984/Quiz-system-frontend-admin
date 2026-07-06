@@ -161,11 +161,82 @@ export function mapLiveQuestions(questions) {
       ratingMax: Number(q.rating_max ?? 5),
       ratingMinLabel: q.rating_min_label || '',
       ratingMaxLabel: q.rating_max_label || '',
+      allowMultipleSelect: Boolean(q.allow_multiple_select),
       correctOptionIds: resolveCorrectOptionIds({ ...q, answerRevealed }, options),
       options,
       media: mapApiMediaToQuestionMedia(q),
     }
   })
+}
+
+export function questionAllowsMultipleSelect(question) {
+  if (!question) return false
+  return Boolean(question.allowMultipleSelect ?? question.allow_multiple_select)
+}
+
+export function questionSupportsMultipleOptionSelection(question) {
+  if (!questionAllowsMultipleSelect(question)) return false
+  const chartRawType = question.chartRawType ?? getQuestionChartRawType(question)
+  return chartRawType === 'mcq' || chartRawType === 'poll'
+}
+
+function groupResponsesByParticipant(responses) {
+  const groups = new Map()
+  for (const row of responses || []) {
+    const participantId = Number(row.participant_id)
+    if (!Number.isFinite(participantId)) continue
+    if (!groups.has(participantId)) groups.set(participantId, [])
+    groups.get(participantId).push(row)
+  }
+  return groups
+}
+
+function buildMultiSelectOptionLabel(rows, question) {
+  const options = question?.options || []
+  const orderByOptionId = new Map(
+    options.map((option, index) => [
+      Number(option.option_id),
+      Number(option.display_order ?? index),
+    ]),
+  )
+
+  return rows
+    .map((row) => ({
+      text: row.question_option?.option_text || '',
+      optionId: Number(row.option_id ?? row.question_option?.option_id),
+    }))
+    .filter((item) => item.text)
+    .sort(
+      (a, b) =>
+        (orderByOptionId.get(a.optionId) ?? 999) - (orderByOptionId.get(b.optionId) ?? 999),
+    )
+    .map((item) => item.text)
+    .join(' | ')
+}
+
+export function countResponseSubmissions(responses, question = null) {
+  if (questionSupportsMultipleOptionSelection(question)) {
+    return groupResponsesByParticipant(responses).size
+  }
+  return (responses || []).length
+}
+
+export function buildResponseCountByQuestionId(responses, questions = []) {
+  const questionById = new Map((questions || []).map((question) => [Number(question.id), question]))
+  const byQuestion = new Map()
+
+  for (const row of responses || []) {
+    const questionId = Number(row.question_id)
+    if (!questionId) continue
+    if (!byQuestion.has(questionId)) byQuestion.set(questionId, [])
+    byQuestion.get(questionId).push(row)
+  }
+
+  const counts = {}
+  for (const [questionId, rows] of byQuestion) {
+    counts[questionId] = countResponseSubmissions(rows, questionById.get(questionId))
+  }
+  return counts
 }
 
 export function getCorrectOptionsForQuestion(question) {
@@ -323,6 +394,15 @@ export function buildRankingResponseLabel(row, optionsById) {
     .join(' | ')
 }
 
+function sortResponseRowsByTime(rows) {
+  return rows.sort((a, b) => {
+    if (a.responseTimeMs == null && b.responseTimeMs == null) return 0
+    if (a.responseTimeMs == null) return 1
+    if (b.responseTimeMs == null) return -1
+    return a.responseTimeMs - b.responseTimeMs
+  })
+}
+
 export function buildResponseRows(currentResponses, question = null) {
   const ratingMax = Number(question?.rating_max ?? question?.ratingMax ?? 5)
   const chartRawType = question ? question.chartRawType ?? getQuestionChartRawType(question) : null
@@ -331,8 +411,26 @@ export function buildResponseRows(currentResponses, question = null) {
     ? new Map((question?.options || []).map((opt) => [Number(opt.option_id), opt.option_text]))
     : null
 
-  return currentResponses
-    .map((row) => ({
+  if (questionSupportsMultipleOptionSelection(question)) {
+    const rows = []
+    for (const [participantId, groupRows] of groupResponsesByParticipant(currentResponses)) {
+      const firstRow = groupRows[0]
+      const responseTimes = groupRows
+        .map((row) => (row.response_time_ms != null ? Number(row.response_time_ms) : null))
+        .filter((time) => time != null)
+
+      rows.push({
+        id: firstRow.response_id,
+        participant: firstRow.participant?.nickname || `Participant ${participantId}`,
+        response: buildMultiSelectOptionLabel(groupRows, question) || '—',
+        responseTimeMs: responseTimes.length ? Math.min(...responseTimes) : null,
+      })
+    }
+    return sortResponseRowsByTime(rows)
+  }
+
+  return sortResponseRowsByTime(
+    currentResponses.map((row) => ({
       id: row.response_id,
       participant: row.participant?.nickname || `Participant ${row.participant_id}`,
       response:
@@ -341,11 +439,6 @@ export function buildResponseRows(currentResponses, question = null) {
         row.text_response ||
         (row.rating_value != null ? `${row.rating_value} / ${ratingMax}` : '—'),
       responseTimeMs: row.response_time_ms != null ? Number(row.response_time_ms) : null,
-    }))
-    .sort((a, b) => {
-      if (a.responseTimeMs == null && b.responseTimeMs == null) return 0
-      if (a.responseTimeMs == null) return 1
-      if (b.responseTimeMs == null) return -1
-      return a.responseTimeMs - b.responseTimeMs
-    })
+    })),
+  )
 }
