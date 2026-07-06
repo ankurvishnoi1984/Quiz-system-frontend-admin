@@ -1,4 +1,4 @@
-import { getChartColor } from './chartColors'
+import { sortLeaderboardEntries } from './leaderboard'
 import { mapApiMediaToQuestionMedia } from './questionMedia'
 import { wordCountsFromApiResults, wordCountsFromResponses } from './wordCloud'
 
@@ -324,9 +324,7 @@ export function buildLeaderboard(responses, limit = 10) {
     existing.attempts += 1
     scoreByParticipant.set(key, existing)
   }
-  return Array.from(scoreByParticipant.values())
-    .sort((a, b) => b.score - a.score || b.attempts - a.attempts)
-    .slice(0, limit)
+  return sortLeaderboardEntries(Array.from(scoreByParticipant.values())).slice(0, limit)
 }
 
 export function filterResponsesForQuestion(responses, questionId) {

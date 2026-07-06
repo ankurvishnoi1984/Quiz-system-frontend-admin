@@ -37,6 +37,12 @@ export async function getSessionResponsesApi(accessToken, sessionId) {
   return data?.responses || []
 }
 
+export async function getSessionLeaderboardApi(accessToken, sessionId, { limit = 10 } = {}) {
+  const query = Number.isFinite(limit) && limit > 0 ? `?limit=${limit}` : ''
+  const data = await authRequest(`/responses/session/${sessionId}/leaderboard${query}`, accessToken)
+  return data?.leaderboard || []
+}
+
 export async function listSessionParticipantsApi(accessToken, sessionId) {
   const data = await authRequest(`/sessions/${sessionId}/participants`, accessToken)
   return data?.participants || []

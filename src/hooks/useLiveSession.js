@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getSessionDetailApi,
+  getSessionLeaderboardApi,
   getSessionResponsesApi,
   listSessionParticipantsApi,
   listSessionQuestionsApi,
 } from '../services/liveApi'
 import {
+  getPresentViewLeaderboardApi,
   getPresentViewResponsesApi,
   getPresentViewSessionApi,
   listPresentViewParticipantsApi,
@@ -14,7 +16,6 @@ import {
 } from '../services/presentViewApi'
 import { createRealtimeClient, RealtimeEvent } from '../services/realtimeClient'
 import {
-  buildLeaderboard,
   buildParticipantList,
   mapLiveQuestions,
   mapSessionParticipants,
@@ -69,6 +70,16 @@ export function useLiveSession(accessToken, sessionId, options = {}) {
     refetchInterval: 5000,
   })
 
+  const leaderboardQuery = useQuery({
+    queryKey: ['live-leaderboard', sessionId, mode, SESSION_LEADERBOARD_TOP_N],
+    queryFn: () =>
+      isViewer
+        ? getPresentViewLeaderboardApi(accessToken, sessionId, { limit: SESSION_LEADERBOARD_TOP_N })
+        : getSessionLeaderboardApi(accessToken, sessionId, { limit: SESSION_LEADERBOARD_TOP_N }),
+    enabled: Boolean(accessToken && sessionId && sessionReady && viewerSessionActive),
+    refetchInterval: 5000,
+  })
+
   const participantsQuery = useQuery({
     queryKey: ['live-participants', sessionId, mode],
     queryFn: () =>
@@ -93,10 +104,7 @@ export function useLiveSession(accessToken, sessionId, options = {}) {
       ),
     [participantsQuery.data, responses],
   )
-  const leaderboard = useMemo(
-    () => buildLeaderboard(responses, SESSION_LEADERBOARD_TOP_N),
-    [responses],
-  )
+  const leaderboard = leaderboardQuery.data || []
 
   useEffect(() => {
     const sessionCode = sessionQuery.data?.session_code
@@ -112,6 +120,7 @@ export function useLiveSession(accessToken, sessionId, options = {}) {
       queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
       queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
       queryClient.invalidateQueries({ queryKey: ['live-responses', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-leaderboard', sessionId] })
       queryClient.invalidateQueries({ queryKey: ['live-participants', sessionId] })
       queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
     }
@@ -121,6 +130,16 @@ export function useLiveSession(accessToken, sessionId, options = {}) {
     const offQuestion = client.on('question_changed', invalidateAll)
     const offAnswerReveal = client.on(RealtimeEvent.ANSWER_REVEALED, invalidateAll)
     const offQuestionLb = client.on(RealtimeEvent.QUESTION_LEADERBOARD_VISIBILITY, invalidateAll)
+    const offLeaderboard = client.on(RealtimeEvent.LEADERBOARD_UPDATE, (data) => {
+      if (Array.isArray(data?.leaderboard)) {
+        queryClient.setQueryData(
+          ['live-leaderboard', sessionId, mode, SESSION_LEADERBOARD_TOP_N],
+          data.leaderboard,
+        )
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['live-leaderboard', sessionId] })
+      }
+    })
     const offParticipantJoined = client.on(RealtimeEvent.PARTICIPANT_JOINED, invalidateAll)
     const offSessionProgress = client.on('session_progress', invalidateAll)
     const offConnected = client.on(RealtimeEvent.CONNECTED, invalidateAll)
@@ -136,6 +155,7 @@ export function useLiveSession(accessToken, sessionId, options = {}) {
       offQuestion()
       offAnswerReveal()
       offQuestionLb()
+      offLeaderboard()
       offParticipantJoined()
       offSessionProgress()
       offConnected()

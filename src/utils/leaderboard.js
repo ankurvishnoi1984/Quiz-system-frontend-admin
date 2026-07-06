@@ -10,6 +10,20 @@ export function participantDisplayName(row, participantId) {
   return `Participant ${participantId}`
 }
 
+export function sortLeaderboardEntries(entries) {
+  return [...(entries || [])].sort((a, b) => {
+    const scoreDiff = Number(b.score ?? 0) - Number(a.score ?? 0)
+    if (scoreDiff !== 0) return scoreDiff
+
+    const nameA = String(a.name || a.nickname || '').trim()
+    const nameB = String(b.name || b.nickname || '').trim()
+    const nameCompare = nameA.localeCompare(nameB, undefined, { sensitivity: 'base' })
+    if (nameCompare !== 0) return nameCompare
+
+    return Number(a.participant_id) - Number(b.participant_id)
+  })
+}
+
 /**
  * Session-wide scores from response rows (sum of points_earned per participant).
  * @param {Array} responses
@@ -32,9 +46,7 @@ export function buildSessionLeaderboardFromResponses(responses, limit = 10) {
     scoreByParticipant.set(key, existing)
   })
 
-  return Array.from(scoreByParticipant.values())
-    .sort((a, b) => b.score - a.score || (b.attempts || 0) - (a.attempts || 0))
-    .slice(0, limit)
+  return sortLeaderboardEntries(Array.from(scoreByParticipant.values())).slice(0, limit)
 }
 
 /**
@@ -62,9 +74,7 @@ export function buildQuestionLeaderboardForQuestion(responses, questionId, limit
       }
     })
 
-  return Array.from(byParticipant.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
+  return sortLeaderboardEntries(Array.from(byParticipant.values())).slice(0, limit)
 }
 
 export function normalizeLeaderboardEntries(entries) {

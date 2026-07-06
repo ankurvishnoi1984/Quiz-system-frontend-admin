@@ -50,6 +50,12 @@ export async function getPresentViewResponsesApi(viewerToken, sessionId) {
   return data?.responses || []
 }
 
+export async function getPresentViewLeaderboardApi(viewerToken, sessionId, { limit = 10 } = {}) {
+  const query = Number.isFinite(limit) && limit > 0 ? `?limit=${limit}` : ''
+  const data = await viewerRequest(`/present-view/sessions/${sessionId}/leaderboard${query}`, viewerToken)
+  return data?.leaderboard || []
+}
+
 export async function listPresentViewParticipantsApi(viewerToken, sessionId) {
   const data = await viewerRequest(`/present-view/sessions/${sessionId}/participants`, viewerToken)
   return data?.participants || []

@@ -50,7 +50,6 @@ import { QuestionMedia } from '../components/participant-session/QuestionMedia'
 import { SessionLeaderboardModal } from '../components/leaderboard/SessionLeaderboardModal'
 import {
   buildQuestionLeaderboardForQuestion,
-  buildSessionLeaderboardFromResponses,
 } from '../utils/leaderboard'
 import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
 import { getSessionQaReportApi } from '../services/analyticsApi'
@@ -58,6 +57,7 @@ import { useAuthStore, syncAuthForNewBrowserTab } from '../store/authStore'
 import {
   getQuestionResultsApi,
   getSessionDetailApi,
+  getSessionLeaderboardApi,
   getSessionResponsesApi,
   listQaQuestionsApi,
   listSessionQuestionsApi,
@@ -129,6 +129,13 @@ function LivePage() {
   const responsesQuery = useQuery({
     queryKey: ['live-responses', sessionId],
     queryFn: () => getSessionResponsesApi(accessToken, sessionId),
+    enabled: Boolean(accessToken && sessionId),
+    refetchInterval: 10000,
+  })
+
+  const leaderboardQuery = useQuery({
+    queryKey: ['live-leaderboard', sessionId, leaderboardLimit],
+    queryFn: () => getSessionLeaderboardApi(accessToken, sessionId, { limit: leaderboardLimit }),
     enabled: Boolean(accessToken && sessionId),
     refetchInterval: 10000,
   })
@@ -231,6 +238,7 @@ function LivePage() {
     const offResp = client.on('response_received', () => {
       queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
       queryClient.invalidateQueries({ queryKey: ['live-responses', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-leaderboard', sessionId] })
     })
     const offRankingResp = client.on(RealtimeEvent.RANKING_RESPONSE_SUBMITTED, () => {
       queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
@@ -254,6 +262,13 @@ function LivePage() {
     const offQuestionLb = client.on(RealtimeEvent.QUESTION_LEADERBOARD_VISIBILITY, () => {
       queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
     })
+    const offLeaderboard = client.on(RealtimeEvent.LEADERBOARD_UPDATE, (data) => {
+      if (Array.isArray(data?.leaderboard)) {
+        queryClient.setQueryData(['live-leaderboard', sessionId, leaderboardLimit], data.leaderboard)
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['live-leaderboard', sessionId] })
+      }
+    })
 
 
     client.connect()
@@ -268,9 +283,10 @@ function LivePage() {
       offQuestion()
       offAnswerReveal()
       offQuestionLb()
+      offLeaderboard()
       client.disconnect()
     }
-  }, [sessionQuery.data?.session_code, accessToken, queryClient, sessionId])
+  }, [sessionQuery.data?.session_code, accessToken, queryClient, sessionId, leaderboardLimit])
 
 
   const transitionMutation = useMutation({
@@ -490,10 +506,7 @@ function LivePage() {
 
   const sessionResponses = responsesQuery.data || []
 
-  const leaderboard = useMemo(
-    () => buildSessionLeaderboardFromResponses(sessionResponses, leaderboardLimit),
-    [sessionResponses, leaderboardLimit],
-  )
+  const leaderboard = leaderboardQuery.data || []
 
   const activeQuestionLeaderboard = useMemo(() => {
     if (
