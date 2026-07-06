@@ -1061,7 +1061,7 @@ function BuilderPage() {
   const [questions, setQuestions] = useState([])
   const [settings, setSettings] = useState({
     anonymous: false,
-    leaderboard: true,
+    leaderboard: false,
     maxParticipants: 300,
     password: '',
   })

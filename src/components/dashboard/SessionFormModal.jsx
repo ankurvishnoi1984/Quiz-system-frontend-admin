@@ -13,7 +13,7 @@ const defaultInitial = {
   enableNavigation: false,
   quizTotalTimeEnabled: false,
   quizTotalTimeMinutes: 30,
-  overallLeaderboard: true,
+  overallLeaderboard: false,
 }
 
 function SessionFormModal({
@@ -46,7 +46,7 @@ function SessionFormModal({
         ? Number(initialValues.quizTotalTimeMinutes)
         : 30,
     )
-    setOverallLeaderboard(initialValues.overallLeaderboard !== false)
+    setOverallLeaderboard(initialValues.overallLeaderboard === true)
   }, [open, initialValues])
 
   const handleNavigationChange = (enabled) => {
@@ -222,7 +222,7 @@ function SessionFormModal({
             changed here.
           </p>
         )}
-        <div className="md:col-span-2">
+        {/* <div className="md:col-span-2">
           <label className="flex items-center justify-between gap-3 rounded-xl border border-blue-200/70 bg-white px-3 py-3">
             <div>
               <p className="text-sm font-semibold text-slate-700">Overall rankings (Q&A)</p>
@@ -237,7 +237,7 @@ function SessionFormModal({
               className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
             />
           </label>
-        </div>
+        </div> */}
         </div>
         <div className="mt-4 flex shrink-0 items-end gap-2 border-t border-blue-100/80 pt-4 md:justify-end">
           <button

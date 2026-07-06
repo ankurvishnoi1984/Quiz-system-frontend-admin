@@ -365,7 +365,7 @@ function DashboardPage() {
         editSession.quiz_total_time_minutes != null &&
         Number(editSession.quiz_total_time_minutes) > 0,
       quizTotalTimeMinutes: Number(editSession.quiz_total_time_minutes) || 30,
-      overallLeaderboard: editSession.leaderboard_enabled !== false,
+      overallLeaderboard: Boolean(editSession.leaderboard_enabled),
     }
   }, [editSession])
 

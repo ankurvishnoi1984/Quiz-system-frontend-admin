@@ -55,7 +55,7 @@ function mapApiSessionToLocal(session) {
     joinRequirement: session.join_type ?? 'name',
     settings: {
       anonymous: session.join_type === 'anonymous',
-      leaderboard: session.leaderboard_enabled ?? true,
+      leaderboard: session.leaderboard_enabled ?? false,
       maxParticipants: session.max_participants ?? 300,
       password: '',
     },
@@ -131,7 +131,7 @@ export function SessionsProvider({ children }) {
         tags: [type],
         department,
         joinRequirement,
-        settings: { anonymous: joinRequirement === 'anonymous', leaderboard: true, maxParticipants: 300, password: '' },
+        settings: { anonymous: joinRequirement === 'anonymous', leaderboard: false, maxParticipants: 300, password: '' },
         quizMode: type === 'Quiz',
         timeLimitSeconds: 30,
         questions: createDefaultQuestions(),

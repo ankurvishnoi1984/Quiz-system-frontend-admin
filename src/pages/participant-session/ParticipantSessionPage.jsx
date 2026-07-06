@@ -856,11 +856,18 @@ function ParticipantSessionPage() {
     })
 
     const offSessionSettings = client.on(RealtimeEvent.SESSION_SETTINGS_UPDATED, (data) => {
+      const previousSession = queryClient.getQueryData(['participant-session', effectiveSessionCode])
+      const wasLeaderboardEnabled = Boolean(previousSession?.leaderboard_enabled)
+      const isLeaderboardEnabled =
+        data.leaderboard_enabled !== undefined
+          ? Boolean(data.leaderboard_enabled)
+          : wasLeaderboardEnabled
+
       queryClient.setQueryData(['participant-session', effectiveSessionCode], (old) =>
         old
           ? {
               ...old,
-              leaderboard_enabled: data.leaderboard_enabled ?? old.leaderboard_enabled,
+              leaderboard_enabled: isLeaderboardEnabled,
               participant_navigation_enabled:
                 data.participant_navigation_enabled ?? old.participant_navigation_enabled,
               allow_late_join:
@@ -868,6 +875,14 @@ function ParticipantSessionPage() {
             }
           : old,
       )
+
+      if (!wasLeaderboardEnabled && isLeaderboardEnabled) {
+        setStep((current) => {
+          if (current === 'join' || current === 'waiting') return current
+          return 'leaderboard'
+        })
+        queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
+      }
     })
 
     const offQuestionLbVisibility = client.on(
