@@ -17,7 +17,7 @@ const pageTitles = {
   '/manage/clients': 'Manage Clients',
   '/manage/departments': 'Manage Departments',
   '/manage/users': 'User Management',
-  '/monitor/websockets': 'WebSocket Monitor',
+  '/monitor/websockets': 'Connection Monitor',
 }
 
 function Navbar() {
