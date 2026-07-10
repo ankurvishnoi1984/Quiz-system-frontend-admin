@@ -1,11 +1,11 @@
-import { Activity, Cpu, MemoryStick, Radio, RefreshCw, Server, Users } from 'lucide-react'
+import { Activity, Cpu, MemoryStick, RefreshCw, Server, Users } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import StatCard from '../components/dashboard/StatCard'
 import { WebSocketMonitorCharts } from '../components/monitor/WebSocketMonitorCharts'
 import { WebSocketSessionsTable } from '../components/monitor/WebSocketSessionsTable'
 import { useAuthStore } from '../store/authStore'
 import { getWebSocketMonitorApi } from '../services/monitorApi'
-import { formatLastUpdated, formatUptime } from '../utils/websocketMonitor'
+import { formatUptime } from '../utils/websocketMonitor'
 
 const POLL_INTERVAL_MS = 5000
 
@@ -36,10 +36,6 @@ function WebSocketMonitorPage() {
             System monitoring
           </p>
           <h2 className="mt-1 text-2xl font-bold text-navy-900">WebSocket connections</h2>
-          <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Real-time view of open sockets on this API server. Super admin only — data reflects the
-            current Node process (single-server deployment).
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -69,19 +65,11 @@ function WebSocketMonitorPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-blue-200/70 bg-white/90 px-4 py-3 text-sm text-slate-600 shadow-sm">
-        <span className="inline-flex items-center gap-2 font-medium text-navy-900">
-          <Radio className={`size-4 ${isLive ? 'text-emerald-600' : 'text-slate-400'}`} />
-          {isLive ? 'Polling every 5 seconds' : 'Unable to poll — check connection'}
-        </span>
-        <span className="hidden text-slate-300 sm:inline">|</span>
-        <span>Last updated: {formatLastUpdated(monitor?.timestamp)}</span>
-        {monitorQuery.isError ? (
-          <span className="font-medium text-red-600">
-            {monitorQuery.error?.message || 'Failed to load monitor data'}
-          </span>
-        ) : null}
-      </div>
+      {monitorQuery.isError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+          {monitorQuery.error?.message || 'Failed to load monitor data'}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -165,9 +153,6 @@ function WebSocketMonitorPage() {
               </dd>
             </div>
           </dl>
-          <p className="mt-4 text-xs leading-relaxed text-slate-500">
-            History is stored in memory on the API server and resets when the process restarts.
-          </p>
         </div>
 
         <div className="xl:col-span-2">

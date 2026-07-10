@@ -346,6 +346,9 @@ function DashboardPage() {
             ? Number(values.quizTotalTimeMinutes)
             : null,
         join_type: values.joinRequirement || 'name',
+        auto_end_enabled: Boolean(values.autoEndEnabled),
+        auto_end_date: values.autoEndEnabled ? values.autoEndDate || null : null,
+        auto_end_time: values.autoEndEnabled ? values.autoEndTime || null : null,
       },
     })
   }

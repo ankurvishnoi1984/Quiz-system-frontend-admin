@@ -8,6 +8,9 @@ const defaultInitial = {
   description: '',
   scheduledDate: '',
   scheduledTime: '',
+  autoEndEnabled: false,
+  autoEndDate: '',
+  autoEndTime: '',
   departmentId: '',
   joinRequirement: 'name',
   enableNavigation: false,
@@ -35,6 +38,7 @@ function SessionFormModal({
   const [quizTotalTimeEnabled, setQuizTotalTimeEnabled] = useState(defaultInitial.quizTotalTimeEnabled)
   const [quizTotalTimeMinutes, setQuizTotalTimeMinutes] = useState(defaultInitial.quizTotalTimeMinutes)
   const [overallLeaderboard, setOverallLeaderboard] = useState(defaultInitial.overallLeaderboard)
+  const [autoEndEnabled, setAutoEndEnabled] = useState(defaultInitial.autoEndEnabled)
 
   useEffect(() => {
     if (!open) return
@@ -47,6 +51,7 @@ function SessionFormModal({
         : 30,
     )
     setOverallLeaderboard(initialValues.overallLeaderboard === true)
+    setAutoEndEnabled(Boolean(initialValues.autoEndEnabled))
   }, [open, initialValues])
 
   const handleNavigationChange = (enabled) => {
@@ -59,17 +64,49 @@ function SessionFormModal({
   const handleSubmit = (event) => {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
+    const scheduledDate = String(form.get('scheduledDate') ?? '').trim()
+    const scheduledTime = String(form.get('scheduledTime') ?? '').trim()
+    const autoEndDate = String(form.get('autoEndDate') ?? '').trim()
+    const autoEndTime = String(form.get('autoEndTime') ?? '').trim()
+
+    if (mode === 'create' && autoEndEnabled) {
+      if (!autoEndDate || !autoEndTime) {
+        window.alert('Please enter both an end date and end time for automatic session end.')
+        return
+      }
+
+      const endAt = new Date(`${autoEndDate}T${autoEndTime}`)
+      if (Number.isNaN(endAt.getTime())) {
+        window.alert('Automatic end date and time are not valid.')
+        return
+      }
+      if (endAt.getTime() <= Date.now()) {
+        window.alert('Automatic end must be scheduled in the future.')
+        return
+      }
+      if (scheduledDate && scheduledTime) {
+        const startAt = new Date(`${scheduledDate}T${scheduledTime}`)
+        if (!Number.isNaN(startAt.getTime()) && endAt.getTime() <= startAt.getTime()) {
+          window.alert('Automatic end must be after the planned session start.')
+          return
+        }
+      }
+    }
+
     onSubmit({
       title: String(form.get('title') ?? '').trim(),
       description: String(form.get('description') ?? '').trim(),
-      scheduledDate: String(form.get('scheduledDate') ?? '').trim(),
-      scheduledTime: String(form.get('scheduledTime') ?? '').trim(),
+      scheduledDate,
+      scheduledTime,
       departmentId: String(form.get('department') || defaultDepartmentId || ''),
       joinRequirement,
       enableNavigation,
       quizTotalTimeEnabled: enableNavigation && quizTotalTimeEnabled,
       quizTotalTimeMinutes: enableNavigation && quizTotalTimeEnabled ? quizTotalTimeMinutes : null,
       overallLeaderboard,
+      autoEndEnabled: mode === 'create' ? autoEndEnabled : false,
+      autoEndDate: mode === 'create' && autoEndEnabled ? autoEndDate : '',
+      autoEndTime: mode === 'create' && autoEndEnabled ? autoEndTime : '',
     })
   }
 
@@ -126,6 +163,55 @@ function SessionFormModal({
                 placeholder="e.g., Friday live polling session"
               />
             </div>
+            {mode === 'create' ? (
+              <>
+                <div className="md:col-span-2">
+                  <label className="flex items-center justify-between gap-3 rounded-xl border border-blue-200/70 bg-white px-3 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">Schedule automatic end</p>
+                      <p className="text-xs text-slate-500">
+                        End this session automatically at the date and time below once it is live.
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={autoEndEnabled}
+                      onChange={(event) => setAutoEndEnabled(event.target.checked)}
+                      className="h-5 w-5 rounded border-slate-300 text-navy-700 focus:ring-blue-500/40"
+                    />
+                  </label>
+                </div>
+                {autoEndEnabled ? (
+                  <>
+                    <div>
+                      <label className="text-sm font-semibold text-slate-700">End date</label>
+                      <input
+                        type="date"
+                        name="autoEndDate"
+                        key={`autoEndDate-${initialValues.autoEndDate}-${open}`}
+                        defaultValue={initialValues.autoEndDate ?? ''}
+                        required={autoEndEnabled}
+                        className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-slate-700">End time</label>
+                      <input
+                        type="time"
+                        name="autoEndTime"
+                        key={`autoEndTime-${initialValues.autoEndTime}-${open}`}
+                        defaultValue={initialValues.autoEndTime ?? ''}
+                        required={autoEndEnabled}
+                        className="mt-1 h-11 w-full rounded-xl border border-blue-200/70 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                      />
+                      <p className="mt-1 text-xs text-slate-500">
+                        The session will move to completed when this time is reached.
+                      </p>
+                    </div>
+                  </>
+                ) : null}
+              </>
+            ) : null}
           </>
         ) : null}
         {mode === 'edit' ? (
