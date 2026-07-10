@@ -44,7 +44,7 @@ function DashboardPage() {
   const [dashboardError, setDashboardError] = useState('')
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
 
-  const { departmentId, departments } = useShell()
+  const { departmentId, departments, clientId, client, isSuperAdmin } = useShell()
   const canSelectDepartmentOnCreate = ['super_admin', 'client_admin', 'dept_admin'].includes(
     user?.role,
   )
@@ -329,8 +329,24 @@ function DashboardPage() {
   const handleCreate = (values) => {
     if (!values.title) return
 
+    const targetDeptId = isSuperAdmin
+      ? departmentId
+      : values.departmentId || departmentId || user?.dept_id
+
+    if (!targetDeptId) {
+      setSessionAlert({
+        variant: 'error',
+        title: 'Department required',
+        message: isSuperAdmin
+          ? 'Select a client and department in Host Workspace before creating a session.'
+          : 'Select a department before creating a session.',
+        confirmLabel: 'Close',
+      })
+      return
+    }
+
     createMutation.mutate({
-      deptId: values.departmentId || departmentId || user?.dept_id,
+      deptId: targetDeptId,
       input: {
         host_id: user?.user_id,
         title: values.title,
@@ -395,6 +411,12 @@ function DashboardPage() {
       `Department ${activeDepartmentId}`
     )
   }, [departmentId, departments, user?.dept_id])
+
+  const createClientLabel = useMemo(() => {
+    if (!isSuperAdmin) return ''
+    if (client) return client
+    return clientId ? `Client ${clientId}` : '—'
+  }, [isSuperAdmin, client, clientId])
 
   const handleUpdate = (values) => {
     if (!editSession || !values.title) return
@@ -544,6 +566,8 @@ function DashboardPage() {
         allowDepartmentSelection={canSelectDepartmentOnCreate}
         defaultDepartmentId={departmentId}
         departmentLabel={createDepartmentLabel}
+        workspaceClientLabel={isSuperAdmin ? createClientLabel : ''}
+        useWorkspaceDepartment={isSuperAdmin}
         onClose={() => setCreateOpen(false)}
         onSubmit={handleCreate}
         isSubmitting={createMutation.isPending}

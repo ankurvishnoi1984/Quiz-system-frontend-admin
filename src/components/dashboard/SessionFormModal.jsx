@@ -29,6 +29,8 @@ function SessionFormModal({
   initialValues = defaultInitial,
   liveSettingsOnly = false,
   departmentLabel = '',
+  workspaceClientLabel = '',
+  useWorkspaceDepartment = false,
   onClose,
   onSubmit,
   isSubmitting = false,
@@ -98,7 +100,9 @@ function SessionFormModal({
       description: String(form.get('description') ?? '').trim(),
       scheduledDate,
       scheduledTime,
-      departmentId: String(form.get('department') || defaultDepartmentId || ''),
+      departmentId: useWorkspaceDepartment
+        ? String(defaultDepartmentId || '')
+        : String(form.get('department') || defaultDepartmentId || ''),
       joinRequirement,
       enableNavigation,
       quizTotalTimeEnabled: enableNavigation && quizTotalTimeEnabled,
@@ -127,6 +131,26 @@ function SessionFormModal({
         </div>
         {!liveSettingsOnly ? (
           <>
+            {mode === 'create' && useWorkspaceDepartment ? (
+              <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
+                {workspaceClientLabel ? (
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700">Client</label>
+                    <p className="mt-1 flex h-11 items-center rounded-xl border border-blue-200/70 bg-slate-50 px-3 text-sm text-slate-700">
+                      {workspaceClientLabel}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">From Host Workspace</p>
+                  </div>
+                ) : null}
+                <div className={workspaceClientLabel ? '' : 'md:col-span-2'}>
+                  <label className="text-sm font-semibold text-slate-700">Department</label>
+                  <p className="mt-1 flex h-11 items-center rounded-xl border border-blue-200/70 bg-slate-50 px-3 text-sm text-slate-700">
+                    {departmentLabel || '—'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">From Host Workspace</p>
+                </div>
+              </div>
+            ) : null}
             <div>
               <label className="text-sm font-semibold text-slate-700">Session date</label>
               <input
