@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
+  Activity,
   Building2,
   ChartColumnBig,
   CirclePlay,
@@ -24,6 +25,7 @@ const staticNavigationItems = [
   { to: '/analytics', label: 'Session Analytics', icon: ChartColumnBig, kind: 'static' },
   { to: '/department-analytics', label: 'Department Analytics', icon: Building2, kind: 'static', adminOnly: true },
   { to: '/client-analytics', label: 'Client Analytics', icon: Layers, kind: 'static', superAdminOnly: true },
+  { to: '/monitor/websockets', label: 'WebSocket Monitor', icon: Activity, kind: 'static', superAdminOnly: true },
   { to: '/reports', label: 'Reports', icon: FileBarChart2, kind: 'static' },
 ]
 

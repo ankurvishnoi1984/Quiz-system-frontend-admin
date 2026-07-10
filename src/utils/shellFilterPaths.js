@@ -1,4 +1,8 @@
-export const SHELL_FILTER_DISABLED_PATHS = ['/manage/clients', '/manage/departments']
+export const SHELL_FILTER_DISABLED_PATHS = [
+  '/manage/clients',
+  '/manage/departments',
+  '/monitor/websockets',
+]
 
 export function isShellFilterDisabled(pathname) {
   return SHELL_FILTER_DISABLED_PATHS.includes(pathname)

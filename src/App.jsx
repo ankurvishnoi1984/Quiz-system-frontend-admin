@@ -15,6 +15,7 @@ import ReportsPage from './pages/ReportsPage'
 import ManageClientsPage from './pages/ManageClientsPage'
 import ManageDepartmentsPage from './pages/ManageDepartmentsPage'
 import ManageUsersPage from './pages/ManageUsersPage'
+import WebSocketMonitorPage from './pages/WebSocketMonitorPage'
 import ParticipantSessionPage from './pages/participant-session'
 import PresentModePage from './pages/present-mode'
 import PresentViewPage from './pages/present-mode/PresentViewPage'
@@ -164,6 +165,14 @@ function App() {
               element={
                 <SuperAdminOnlyRoute>
                   <ManageUsersPage />
+                </SuperAdminOnlyRoute>
+              }
+            />
+            <Route
+              path="/monitor/websockets"
+              element={
+                <SuperAdminOnlyRoute>
+                  <WebSocketMonitorPage />
                 </SuperAdminOnlyRoute>
               }
             />
