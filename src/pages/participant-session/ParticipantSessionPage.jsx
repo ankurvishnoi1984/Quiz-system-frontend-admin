@@ -883,6 +883,10 @@ function ParticipantSessionPage() {
         })
         queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
       }
+
+      if (wasLeaderboardEnabled && !isLeaderboardEnabled) {
+        setStep((current) => (current === 'leaderboard' ? 'active' : current))
+      }
     })
 
     const offQuestionLbVisibility = client.on(
@@ -938,16 +942,21 @@ function ParticipantSessionPage() {
   ])
 
   useEffect(() => {
-    if (step === 'leaderboard' && showOverallLeaderboardTab && dbSessionId) {
+    if (showOverallLeaderboardTab && dbSessionId) {
       queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
     }
-  }, [step, showOverallLeaderboardTab, dbSessionId, queryClient])
+  }, [showOverallLeaderboardTab, dbSessionId, queryClient])
 
   useEffect(() => {
-    if (step === 'leaderboard' && !showOverallLeaderboardTab) {
-      setStep('qa')
+    if (step === 'join' || step === 'waiting') return
+    if (showOverallLeaderboardTab && step !== 'leaderboard') {
+      setStep('leaderboard')
+      return
     }
-  }, [step, showOverallLeaderboardTab])
+    if (!showOverallLeaderboardTab && step === 'leaderboard') {
+      setStep('active')
+    }
+  }, [showOverallLeaderboardTab, step])
 
   useEffect(() => {
     if (!activeQuestions.length) {
@@ -1259,7 +1268,7 @@ function ParticipantSessionPage() {
       participantToken &&
         dbSessionId &&
         showOverallLeaderboardTab &&
-        (step === 'leaderboard' || hasAnyQuestionSaved || session?.status === 'completed'),
+        (hasAnyQuestionSaved || session?.status === 'completed' || step === 'leaderboard'),
     ),
     staleTime: 5000,
   })
@@ -1956,26 +1965,33 @@ function ParticipantSessionPage() {
           joinedUser={joinedUser}
           step={step}
           onStepChange={setStep}
-          showOverallLeaderboardTab={showOverallLeaderboardTab}
+          rankingsOnlyMode={showOverallLeaderboardTab}
         />
 
         {isSessionEnded ? <SessionEndedBanner /> : null}
 
-        {step === 'active' && !question && !isSessionEnded && <WaitingForQuestion />}
+        {showOverallLeaderboardTab ? (
+          <OverallLeaderboardPanel
+            leaderboard={leaderboard}
+            hasAnyQuestionSaved={hasAnyQuestionSaved}
+            sessionStatus={session?.status}
+            isLoading={leaderboardQuery.isLoading}
+          />
+        ) : (
+          <>
+            {step === 'active' && !question && !isSessionEnded && <WaitingForQuestion />}
 
-        {step === 'active' && !question && isSessionEnded && (
-          <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
-            <h2 className="text-xl font-bold text-navy-900">Session ended</h2>
-            <p className="text-sm text-slate-600">
-              The host has ended this session. Switch to Q&amp;A or{' '}
-              {showOverallLeaderboardTab ? 'Overall Rankings ' : ''}
-              to review past activity.
-            </p>
-          </section>
-        )}
+            {step === 'active' && !question && isSessionEnded && (
+              <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
+                <h2 className="text-xl font-bold text-navy-900">Session ended</h2>
+                <p className="text-sm text-slate-600">
+                  The host has ended this session. Switch to Q&amp;A to review past activity.
+                </p>
+              </section>
+            )}
 
-        {step === 'active' && question && (
-          <ActiveQuestionPanel
+            {step === 'active' && question && (
+              <ActiveQuestionPanel
             question={question}
             activeQuestions={activeQuestions}
             displayQuestionIndex={displayQuestionIndex}
@@ -2026,30 +2042,23 @@ function ParticipantSessionPage() {
             onNextOrSubmit={handleNextOrSubmit}
             onGoToQa={() => setStep('qa')}
           />
-        )}
+            )}
 
-        {step === 'qa' && (
-          <QaPanel
-            askText={askText}
-            onAskTextChange={setAskText}
-            allowAnonymousQa={allowAnonymousQa}
-            askAnonymous={askAnonymous}
-            onAskAnonymousChange={setAskAnonymous}
-            onAskQuestion={handleAskQuestion}
-            ownQuestions={ownQuestions}
-            approvedQa={approvedQa}
-            upvotes={upvotes}
-            onUpvote={handleUpvote}
-          />
-        )}
-
-        {step === 'leaderboard' && showOverallLeaderboardTab && (
-          <OverallLeaderboardPanel
-            leaderboard={leaderboard}
-            hasAnyQuestionSaved={hasAnyQuestionSaved}
-            sessionStatus={session?.status}
-            isLoading={leaderboardQuery.isLoading}
-          />
+            {step === 'qa' && (
+              <QaPanel
+                askText={askText}
+                onAskTextChange={setAskText}
+                allowAnonymousQa={allowAnonymousQa}
+                askAnonymous={askAnonymous}
+                onAskAnonymousChange={setAskAnonymous}
+                onAskQuestion={handleAskQuestion}
+                ownQuestions={ownQuestions}
+                approvedQa={approvedQa}
+                upvotes={upvotes}
+                onUpvote={handleUpvote}
+              />
+            )}
+          </>
         )}
       </div>
 

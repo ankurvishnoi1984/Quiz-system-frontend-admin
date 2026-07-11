@@ -3,7 +3,7 @@ export function SessionHeader({
   joinedUser,
   step,
   onStepChange,
-  showOverallLeaderboardTab = false,
+  rankingsOnlyMode = false,
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-white p-4 shadow-sm">
@@ -17,31 +17,25 @@ export function SessionHeader({
               : ''}
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onStepChange('active')}
-          className={`rounded-xl px-3 py-2 text-sm font-semibold ${step === 'active' ? 'bg-blue-100 text-blue-900' : 'border border-blue-200/70 bg-white text-slate-700'}`}
-        >
-          Questions
-        </button>
-        <button
-          type="button"
-          onClick={() => onStepChange('qa')}
-          className={`rounded-xl px-3 py-2 text-sm font-semibold ${step === 'qa' ? 'bg-blue-100 text-blue-900' : 'border border-blue-200/70 bg-white text-slate-700'}`}
-        >
-          Q&amp;A
-        </button>
-        {showOverallLeaderboardTab ? (
+
+      {!rankingsOnlyMode ? (
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => onStepChange('leaderboard')}
-            className={`rounded-xl px-3 py-2 text-sm font-semibold ${step === 'leaderboard' ? 'bg-blue-100 text-blue-900' : 'border border-blue-200/70 bg-white text-slate-700'}`}
+            onClick={() => onStepChange('active')}
+            className={`rounded-xl px-3 py-2 text-sm font-semibold ${step === 'active' ? 'bg-blue-100 text-blue-900' : 'border border-blue-200/70 bg-white text-slate-700'}`}
           >
-            Overall Rankings
+            Questions
           </button>
-        ) : null}
-      </div>
+          <button
+            type="button"
+            onClick={() => onStepChange('qa')}
+            className={`rounded-xl px-3 py-2 text-sm font-semibold ${step === 'qa' ? 'bg-blue-100 text-blue-900' : 'border border-blue-200/70 bg-white text-slate-700'}`}
+          >
+            Q&amp;A
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
