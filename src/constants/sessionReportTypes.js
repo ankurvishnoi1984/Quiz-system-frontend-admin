@@ -17,12 +17,12 @@ export const SESSION_REPORT_EXPORTS = [
     description: 'Summary per participant plus every answer row for HR/training review',
     format: 'xlsx',
   },
-  {
-    id: 'qa',
-    label: 'Q&A Analytics Report',
-    description: 'Full Q&A log including rejected questions, sorted by upvotes',
-    format: 'xlsx',
-  },
+  // {
+  //   id: 'qa',
+  //   label: 'Q&A Analytics Report',
+  //   description: 'Full Q&A log including rejected questions, sorted by upvotes',
+  //   format: 'xlsx',
+  // },
   {
     id: 'raw-responses',
     label: 'Raw responses',
