@@ -1,20 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Layers, Maximize2, Minimize2, Play, Trophy } from 'lucide-react'
+import { BarChart3, Layers, Maximize2, Minimize2, Play, Trophy } from 'lucide-react'
 import { HostAlertModal } from '../../components/live/HostAlertModal'
 import { HostQuestionActionButton } from '../../components/live/HostQuestionActionButton'
 import { HostQuestionControls } from '../../components/live/HostQuestionControls'
 import { useAuthStore } from '../../store/authStore'
 import { useHostQuestionMutations } from '../../hooks/useHostQuestionMutations'
 import { useLiveSession } from '../../hooks/useLiveSession'
-import { listQaQuestionsApi, setPresentSlideApi, updateSessionApi } from '../../services/liveApi'
-import { getPresentViewSlideApi, listPresentViewQaApi } from '../../services/presentViewApi'
+import {
+  getSessionSurveySummaryApi,
+  listQaQuestionsApi,
+  setPresentSlideApi,
+  updateSessionApi,
+} from '../../services/liveApi'
+import {
+  getPresentViewSlideApi,
+  getPresentViewSurveySummaryApi,
+  listPresentViewQaApi,
+} from '../../services/presentViewApi'
 import { canHostActivateAllQuestions, canHostCloseAllQuestions } from '../../utils/hostQuestionControls'
-import { sessionSupportsOverallLeaderboard } from '../../utils/livePresentation'
+import { sessionSupportsOverallLeaderboard, sessionSupportsSurveyEndingScreen } from '../../utils/livePresentation'
 import { isSessionQuizTotalTimeEnabled } from '../../utils/sessionFlags'
 import { formatScheduledSessionForDisplay } from '../../utils/sessionSchedule'
 import { LeaderboardSlide } from './LeaderboardSlide'
+import { PresentSurveyEndingSlide } from './PresentSurveyEndingSlide'
 import { ParticipantsSlide } from './ParticipantsSlide'
 import { PresentNavButton, PresentShell, PresentSlideHeader } from './PresentShell'
 import { PresentParticipantsModal } from './PresentParticipantsModal'
@@ -69,6 +79,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
   const canEditLive = !readOnly && session?.status === 'live'
   const showSessionControls = !readOnly && (session?.status === 'live' || session?.status === 'paused')
   const canToggleOverallLeaderboard = sessionSupportsOverallLeaderboard(mappedQuestions)
+  const canToggleSurveyResults = sessionSupportsSurveyEndingScreen(mappedQuestions)
   const singleActiveQuestionMode = session?.participant_navigation_enabled === false
   const sessionQuizTotalTimeEnabled = isSessionQuizTotalTimeEnabled(session)
 
@@ -114,6 +125,34 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
         variant: 'error',
         title: 'Could not update rankings',
         message: 'Unable to update the overall rankings setting. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
+  })
+
+  const sessionSurveyResultsMutation = useMutation({
+    mutationFn: (enabled) =>
+      updateSessionApi(hostAccessToken, sessionId, { survey_results_enabled: enabled }),
+    onSuccess: (updated) => {
+      if (updated) {
+        queryClient.setQueryData(['live-session', sessionId], (old) =>
+          old
+            ? {
+                ...old,
+                ...updated,
+                survey_results_enabled: updated.survey_results_enabled,
+              }
+            : updated,
+        )
+      }
+      queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+    },
+    onError: () => {
+      setHostAlert({
+        variant: 'error',
+        title: 'Could not update survey results',
+        message: 'Unable to update the survey results setting. Please try again.',
         confirmLabel: 'Close',
       })
     },
@@ -215,9 +254,27 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
     mappedQuestions.forEach((q, i) => list.push({ type: 'question', question: q, questionNumber: i + 1 }))
     if (sessionSupportsOverallLeaderboard(mappedQuestions)) {
       list.push({ type: 'leaderboard' })
+    } else if (sessionSupportsSurveyEndingScreen(mappedQuestions)) {
+      list.push({ type: 'surveyEnding' })
     }
     return list
   }, [mappedQuestions])
+
+  const surveySummaryQuery = useQuery({
+    queryKey: ['present-survey-summary', sessionId, readOnly ? 'viewer' : 'host'],
+    queryFn: () =>
+      readOnly
+        ? getPresentViewSurveySummaryApi(accessToken, sessionId)
+        : getSessionSurveySummaryApi(accessToken, sessionId),
+    enabled: Boolean(
+      accessToken &&
+        sessionId &&
+        sessionSupportsSurveyEndingScreen(mappedQuestions) &&
+        !isViewWaiting,
+    ),
+    staleTime: 5000,
+    refetchInterval: session?.status === 'live' ? 5000 : false,
+  })
 
   const slideTotal = slides.length
   slideTotalRef.current = slideTotal
@@ -404,6 +461,26 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
               }
             />
           ) : null}
+          {!readOnly && canToggleSurveyResults && showSessionControls ? (
+            <HostQuestionActionButton
+              disabled={sessionSurveyResultsMutation.isPending}
+              icon={BarChart3}
+              size="compact"
+              label={
+                sessionSurveyResultsMutation.isPending ? 'Updating…' : 'Survey results'
+              }
+              title={
+                session?.survey_results_enabled
+                  ? 'Hide the survey ending screen from participants'
+                  : 'Show the survey ending screen to participants before the session ends'
+              }
+              active={Boolean(session?.survey_results_enabled)}
+              tone="sky"
+              onClick={() =>
+                sessionSurveyResultsMutation.mutate(!session?.survey_results_enabled)
+              }
+            />
+          ) : null}
           {!readOnly && showActivateAllQuestionsButton ? (
             <HostQuestionActionButton
               disabled={activateAllQuestionsMutation.isPending}
@@ -493,7 +570,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
               qaCount={qaCount}
               isSessionLive={false}
               onParticipantsClick={openParticipantsModal}
-              onQaClick={openQaClick}
+              onQaClick={openQaModal}
               readOnly
             />
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-[clamp(1rem,4vw,3rem)] text-center">
@@ -551,6 +628,20 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
           <LeaderboardSlide
             sessionTitle={sessionTitle}
             leaderboard={leaderboard}
+            participantCount={participantCount}
+            qaCount={qaCount}
+            isSessionLive={isSessionLive}
+            onParticipantsClick={openParticipantsModal}
+            onQaClick={openQaModal}
+            readOnly={readOnly}
+          />
+        ) : null}
+
+        {!isViewWaiting && currentSlide?.type === 'surveyEnding' ? (
+          <PresentSurveyEndingSlide
+            sessionTitle={sessionTitle}
+            summary={surveySummaryQuery.data}
+            isLoading={surveySummaryQuery.isLoading}
             participantCount={participantCount}
             qaCount={qaCount}
             isSessionLive={isSessionLive}

@@ -132,3 +132,8 @@ export async function getSessionLeaderboardApi(participantToken, sessionId) {
   const data = await authRequest(`/sessions/${sessionId}/leaderboard`, participantToken)
   return data?.leaderboard || []
 }
+
+export async function getParticipantSessionSurveySummaryApi(participantToken, sessionId) {
+  const data = await authRequest(`/sessions/${sessionId}/survey-summary`, participantToken)
+  return data || null
+}

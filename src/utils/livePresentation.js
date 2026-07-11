@@ -97,6 +97,13 @@ export function sessionSupportsOverallLeaderboard(questions) {
   )
 }
 
+/** Survey/poll ending screen when session has no overall rankings. */
+export function sessionSupportsSurveyEndingScreen(questions) {
+  if (!Array.isArray(questions) || !questions.length) return false
+  if (sessionSupportsOverallLeaderboard(questions)) return false
+  return questions.some((q) => questionSupportsParticipantResults(q))
+}
+
 export function questionUsesEmojiChart(chartRawType) {
   return chartRawType === 'emoji_reaction'
 }

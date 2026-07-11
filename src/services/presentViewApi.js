@@ -56,6 +56,11 @@ export async function getPresentViewLeaderboardApi(viewerToken, sessionId, { lim
   return data?.leaderboard || []
 }
 
+export async function getPresentViewSurveySummaryApi(viewerToken, sessionId) {
+  const data = await viewerRequest(`/present-view/sessions/${sessionId}/survey-summary`, viewerToken)
+  return data || null
+}
+
 export async function listPresentViewParticipantsApi(viewerToken, sessionId) {
   const data = await viewerRequest(`/present-view/sessions/${sessionId}/participants`, viewerToken)
   return data?.participants || []

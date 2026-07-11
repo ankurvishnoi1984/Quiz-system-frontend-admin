@@ -43,6 +43,11 @@ export async function getSessionLeaderboardApi(accessToken, sessionId, { limit =
   return data?.leaderboard || []
 }
 
+export async function getSessionSurveySummaryApi(accessToken, sessionId) {
+  const data = await authRequest(`/responses/session/${sessionId}/survey-summary`, accessToken)
+  return data || null
+}
+
 export async function listSessionParticipantsApi(accessToken, sessionId) {
   const data = await authRequest(`/sessions/${sessionId}/participants`, accessToken)
   return data?.participants || []

@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import {
   Eye,
+  BarChart3,
   Layers,
   Play,
   Presentation,
@@ -76,6 +77,7 @@ import {
   questionUsesOptionChart,
   questionUsesEmojiChart,
   sessionSupportsOverallLeaderboard,
+  sessionSupportsSurveyEndingScreen,
   buildResponseRows,
   buildResponseCountByQuestionId,
   countResponseSubmissions,
@@ -326,6 +328,28 @@ function LivePage() {
       setErrorMessage(error.message || 'Unable to update overall rankings setting'),
   })
 
+  const sessionSurveyResultsMutation = useMutation({
+    mutationFn: (enabled) =>
+      updateSessionApi(accessToken, sessionId, { survey_results_enabled: enabled }),
+    onSuccess: (updated) => {
+      if (updated) {
+        queryClient.setQueryData(['live-session', sessionId], (old) =>
+          old
+            ? {
+                ...old,
+                ...updated,
+                survey_results_enabled: updated.survey_results_enabled,
+              }
+            : updated,
+        )
+      }
+      queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+    },
+    onError: (error) =>
+      setErrorMessage(error.message || 'Unable to update survey results setting'),
+  })
+
 
   const {
     questionLiveMutation,
@@ -526,6 +550,7 @@ function LivePage() {
   const session = sessionQuery.data
   const canViewSessionLeaderboard = sessionSupportsOverallLeaderboard(mappedQuestions)
   const canToggleOverallLeaderboard = sessionSupportsOverallLeaderboard(mappedQuestions)
+  const canToggleSurveyResults = sessionSupportsSurveyEndingScreen(mappedQuestions)
   const statusLabel = session?.status ? session.status.charAt(0).toUpperCase() + session.status.slice(1) : '—'
   const canEditLive = session?.status === 'live'
   const canLaunchSession =
@@ -734,9 +759,7 @@ function LivePage() {
                 label={
                   sessionLeaderboardMutation.isPending
                     ? 'Updating…'
-                    : session?.leaderboard_enabled
-                      ? 'Overall rankings'
-                      : 'Overall rankings'
+                    : 'Overall rankings'
                 }
                 title={
                   session?.leaderboard_enabled
@@ -747,6 +770,25 @@ function LivePage() {
                 tone="amber"
                 onClick={() =>
                   sessionLeaderboardMutation.mutate(!session?.leaderboard_enabled)
+                }
+              />
+            ) : null}
+            {canToggleSurveyResults && showSessionControls ? (
+              <HostQuestionActionButton
+                disabled={sessionSurveyResultsMutation.isPending}
+                icon={BarChart3}
+                label={
+                  sessionSurveyResultsMutation.isPending ? 'Updating…' : 'Survey results'
+                }
+                title={
+                  session?.survey_results_enabled
+                    ? 'Hide the survey ending screen from participants'
+                    : 'Show the survey ending screen to participants before the session ends'
+                }
+                active={Boolean(session?.survey_results_enabled)}
+                tone="sky"
+                onClick={() =>
+                  sessionSurveyResultsMutation.mutate(!session?.survey_results_enabled)
                 }
               />
             ) : null}

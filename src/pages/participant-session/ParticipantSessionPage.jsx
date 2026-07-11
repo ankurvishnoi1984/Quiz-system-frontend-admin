@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/shallow'
 import {
   askQaQuestionApi,
   getSessionLeaderboardApi,
+  getParticipantSessionSurveySummaryApi,
   getParticipantSurveyQuestionResultsApi,
   joinSessionApi,
   listQaQuestionsApi,
@@ -24,6 +25,7 @@ import {
   questionSupportsLeaderboard,
   questionSupportsParticipantResults,
   sessionSupportsOverallLeaderboard,
+  sessionSupportsSurveyEndingScreen,
 } from '../../utils/livePresentation'
 import {
   filterActiveQuestionsForLateJoinPolicy,
@@ -36,6 +38,7 @@ import { PageCenteredShell } from './components/PageCenteredShell'
 import { ParticipantAlertModal } from './components/ParticipantAlertModal'
 import { QaPanel } from './components/QaPanel'
 import { OverallLeaderboardPanel } from './components/OverallLeaderboardPanel'
+import { SurveySessionEndingPanel } from './components/SurveySessionEndingPanel'
 import { SessionHeader } from './components/SessionHeader'
 import { SessionEndedBanner } from './components/SessionEndedBanner'
 import { WaitingForQuestion } from './components/WaitingForQuestion'
@@ -259,6 +262,11 @@ function ParticipantSessionPage() {
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
   const showOverallLeaderboardTab =
     showOverallLeaderboard && sessionSupportsOverallLeaderboard(mappedQuestions)
+  const showSurveyResultsEnabled = Boolean(session?.survey_results_enabled)
+  const showSurveyEndingScreen =
+    sessionSupportsSurveyEndingScreen(mappedQuestions) &&
+    (isSessionEnded || showSurveyResultsEnabled)
+  const endingScreenOnlyMode = showOverallLeaderboardTab || showSurveyEndingScreen
   const navigationEnabled = session?.participant_navigation_enabled !== false
   const sessionQuizTotalTimeEnabled = useMemo(
     () => isSessionQuizTotalTimeEnabled(session),
@@ -662,6 +670,7 @@ function ParticipantSessionPage() {
       queryClient.invalidateQueries({ queryKey: ['participant-questions', dbSessionId] })
       if (data.status === 'completed' || data.status === 'live') {
         queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
+        queryClient.invalidateQueries({ queryKey: ['participant-survey-summary', dbSessionId] })
       }
       if (data.status === 'completed' || data.status === 'archived') {
         freezeAllCountdowns()
@@ -841,6 +850,7 @@ function ParticipantSessionPage() {
     const offResp = client.on('response_received', () => {
       queryClient.invalidateQueries({ queryKey: ['participant-qa', dbSessionId] })
       queryClient.invalidateQueries({ queryKey: ['participant-survey-results'] })
+      queryClient.invalidateQueries({ queryKey: ['participant-survey-summary', dbSessionId] })
     })
 
     const offLeaderboard = client.on(RealtimeEvent.LEADERBOARD_UPDATE, (data) => {
@@ -862,12 +872,18 @@ function ParticipantSessionPage() {
         data.leaderboard_enabled !== undefined
           ? Boolean(data.leaderboard_enabled)
           : wasLeaderboardEnabled
+      const wasSurveyResultsEnabled = Boolean(previousSession?.survey_results_enabled)
+      const isSurveyResultsEnabled =
+        data.survey_results_enabled !== undefined
+          ? Boolean(data.survey_results_enabled)
+          : wasSurveyResultsEnabled
 
       queryClient.setQueryData(['participant-session', effectiveSessionCode], (old) =>
         old
           ? {
               ...old,
               leaderboard_enabled: isLeaderboardEnabled,
+              survey_results_enabled: isSurveyResultsEnabled,
               participant_navigation_enabled:
                 data.participant_navigation_enabled ?? old.participant_navigation_enabled,
               allow_late_join:
@@ -886,6 +902,18 @@ function ParticipantSessionPage() {
 
       if (wasLeaderboardEnabled && !isLeaderboardEnabled) {
         setStep((current) => (current === 'leaderboard' ? 'active' : current))
+      }
+
+      if (!wasSurveyResultsEnabled && isSurveyResultsEnabled) {
+        setStep((current) => {
+          if (current === 'join' || current === 'waiting') return current
+          return 'surveyEnding'
+        })
+        queryClient.invalidateQueries({ queryKey: ['participant-survey-summary', dbSessionId] })
+      }
+
+      if (wasSurveyResultsEnabled && !isSurveyResultsEnabled) {
+        setStep((current) => (current === 'surveyEnding' ? 'active' : current))
       }
     })
 
@@ -948,15 +976,27 @@ function ParticipantSessionPage() {
   }, [showOverallLeaderboardTab, dbSessionId, queryClient])
 
   useEffect(() => {
+    if (showSurveyEndingScreen && dbSessionId) {
+      queryClient.invalidateQueries({ queryKey: ['participant-survey-summary', dbSessionId] })
+    }
+  }, [showSurveyEndingScreen, dbSessionId, queryClient])
+
+  useEffect(() => {
     if (step === 'join' || step === 'waiting') return
     if (showOverallLeaderboardTab && step !== 'leaderboard') {
       setStep('leaderboard')
       return
     }
-    if (!showOverallLeaderboardTab && step === 'leaderboard') {
-      setStep('active')
+    if (!showOverallLeaderboardTab && showSurveyEndingScreen && step !== 'surveyEnding') {
+      setStep('surveyEnding')
+      return
     }
-  }, [showOverallLeaderboardTab, step])
+    if (!showOverallLeaderboardTab && !showSurveyEndingScreen) {
+      if (step === 'leaderboard' || step === 'surveyEnding') {
+        setStep('active')
+      }
+    }
+  }, [showOverallLeaderboardTab, showSurveyEndingScreen, step])
 
   useEffect(() => {
     if (!activeQuestions.length) {
@@ -1269,6 +1309,21 @@ function ParticipantSessionPage() {
         dbSessionId &&
         showOverallLeaderboardTab &&
         (hasAnyQuestionSaved || session?.status === 'completed' || step === 'leaderboard'),
+    ),
+    staleTime: 5000,
+  })
+
+  const surveySummaryQuery = useQuery({
+    queryKey: ['participant-survey-summary', dbSessionId, participantToken],
+    queryFn: () => getParticipantSessionSurveySummaryApi(participantToken, dbSessionId),
+    enabled: Boolean(
+      participantToken &&
+        dbSessionId &&
+        showSurveyEndingScreen &&
+        (hasAnyQuestionSaved ||
+          session?.status === 'completed' ||
+          session?.survey_results_enabled ||
+          step === 'surveyEnding'),
     ),
     staleTime: 5000,
   })
@@ -1965,7 +2020,7 @@ function ParticipantSessionPage() {
           joinedUser={joinedUser}
           step={step}
           onStepChange={setStep}
-          rankingsOnlyMode={showOverallLeaderboardTab}
+          rankingsOnlyMode={endingScreenOnlyMode}
         />
 
         {isSessionEnded ? <SessionEndedBanner /> : null}
@@ -1976,6 +2031,17 @@ function ParticipantSessionPage() {
             hasAnyQuestionSaved={hasAnyQuestionSaved}
             sessionStatus={session?.status}
             isLoading={leaderboardQuery.isLoading}
+          />
+        ) : showSurveyEndingScreen ? (
+          <SurveySessionEndingPanel
+            sessionTitle={session.title}
+            summary={surveySummaryQuery.data}
+            isLoading={surveySummaryQuery.isLoading}
+            error={
+              surveySummaryQuery.isError
+                ? surveySummaryQuery.error?.message || 'Unable to load survey results.'
+                : ''
+            }
           />
         ) : (
           <>
