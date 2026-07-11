@@ -1,4 +1,4 @@
-/** @typedef {{ participant_id: number|string, name: string, score: number, attempts?: number }} LeaderboardEntry */
+/** @typedef {{ participant_id: number|string, name: string, score: number, attempts?: number, responseTimeMs?: number|null }} LeaderboardEntry */
 
 export const LEADERBOARD_LIMIT_OPTIONS = [10, 20, 30, 40, 50]
 export const SESSION_LEADERBOARD_TOP_N = 10
@@ -82,5 +82,15 @@ export function normalizeLeaderboardEntries(entries) {
     participant_id: row.participant_id,
     name: row.name || row.nickname || 'Anonymous',
     score: Number(row.score ?? 0),
+    responseTimeMs:
+      row.responseTimeMs != null
+        ? row.responseTimeMs
+        : row.response_time_ms != null
+          ? Number(row.response_time_ms)
+          : row.avg_response_time_ms != null
+            ? Number(row.avg_response_time_ms)
+            : row.avg_response_time_seconds != null
+              ? Math.round(Number(row.avg_response_time_seconds) * 1000)
+              : null,
   }))
 }

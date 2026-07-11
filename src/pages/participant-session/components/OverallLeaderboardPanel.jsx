@@ -1,6 +1,5 @@
 import { Trophy } from 'lucide-react'
-import { LeaderboardTable } from '../../../components/leaderboard/LeaderboardTable'
-import { normalizeLeaderboardEntries } from '../../../utils/leaderboard'
+import { ParticipantRankingList } from './ParticipantRankingList'
 
 export function OverallLeaderboardPanel({
   leaderboard,
@@ -8,7 +7,6 @@ export function OverallLeaderboardPanel({
   sessionStatus,
   isLoading = false,
 }) {
-  const entries = normalizeLeaderboardEntries(leaderboard)
   const canShowScores = hasAnyQuestionSaved || sessionStatus === 'completed'
 
   return (
@@ -25,8 +23,9 @@ export function OverallLeaderboardPanel({
           The rankings will appear after participants submit responses.
         </p>
       ) : (
-        <LeaderboardTable
-          entries={entries}
+        <ParticipantRankingList
+          entries={leaderboard}
+          timeMode="session"
           emptyMessage="No scores yet. Rankings update as participants answer quiz questions."
         />
       )}
