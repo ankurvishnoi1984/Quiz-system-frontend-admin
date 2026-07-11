@@ -3,8 +3,8 @@ import { normalizeLeaderboardEntries } from '../../../utils/leaderboard'
 import { formatQuizSubmitTimeParticipant } from '../../../utils/quizResponseTime'
 
 const TIME_HINTS = {
-  question: 'Time taken on this question · e.g. 7s 252 ms',
-  session: 'Average time across answered questions · e.g. 7s 252 ms',
+  question: 'Time taken on this question · e.g. 7.123 s/ms',
+  session: 'Average time across answered questions · e.g. 7.123 s/ms',
 }
 
 function RankingTimeBadge({ responseTimeMs, timeMode }) {
@@ -14,7 +14,7 @@ function RankingTimeBadge({ responseTimeMs, timeMode }) {
 
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-600 ring-1 ring-amber-200/70"
+      className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-slate-600 ring-1 ring-amber-200/70"
       title={
         timeMode === 'session'
           ? 'Average response time across all answered questions'

@@ -66,11 +66,11 @@ export function formatQuizSubmitTimeCompact(responseTimeMs) {
   return `${seconds}.${String(millis).padStart(3, '0')}`
 }
 
-/** Participant rankings: "7s 252 ms" — ms normalized to 3 digits */
+/** Participant rankings: "7.123 s/ms" — seconds.milliseconds */
 export function formatQuizSubmitTimeParticipant(responseTimeMs) {
   if (responseTimeMs == null || Number.isNaN(Number(responseTimeMs))) return '—'
   const total = Math.max(0, Math.round(Number(responseTimeMs)))
   const seconds = Math.floor(total / 1000)
   const millis = total % 1000
-  return `${seconds}s ${String(millis).padStart(3, '0')} ms`
+  return `${seconds}.${String(millis).padStart(3, '0')} s/ms`
 }
