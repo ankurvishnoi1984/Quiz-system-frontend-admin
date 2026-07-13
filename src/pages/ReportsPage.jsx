@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Search, ShieldCheck } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import ExcelJS from 'exceljs'
 import { ReportsPrintReport } from '../components/reports/ReportsPrintReport'
 import { ReportPreviewModal } from '../components/reports/ReportPreviewModal'
 import KebabMenu from '../components/ui/KebabMenu'
@@ -9,17 +10,7 @@ import { useDepartmentSessionsList } from '../hooks/useHostNavSessions'
 import { listSessionQuestionsApi } from '../services/builderApi'
 import { useAuthStore } from '../store/authStore'
 
-function downloadText(filename, text, mime = 'text/plain') {
-  const blob = new Blob([text], { type: mime })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-const REPORT_CSV_HEADERS = [
+const REPORT_HEADERS = [
   'sessionId',
   'sessionTitle',
   'status',
@@ -31,13 +22,53 @@ const REPORT_CSV_HEADERS = [
   'response',
 ]
 
-function csvEscapeCell(value) {
-  return `"${String(value ?? '').replaceAll('"', '""')}"`
+function styleHeaderRow(sheet, rowNumber, columnCount) {
+  const row = sheet.getRow(rowNumber)
+  row.font = { bold: true }
+  row.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFE8EEF7' },
+  }
+  for (let col = 1; col <= columnCount; col += 1) {
+    row.getCell(col).border = {
+      bottom: { style: 'thin', color: { argb: 'FFB8C4DC' } },
+    }
+  }
 }
 
-function buildReportCsv(rows) {
-  const lines = [REPORT_CSV_HEADERS.join(','), ...rows.map((r) => r.map(csvEscapeCell).join(','))]
-  return lines.join('\n')
+async function downloadReportExcel(filename, rows) {
+  const workbook = new ExcelJS.Workbook()
+  workbook.creator = 'Quiz System'
+  workbook.created = new Date()
+
+  const sheet = workbook.addWorksheet('Reports')
+  sheet.columns = REPORT_HEADERS.map((header) => ({
+    header,
+    key: header,
+    width:
+      header === 'questionText' || header === 'sessionTitle'
+        ? 42
+        : header === 'response'
+          ? 28
+          : 16,
+  }))
+  styleHeaderRow(sheet, 1, REPORT_HEADERS.length)
+
+  for (const row of rows) {
+    sheet.addRow(row)
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer()
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function isBackendSessionId(id) {
@@ -133,14 +164,14 @@ function rowsFromFallbackQuestions(session) {
   })
 }
 
-async function exportSessionCsvAsync(accessToken, session) {
+async function exportSessionExcelAsync(accessToken, session) {
   const apiQs = await loadQuestionsForReport(accessToken, session)
   const rows =
     apiQs && apiQs.length > 0 ? rowsFromApiQuestions(session, apiQs) : rowsFromFallbackQuestions(session)
-  downloadText(`report-${session.id}.csv`, buildReportCsv(rows), 'text/csv')
+  await downloadReportExcel(`report-${session.id}.xlsx`, rows)
 }
 
-async function exportAllCsvAsync(accessToken, sessions) {
+async function exportAllExcelAsync(accessToken, sessions) {
   const rowLists = await Promise.all(
     sessions.map(async (session) => {
       const apiQs = await loadQuestionsForReport(accessToken, session)
@@ -149,7 +180,7 @@ async function exportAllCsvAsync(accessToken, sessions) {
     }),
   )
   const rows = rowLists.flat()
-  downloadText('reports-all-sessions.csv', buildReportCsv(rows), 'text/csv')
+  await downloadReportExcel('reports-all-sessions.xlsx', rows)
 }
 
 const PAGE_SIZE = 10
@@ -216,13 +247,13 @@ function ReportsPage() {
     }
   }, [status, debounced, fromDate, toDate])
 
-  const handleExportAll = async () => {
+  const handleDownloadReport = async () => {
     if (!filtered.length) return
     setExportAllLoading(true)
     try {
-      await exportAllCsvAsync(accessToken, filtered)
+      await exportAllExcelAsync(accessToken, filtered)
     } catch (err) {
-      console.error('Export all failed', err)
+      console.error('Download report failed', err)
     } finally {
       setExportAllLoading(false)
     }
@@ -253,11 +284,11 @@ function ReportsPage() {
           <button
             type="button"
             disabled={!filtered.length || exportAllLoading}
-            onClick={() => void handleExportAll()}
+            onClick={() => void handleDownloadReport()}
             className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-900/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Download className="size-4" />
-            {exportAllLoading ? 'Exporting…' : 'Export all (CSV)'}
+            {exportAllLoading ? 'Downloading…' : 'Download report'}
           </button>
           <button
             type="button"
@@ -362,7 +393,7 @@ function ReportsPage() {
               <KebabMenu
                 items={[
                   { id: 'view', label: 'View (Analytics)', icon: ExternalLink, onClick: () => navigate(`/analytics?session=${encodeURIComponent(s.id)}`) },
-                  { id: 'csv', label: 'Download CSV', icon: Download, onClick: () => void exportSessionCsvAsync(accessToken, s) },
+                  { id: 'xlsx', label: 'Download Excel', icon: Download, onClick: () => void exportSessionExcelAsync(accessToken, s) },
                   {
                     id: 'pdf',
                     label: 'Download PDF',
