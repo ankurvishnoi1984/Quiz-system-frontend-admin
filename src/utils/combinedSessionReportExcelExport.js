@@ -109,7 +109,7 @@ function downloadWorkbook(workbook, filename) {
 
 /**
  * Combined Session Summary + Participant report (single Excel download).
- * Sheets: Summary, Question Summary, Participant Summary, Responses
+ * Sheets: Summary (includes participant rankings + timeline), Question Summary, Responses
  */
 
 function sortParticipantSummaryRows(rows, { showScore = true } = {}) {
@@ -147,7 +147,14 @@ export async function exportCombinedSessionReportExcel({
   workbook.created = new Date()
 
   const summarySheet = workbook.addWorksheet('Summary')
-  summarySheet.columns = [{ width: 28 }, { width: 40 }]
+  summarySheet.columns = [
+    { width: 28 },
+    { width: 24 },
+    { width: 18 },
+    { width: 14 },
+    { width: 12 },
+    { width: 22 },
+  ]
 
   let nextRow = addKeyValueRows(summarySheet, [
     ['Session title', summaryReport.session.title],
@@ -175,6 +182,69 @@ export async function exportCombinedSessionReportExcel({
       nextRow + 1,
     )
   }
+
+  nextRow += 2
+  summarySheet.getRow(nextRow).getCell(1).value = 'Participant Summary'
+  summarySheet.getRow(nextRow).getCell(1).font = { bold: true, size: 12 }
+  nextRow += 1
+
+  const participantColumns = showScore
+    ? [
+        'Rank',
+        'Nickname',
+        'Questions answered',
+        'Correct count',
+        'Total score',
+        'Avg response time',
+      ]
+    : [
+        'Rank',
+        'Nickname',
+        'Questions answered',
+        'Avg response time',
+      ]
+  const participantHeader = summarySheet.getRow(nextRow)
+  participantColumns.forEach((label, index) => {
+    participantHeader.getCell(index + 1).value = label
+  })
+  styleHeaderRow(summarySheet, nextRow, participantColumns.length)
+  nextRow += 1
+
+  const participantRows = sortParticipantSummaryRows(
+    participantsReport?.summary_rows ||
+      (summaryReport.participant_summaries || []).map((row) => ({
+        nickname: row.nickname,
+        questions_answered: row.responses_submitted,
+        correct_count: null,
+        total_score: row.score,
+        avg_response_time_ms: null,
+      })),
+    { showScore },
+  )
+
+  participantRows.forEach((row, index) => {
+    const avgTimeLabel = formatQuizSubmitTimeParticipant(row.avg_response_time_ms)
+    const dataRow = summarySheet.getRow(nextRow)
+    const values = showScore
+      ? [
+          index + 1,
+          row.nickname,
+          row.questions_answered,
+          row.correct_count ?? '—',
+          row.total_score ?? '—',
+          avgTimeLabel,
+        ]
+      : [
+          index + 1,
+          row.nickname,
+          row.questions_answered,
+          avgTimeLabel,
+        ]
+    values.forEach((value, colIndex) => {
+      dataRow.getCell(colIndex + 1).value = value
+    })
+    nextRow += 1
+  })
 
   nextRow += 2
   summarySheet.getRow(nextRow).getCell(1).value = 'Response timeline'
@@ -209,74 +279,6 @@ export async function exportCombinedSessionReportExcel({
     { width: 10 },
   ]
   addBreakdownSection(questionSheet, 'Question Summary', questionBreakdowns, 1)
-
-  // From old participant report Summary sheet — ranked leaderboard-style list
-  const participantSummarySheet = workbook.addWorksheet('Participant Summary')
-  participantSummarySheet.columns = showScore
-    ? [
-        { width: 8 },
-        { width: 24 },
-        { width: 18 },
-        { width: 14 },
-        { width: 12 },
-        { width: 22 },
-      ]
-    : [
-        { width: 8 },
-        { width: 24 },
-        { width: 18 },
-        { width: 22 },
-      ]
-  const participantColumns = showScore
-    ? [
-        'Rank',
-        'Nickname',
-        'Questions answered',
-        'Correct count',
-        'Total score',
-        'Avg response time',
-      ]
-    : [
-        'Rank',
-        'Nickname',
-        'Questions answered',
-        'Avg response time',
-      ]
-  const participantHeader = participantSummarySheet.addRow(participantColumns)
-  styleHeaderRow(participantSummarySheet, participantHeader.number, participantColumns.length)
-
-  const participantRows = sortParticipantSummaryRows(
-    participantsReport?.summary_rows ||
-      (summaryReport.participant_summaries || []).map((row) => ({
-        nickname: row.nickname,
-        questions_answered: row.responses_submitted,
-        correct_count: null,
-        total_score: row.score,
-        avg_response_time_ms: null,
-      })),
-    { showScore },
-  )
-
-  participantRows.forEach((row, index) => {
-    const avgTimeLabel = formatQuizSubmitTimeParticipant(row.avg_response_time_ms)
-    participantSummarySheet.addRow(
-      showScore
-        ? [
-            index + 1,
-            row.nickname,
-            row.questions_answered,
-            row.correct_count ?? '—',
-            row.total_score ?? '—',
-            avgTimeLabel,
-          ]
-        : [
-            index + 1,
-            row.nickname,
-            row.questions_answered,
-            avgTimeLabel,
-          ],
-    )
-  })
 
   const rawSheet = workbook.addWorksheet('Responses')
   rawSheet.columns = RAW_RESPONSE_COLUMNS.map((header) => ({
