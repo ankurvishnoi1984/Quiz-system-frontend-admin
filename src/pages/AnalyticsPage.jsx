@@ -33,16 +33,6 @@ import { getQuestionResultsApi, getSessionResponsesApi } from '../services/liveA
 import { ReportPreviewModal } from '../components/reports/ReportPreviewModal'
 import { useAuthStore } from '../store/authStore'
 
-function downloadText(filename, text, mime = 'text/plain') {
-  const blob = new Blob([text], { type: mime })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 function isBackendSessionId(id) {
   const n = Number(id)
   return Number.isFinite(n) && n > 0 && String(n) === String(id).trim()
@@ -330,29 +320,19 @@ function AnalyticsPage() {
     )
   }, [sortedQuestions])
 
-  const exportCsv = () => {
-    if (!sessionMeta) return
-    const headers = [
-      'sessionId',
-      'sessionTitle',
-      'questionIndex',
-      'questionType',
-      'survey_sub_type',
-      'questionText',
-      'participant',
-      'response',
-      'points',
-      'Correct',
-    ]
+  const buildRawResponseExportRows = () => {
+    if (!sessionMeta) {
+      return { rawResponseRows: [], emojiSummaryRows: [] }
+    }
 
-    let rows = buildAnalyticsCsvRows({
+    let rawResponseRows = buildAnalyticsCsvRows({
       sessionMeta,
       sortedQuestions,
       allResponses,
     })
 
-    if (!rows.length) {
-      rows = perQuestion.map((q) => [
+    if (!rawResponseRows.length) {
+      rawResponseRows = perQuestion.map((q) => [
         sessionMeta.id,
         sessionMeta.title,
         String(q.index),
@@ -366,59 +346,38 @@ function AnalyticsPage() {
       ])
     }
 
-    const csvLines = [headers.join(','), ...rows.map((r) => r.map((x) => `"${String(x ?? '').replaceAll('"', '""')}"`).join(','))]
-
+    const emojiSummaryRows = []
     const emojiQuestions = (sortedQuestions || []).filter((q) => q.question_type === 'emoji_reaction')
-    if (emojiQuestions.length) {
-      const emojiHeaders = [
-        'sessionId',
-        'sessionTitle',
-        'questionIndex',
-        'questionText',
-        'emoji_1',
-        'emoji_2',
-        'emoji_3',
-        'emoji_4',
-        'emoji_5',
-        'count_1',
-        'count_2',
-        'count_3',
-        'count_4',
-        'count_5',
-      ]
-      csvLines.push('')
-      csvLines.push(emojiHeaders.join(','))
-      for (const question of emojiQuestions) {
-        const questionResponses = (allResponses || []).filter(
-          (row) => Number(row.question_id) === Number(question.question_id),
-        )
-        const { rows: emojiRows } = buildEmojiBarData(question, null, questionResponses)
-        const emojiCols = Array.from({ length: 5 }, (_, index) => emojiRows[index]?.emoji ?? '')
-        const countCols = Array.from({ length: 5 }, (_, index) => String(emojiRows[index]?.count ?? 0))
-        csvLines.push(
-          [
-            sessionMeta.id,
-            sessionMeta.title,
-            String(question.display_order ?? ''),
-            (question.question_text || '').replaceAll('"', '""'),
-            ...emojiCols,
-            ...countCols,
-          ]
-            .map((x) => `"${String(x ?? '').replaceAll('"', '""')}"`)
-            .join(','),
-        )
-      }
+    for (const question of emojiQuestions) {
+      const questionResponses = (allResponses || []).filter(
+        (row) => Number(row.question_id) === Number(question.question_id),
+      )
+      const { rows: emojiRows } = buildEmojiBarData(question, null, questionResponses)
+      const emojiCols = Array.from({ length: 5 }, (_, index) => emojiRows[index]?.emoji ?? '')
+      const countCols = Array.from({ length: 5 }, (_, index) => String(emojiRows[index]?.count ?? 0))
+      emojiSummaryRows.push([
+        sessionMeta.id,
+        sessionMeta.title,
+        String(question.display_order ?? ''),
+        (question.question_text || '').replaceAll('"', '""'),
+        ...emojiCols,
+        ...countCols,
+      ])
     }
 
-    const csv = csvLines.join('\n')
-    downloadText(`session-${sessionMeta.id}-responses.csv`, csv, 'text/csv')
+    return { rawResponseRows, emojiSummaryRows }
   }
 
   const exportParticipantReport = async () => {
     const report =
       participantsReportQuery.data ||
       (await getSessionParticipantsReportApi(accessToken, numericSessionId))
-    await exportPerParticipantExcel(report, { showScore: !isPollOrSurveySession })
+    const { rawResponseRows, emojiSummaryRows } = buildRawResponseExportRows()
+    await exportPerParticipantExcel(report, {
+      showScore: !isPollOrSurveySession,
+      rawResponseRows,
+      emojiSummaryRows,
+    })
   }
 
   const handleExportReport = async (reportId) => {
@@ -440,8 +399,6 @@ function AnalyticsPage() {
         const report =
           qaReportQuery.data || (await getSessionQaReportApi(accessToken, numericSessionId))
         await exportQaAnalyticsExcel(report)
-      } else if (reportId === 'raw-responses') {
-        exportCsv()
       }
       setExportModalOpen(false)
     } catch (error) {

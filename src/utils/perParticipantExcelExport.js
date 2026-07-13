@@ -1,10 +1,5 @@
 import ExcelJS from 'exceljs'
 
-function formatCorrect(value) {
-  if (value == null) return '—'
-  return value ? 'Yes' : 'No'
-}
-
 function styleHeaderRow(sheet, rowNumber, columnCount) {
   const row = sheet.getRow(rowNumber)
   row.font = { bold: true }
@@ -20,7 +15,40 @@ function styleHeaderRow(sheet, rowNumber, columnCount) {
   }
 }
 
-export async function exportPerParticipantExcel(report, { showScore = true } = {}) {
+const RAW_RESPONSE_COLUMNS = [
+  'sessionId',
+  'sessionTitle',
+  'questionIndex',
+  'questionType',
+  'survey_sub_type',
+  'questionText',
+  'participant',
+  'response',
+  'points',
+  'Correct',
+]
+
+const EMOJI_SUMMARY_COLUMNS = [
+  'sessionId',
+  'sessionTitle',
+  'questionIndex',
+  'questionText',
+  'emoji_1',
+  'emoji_2',
+  'emoji_3',
+  'emoji_4',
+  'emoji_5',
+  'count_1',
+  'count_2',
+  'count_3',
+  'count_4',
+  'count_5',
+]
+
+export async function exportPerParticipantExcel(
+  report,
+  { showScore = true, rawResponseRows = [], emojiSummaryRows = [] } = {},
+) {
   if (!report?.session) {
     throw new Error('Report data is missing')
   }
@@ -83,46 +111,24 @@ export async function exportPerParticipantExcel(report, { showScore = true } = {
     )
   }
 
-  const responsesSheet = workbook.addWorksheet('Responses')
-  responsesSheet.columns = showScore
-    ? [
-        { width: 24 },
-        { width: 42 },
-        { width: 36 },
-        { width: 12 },
-        { width: 14 },
-        { width: 16 },
-      ]
-    : [
-        { width: 24 },
-        { width: 42 },
-        { width: 36 },
-        { width: 16 },
-      ]
-  const responsesColumns = showScore
-    ? ['Nickname', 'Question text', 'Answer', 'Correct', 'Points earned', 'Response time (ms)']
-    : ['Nickname', 'Question text', 'Answer', 'Response time (ms)']
-  const responsesHeader = responsesSheet.addRow(responsesColumns)
-  styleHeaderRow(responsesSheet, responsesHeader.number, responsesColumns.length)
+  const rawSheet = workbook.addWorksheet('Raw Responses')
+  rawSheet.columns = RAW_RESPONSE_COLUMNS.map((header) => ({
+    width: header === 'questionText' || header === 'response' ? 42 : header === 'sessionTitle' ? 28 : 16,
+  }))
+  const rawHeader = rawSheet.addRow(RAW_RESPONSE_COLUMNS)
+  styleHeaderRow(rawSheet, rawHeader.number, RAW_RESPONSE_COLUMNS.length)
 
-  for (const row of report.response_rows || []) {
-    responsesSheet.addRow(
-      showScore
-        ? [
-            row.nickname,
-            row.question_text,
-            row.answer,
-            formatCorrect(row.is_correct),
-            row.points_earned,
-            row.response_time_ms ?? '—',
-          ]
-        : [
-            row.nickname,
-            row.question_text,
-            row.answer,
-            row.response_time_ms ?? '—',
-          ],
-    )
+  for (const row of rawResponseRows) {
+    rawSheet.addRow(row)
+  }
+
+  if (emojiSummaryRows.length) {
+    rawSheet.addRow([])
+    const emojiHeader = rawSheet.addRow(EMOJI_SUMMARY_COLUMNS)
+    styleHeaderRow(rawSheet, emojiHeader.number, EMOJI_SUMMARY_COLUMNS.length)
+    for (const row of emojiSummaryRows) {
+      rawSheet.addRow(row)
+    }
   }
 
   const buffer = await workbook.xlsx.writeBuffer()

@@ -14,7 +14,7 @@ export const SESSION_REPORT_EXPORTS = [
   {
     id: 'participants',
     label: 'Per-Participant Report',
-    description: 'Summary per participant plus every answer row for HR/training review',
+    description: 'Summary per participant plus a raw responses sheet for HR/training review',
     format: 'xlsx',
   },
   // {
@@ -23,12 +23,12 @@ export const SESSION_REPORT_EXPORTS = [
   //   description: 'Full Q&A log including rejected questions, sorted by upvotes',
   //   format: 'xlsx',
   // },
-  {
-    id: 'raw-responses',
-    label: 'Raw responses',
-    description: 'Flat CSV export of every participant response',
-    format: 'csv',
-  },
+  // {
+  //   id: 'raw-responses',
+  //   label: 'Raw responses',
+  //   description: 'Flat CSV export of every participant response',
+  //   format: 'csv',
+  // },
 ]
 
 export const SESSION_REPORT_VIEWS = [
