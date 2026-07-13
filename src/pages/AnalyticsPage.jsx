@@ -2,7 +2,7 @@ import { Download, Loader2, Printer } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { AnalyticsExportModal } from '../components/analytics/AnalyticsExportModal'
+// import { AnalyticsExportModal } from '../components/analytics/AnalyticsExportModal'
 import { AnalyticsQuestionChartSection } from '../components/analytics/AnalyticsQuestionChartSection'
 import { AnalyticsQuestionInsights } from '../components/analytics/AnalyticsQuestionInsights'
 import { AnalyticsPrintReport } from '../components/analytics/AnalyticsPrintReport'
@@ -15,10 +15,11 @@ import { PerQuestionReportDetails } from '../components/analytics/PerQuestionRep
 import { SESSION_REPORT_VIEWS } from '../constants/sessionReportTypes'
 import { buildAnalyticsCsvRows, mapAnalyticsPerQuestion } from '../utils/analyticsQuestions'
 import { buildEmojiBarData } from '../utils/emojiReaction'
-import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
-import { exportPerParticipantExcel } from '../utils/perParticipantExcelExport'
-import { exportPerQuestionBreakdownExcel } from '../utils/perQuestionBreakdownExcelExport'
-import { exportSessionSummaryExcel } from '../utils/sessionSummaryExcelExport'
+import { exportCombinedSessionReportExcel } from '../utils/combinedSessionReportExcelExport'
+// import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
+// import { exportPerParticipantExcel } from '../utils/perParticipantExcelExport'
+// import { exportPerQuestionBreakdownExcel } from '../utils/perQuestionBreakdownExcelExport'
+// import { exportSessionSummaryExcel } from '../utils/sessionSummaryExcelExport'
 import { useShell } from '../context/ShellContext'
 import { useDepartmentSessionsList, getPreferredAnalyticsSessionId } from '../hooks/useHostNavSessions'
 import {
@@ -85,7 +86,7 @@ function AnalyticsPage() {
   const [selectedQuestionId, setSelectedQuestionId] = useState(null)
   const [chartView, setChartView] = useState('bar')
   const [activeReportView, setActiveReportView] = useState('summary')
-  const [exportModalOpen, setExportModalOpen] = useState(false)
+  // const [exportModalOpen, setExportModalOpen] = useState(false)
   const [exportingReportId, setExportingReportId] = useState(null)
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false)
 
@@ -368,39 +369,68 @@ function AnalyticsPage() {
     return { rawResponseRows, emojiSummaryRows }
   }
 
-  const exportParticipantReport = async () => {
-    const report =
+  const exportCombinedReport = async () => {
+    const [summaryReport, participantsReport] = await Promise.all([
+      summaryReportQuery.data || getSessionSummaryReportApi(accessToken, numericSessionId),
       participantsReportQuery.data ||
-      (await getSessionParticipantsReportApi(accessToken, numericSessionId))
+        getSessionParticipantsReportApi(accessToken, numericSessionId),
+    ])
     const { rawResponseRows, emojiSummaryRows } = buildRawResponseExportRows()
-    await exportPerParticipantExcel(report, {
+    await exportCombinedSessionReportExcel({
+      summaryReport,
+      participantsReport,
       showScore: !isPollOrSurveySession,
       rawResponseRows,
       emojiSummaryRows,
     })
   }
 
-  const handleExportReport = async (reportId) => {
+  // Separate report downloads (kept for easy restore if we split reports again)
+  // const exportParticipantReport = async () => {
+  //   const report =
+  //     participantsReportQuery.data ||
+  //     (await getSessionParticipantsReportApi(accessToken, numericSessionId))
+  //   const { rawResponseRows, emojiSummaryRows } = buildRawResponseExportRows()
+  //   await exportPerParticipantExcel(report, {
+  //     showScore: !isPollOrSurveySession,
+  //     rawResponseRows,
+  //     emojiSummaryRows,
+  //   })
+  // }
+  //
+  // const handleExportReport = async (reportId) => {
+  //   try {
+  //     setExportingReportId(reportId)
+  //     if (reportId === 'summary') {
+  //       const report =
+  //         summaryReportQuery.data ||
+  //         (await getSessionSummaryReportApi(accessToken, numericSessionId))
+  //       await exportSessionSummaryExcel(report)
+  //     } else if (reportId === 'question-breakdown') {
+  //       const report =
+  //         questionsReportQuery.data ||
+  //         (await getSessionQuestionsReportApi(accessToken, numericSessionId))
+  //       await exportPerQuestionBreakdownExcel(report)
+  //     } else if (reportId === 'participants') {
+  //       await exportParticipantReport()
+  //     } else if (reportId === 'qa') {
+  //       const report =
+  //         qaReportQuery.data || (await getSessionQaReportApi(accessToken, numericSessionId))
+  //       await exportQaAnalyticsExcel(report)
+  //     }
+  //     setExportModalOpen(false)
+  //   } catch (error) {
+  //     console.error(error)
+  //     window.alert(error?.message || 'Export failed')
+  //   } finally {
+  //     setExportingReportId(null)
+  //   }
+  // }
+
+  const handleDownloadReport = async () => {
     try {
-      setExportingReportId(reportId)
-      if (reportId === 'summary') {
-        const report =
-          summaryReportQuery.data ||
-          (await getSessionSummaryReportApi(accessToken, numericSessionId))
-        await exportSessionSummaryExcel(report)
-      } else if (reportId === 'question-breakdown') {
-        const report =
-          questionsReportQuery.data ||
-          (await getSessionQuestionsReportApi(accessToken, numericSessionId))
-        await exportPerQuestionBreakdownExcel(report)
-      } else if (reportId === 'participants') {
-        await exportParticipantReport()
-      } else if (reportId === 'qa') {
-        const report =
-          qaReportQuery.data || (await getSessionQaReportApi(accessToken, numericSessionId))
-        await exportQaAnalyticsExcel(report)
-      }
-      setExportModalOpen(false)
+      setExportingReportId('combined')
+      await exportCombinedReport()
     } catch (error) {
       console.error(error)
       window.alert(error?.message || 'Export failed')
@@ -559,12 +589,16 @@ function AnalyticsPage() {
 
           <button
             type="button"
-            onClick={() => setExportModalOpen(true)}
-            disabled={isLoading}
+            onClick={handleDownloadReport}
+            disabled={isLoading || exportingReportId === 'combined'}
             className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 text-sm font-semibold text-slate-700 shadow-sm shadow-blue-900/5 transition hover:bg-blue-50 disabled:opacity-50"
           >
-            <Download className="size-4" />
-             Download Report
+            {exportingReportId === 'combined' ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            Download Report
           </button>
           <button
             type="button"
@@ -738,28 +772,20 @@ function AnalyticsPage() {
         leaderboard={participantsReport?.leaderboard}
         isLoading={participantsReportLoading}
         showScore={!isPollOrSurveySession}
-        onExport={async () => {
-          try {
-            setExportingReportId('participants')
-            await exportParticipantReport()
-          } catch (error) {
-            console.error(error)
-            window.alert(error?.message || 'Export failed')
-          } finally {
-            setExportingReportId(null)
-          }
-        }}
-        isExporting={exportingReportId === 'participants'}
+        onExport={handleDownloadReport}
+        isExporting={exportingReportId === 'combined'}
       />
       </>
       )}
 
+      {/* Separate report picker modal — restore with SESSION_REPORT_EXPORTS if reports are split again
       <AnalyticsExportModal
         open={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
         onExport={handleExportReport}
         exportingId={exportingReportId}
       />
+      */}
 
     </section>
     </>

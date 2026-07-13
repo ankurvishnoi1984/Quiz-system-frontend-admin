@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 
+/** Standalone Per-Participant export — kept for restore if reports are split again. */
 function styleHeaderRow(sheet, rowNumber, columnCount) {
   const row = sheet.getRow(rowNumber)
   row.font = { bold: true }

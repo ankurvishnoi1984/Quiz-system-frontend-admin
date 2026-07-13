@@ -6,6 +6,7 @@ function formatBadge(format) {
   return format.toUpperCase()
 }
 
+/** Unused while reports are merged into one download. Keep for restore. */
 export function AnalyticsExportModal({ open, onClose, onExport, exportingId }) {
   return (
     <Modal open={open} title="Download Reports" onClose={onClose}>

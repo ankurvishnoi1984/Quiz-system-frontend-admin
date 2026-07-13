@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 
+/** Standalone Session Summary export — kept for restore if reports are split again. */
 function formatDateTime(value) {
   if (!value) return '—'
   return new Date(value).toLocaleString()
@@ -124,7 +125,7 @@ export async function exportSessionSummaryExcel(report) {
     ...(report.standalone_question_breakdowns || []),
   ].sort((a, b) => Number(a.question_index || 0) - Number(b.question_index || 0))
 
-  const questionSheet = workbook.addWorksheet('Question Responses')
+  const questionSheet = workbook.addWorksheet('Question Summary')
   questionSheet.columns = [
     { width: 10 },
     { width: 18 },
@@ -133,7 +134,7 @@ export async function exportSessionSummaryExcel(report) {
     { width: 10 },
     { width: 10 },
   ]
-  addBreakdownSection(questionSheet, 'Question Responses', questionBreakdowns, 1)
+  addBreakdownSection(questionSheet, 'Question Summary', questionBreakdowns, 1)
 
   const participantsSheet = workbook.addWorksheet('Participants')
   participantsSheet.columns = [{ width: 28 }, { width: 18 }, { width: 12 }]
