@@ -2,19 +2,19 @@ export const SESSION_REPORT_EXPORTS = [
   {
     id: 'summary',
     label: 'Session Summary Report',
-    description: 'Overview metrics, Q&A stats, quiz scores, timeline, and detailed breakdown sheets',
+    description: 'Overview metrics, Q&A stats, quiz scores, timeline, and question response breakdown',
     format: 'xlsx',
   },
-  {
-    id: 'question-breakdown',
-    label: 'Per-Question Breakdown Report',
-    description: 'One sheet per question with participant answers, plus a summary sheet',
-    format: 'xlsx',
-  },
+  // {
+  //   id: 'question-breakdown',
+  //   label: 'Per-Question Breakdown Report',
+  //   description: 'One sheet per question with participant answers, plus a summary sheet',
+  //   format: 'xlsx',
+  // },
   {
     id: 'participants',
-    label: 'Per-Participant Report',
-    description: 'Summary per participant plus a raw responses sheet for HR/training review',
+    label: 'Participant Report',
+    description: 'Summary per participant plus a responses sheet for HR/training review',
     format: 'xlsx',
   },
   // {

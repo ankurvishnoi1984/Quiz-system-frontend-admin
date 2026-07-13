@@ -119,8 +119,13 @@ export async function exportSessionSummaryExcel(report) {
     return row + 1
   }
 
-  const surveySheet = workbook.addWorksheet('Survey Responses')
-  surveySheet.columns = [
+  const questionBreakdowns = [
+    ...(report.survey_question_breakdowns || []),
+    ...(report.standalone_question_breakdowns || []),
+  ].sort((a, b) => Number(a.question_index || 0) - Number(b.question_index || 0))
+
+  const questionSheet = workbook.addWorksheet('Question Responses')
+  questionSheet.columns = [
     { width: 10 },
     { width: 18 },
     { width: 42 },
@@ -128,28 +133,7 @@ export async function exportSessionSummaryExcel(report) {
     { width: 10 },
     { width: 10 },
   ]
-  addBreakdownSection(
-    surveySheet,
-    'Survey Responses',
-    report.survey_question_breakdowns || [],
-    1,
-  )
-
-  const standaloneSheet = workbook.addWorksheet('Quiz Poll Other')
-  standaloneSheet.columns = [
-    { width: 10 },
-    { width: 14 },
-    { width: 42 },
-    { width: 28 },
-    { width: 10 },
-    { width: 10 },
-  ]
-  addBreakdownSection(
-    standaloneSheet,
-    'Quiz, Poll & Other Questions',
-    report.standalone_question_breakdowns || [],
-    1,
-  )
+  addBreakdownSection(questionSheet, 'Question Responses', questionBreakdowns, 1)
 
   const participantsSheet = workbook.addWorksheet('Participants')
   participantsSheet.columns = [{ width: 28 }, { width: 18 }, { width: 12 }]

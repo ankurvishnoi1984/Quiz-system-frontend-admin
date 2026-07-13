@@ -111,7 +111,7 @@ export async function exportPerParticipantExcel(
     )
   }
 
-  const rawSheet = workbook.addWorksheet('Raw Responses')
+  const rawSheet = workbook.addWorksheet('Responses')
   rawSheet.columns = RAW_RESPONSE_COLUMNS.map((header) => ({
     width: header === 'questionText' || header === 'response' ? 42 : header === 'sessionTitle' ? 28 : 16,
   }))
