@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs'
+import { formatQuizSubmitTimeParticipant } from './quizResponseTime'
 
 /** Standalone Per-Participant export — kept for restore if reports are split again. */
 function styleHeaderRow(sheet, rowNumber, columnCount) {
@@ -61,56 +62,74 @@ export async function exportPerParticipantExcel(
   const summarySheet = workbook.addWorksheet('Summary')
   summarySheet.columns = showScore
     ? [
+        { width: 8 },
         { width: 24 },
         { width: 18 },
         { width: 14 },
         { width: 12 },
-        { width: 18 },
-        { width: 18 },
+        { width: 22 },
       ]
     : [
+        { width: 8 },
         { width: 24 },
         { width: 18 },
-        { width: 18 },
-        { width: 18 },
+        { width: 22 },
       ]
   const summaryColumns = showScore
     ? [
+        'Rank',
         'Nickname',
         'Questions answered',
         'Correct count',
         'Total score',
-        'Avg response time (s)',
-        'Avg response time (ms)',
+        'Avg response time',
       ]
     : [
+        'Rank',
         'Nickname',
         'Questions answered',
-        'Avg response time (s)',
-        'Avg response time (ms)',
+        'Avg response time',
       ]
   const summaryHeader = summarySheet.addRow(summaryColumns)
   styleHeaderRow(summarySheet, summaryHeader.number, summaryColumns.length)
 
-  for (const row of report.summary_rows || []) {
+  const sortedRows = [...(report.summary_rows || [])].sort((a, b) => {
+    if (showScore) {
+      const scoreDiff = Number(b.total_score || 0) - Number(a.total_score || 0)
+      if (scoreDiff !== 0) return scoreDiff
+      const correctDiff = Number(b.correct_count || 0) - Number(a.correct_count || 0)
+      if (correctDiff !== 0) return correctDiff
+    }
+    const answeredDiff = Number(b.questions_answered || 0) - Number(a.questions_answered || 0)
+    if (answeredDiff !== 0) return answeredDiff
+    const aTime =
+      a.avg_response_time_ms != null ? Number(a.avg_response_time_ms) : Number.POSITIVE_INFINITY
+    const bTime =
+      b.avg_response_time_ms != null ? Number(b.avg_response_time_ms) : Number.POSITIVE_INFINITY
+    if (aTime !== bTime) return aTime - bTime
+    return String(a.nickname || '').localeCompare(String(b.nickname || ''))
+  })
+
+  sortedRows.forEach((row, index) => {
+    const avgTimeLabel = formatQuizSubmitTimeParticipant(row.avg_response_time_ms)
     summarySheet.addRow(
       showScore
         ? [
+            index + 1,
             row.nickname,
             row.questions_answered,
             row.correct_count,
             row.total_score,
-            row.avg_response_time_seconds ?? '—',
-            row.avg_response_time_ms ?? '—',
+            avgTimeLabel,
           ]
         : [
+            index + 1,
             row.nickname,
             row.questions_answered,
-            row.avg_response_time_seconds ?? '—',
-            row.avg_response_time_ms ?? '—',
+            avgTimeLabel,
           ],
     )
-  }
+  })
 
   const rawSheet = workbook.addWorksheet('Responses')
   rawSheet.columns = RAW_RESPONSE_COLUMNS.map((header) => ({
