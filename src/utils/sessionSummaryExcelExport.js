@@ -151,21 +151,6 @@ export async function exportSessionSummaryExcel(report) {
     1,
   )
 
-  const qaSheet = workbook.addWorksheet('Q&A Log')
-  qaSheet.columns = [{ width: 48 }, { width: 10 }, { width: 14 }, { width: 22 }, { width: 22 }]
-  const qaHeader = qaSheet.addRow(['Question', 'Upvotes', 'Status', 'Submitted', 'Answered'])
-  styleHeaderRow(qaSheet, qaHeader.number, 5)
-
-  for (const row of report.qa_log || []) {
-    qaSheet.addRow([
-      row.question_text,
-      row.upvotes,
-      row.status,
-      formatDateTime(row.created_at),
-      formatDateTime(row.answered_at),
-    ])
-  }
-
   const participantsSheet = workbook.addWorksheet('Participants')
   participantsSheet.columns = [{ width: 28 }, { width: 18 }, { width: 12 }]
   const participantHeader = participantsSheet.addRow(['Nickname', 'Responses submitted', 'Score'])
