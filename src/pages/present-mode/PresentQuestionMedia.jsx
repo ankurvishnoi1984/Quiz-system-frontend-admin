@@ -34,14 +34,16 @@ export function PresentQuestionMedia({ media, className = '' }) {
   if (media.kind === 'audio') {
     return (
       <>
-        {/* Spacer so the slide layout does not jump while the player is fixed */}
-        {expanded ? (
-          <div
-            key="audio-spacer"
-            className={`relative z-20 min-h-[88px] overflow-hidden rounded-2xl border border-blue-200/80 bg-slate-950/5 shadow-md shadow-navy-900/10 ${className}`.trim()}
-            aria-hidden
-          />
-        ) : null}
+        {/* Always mounted so the player shell never remounts when expanding */}
+        <div
+          key="audio-spacer"
+          className={
+            expanded
+              ? `relative z-20 min-h-[88px] overflow-hidden rounded-2xl border border-blue-200/80 bg-slate-950/5 shadow-md shadow-navy-900/10 ${className}`.trim()
+              : 'hidden'
+          }
+          aria-hidden
+        />
 
         <div
           key="audio-player-shell"
