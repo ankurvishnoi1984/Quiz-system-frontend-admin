@@ -21,6 +21,7 @@ import {
   PreviewRankingBars,
   PreviewWordCloud,
 } from './PreviewPresentationVisuals'
+import { PresentQuestionMedia } from '../present-mode/PresentQuestionMedia'
 
 /**
  * PPT / Mentimeter-style slide: question + full-screen answers only.
@@ -130,13 +131,33 @@ export function PreviewQuestionSlide({
 
   return (
     <div className="preview-deck flex min-h-0 flex-1 flex-col">
-      <header className="preview-deck-question shrink-0 px-[clamp(0.5rem,2vw,1rem)] pt-[clamp(0.25rem,1vh,0.75rem)] text-center">
-        <h2 className="mx-auto max-w-[22ch] text-[clamp(2rem,6.5vw,4.25rem)] font-bold leading-[1.12] tracking-tight text-navy-900 sm:max-w-[28ch]">
-          {question.text || 'Untitled question'}
-        </h2>
+      <header className="preview-deck-question relative z-20 shrink-0 px-[clamp(0.5rem,2vw,1rem)] pt-[clamp(0.25rem,1vh,0.75rem)]">
+        <div
+          className={
+            question.media?.url
+              ? 'flex flex-col items-center gap-[clamp(0.75rem,2vh,1.25rem)] lg:flex-row lg:items-start lg:justify-center lg:gap-[clamp(1.25rem,3vw,2.5rem)]'
+              : 'text-center'
+          }
+        >
+          <h2
+            className={`min-w-0 font-bold leading-[1.12] tracking-tight text-navy-900 ${
+              question.media?.url
+                ? 'flex-1 text-center text-[clamp(1.75rem,5.5vw,3.75rem)] lg:text-left'
+                : 'mx-auto max-w-[22ch] text-[clamp(2rem,6.5vw,4.25rem)] sm:max-w-[28ch]'
+            }`}
+          >
+            {question.text || 'Untitled question'}
+          </h2>
+          {question.media?.url ? (
+            <PresentQuestionMedia
+              media={question.media}
+              className="relative z-20 w-full max-w-md lg:w-[min(28vw,320px)] lg:max-w-none lg:shrink-0"
+            />
+          ) : null}
+        </div>
       </header>
 
-      <div className="relative mt-[clamp(0.75rem,2.5vh,1.75rem)] flex min-h-0 flex-1 flex-col">
+      <div className="relative z-0 mt-[clamp(0.75rem,2.5vh,1.75rem)] flex min-h-0 flex-1 flex-col">
         {renderVisual()}
       </div>
     </div>
