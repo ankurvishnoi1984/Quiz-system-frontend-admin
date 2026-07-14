@@ -63,6 +63,7 @@ import {
   listQaQuestionsApi,
   listSessionQuestionsApi,
   qaModerateApi,
+  setQuestionLiveStateApi,
   transitionSessionApi,
   updateSessionApi,
 } from '../services/liveApi'
@@ -380,9 +381,47 @@ function LivePage() {
     onError: (error) => setErrorMessage(error.message || 'Unable to update session state'),
   })
 
+  const clearSessionEndingScreens = useCallback(async () => {
+    const current = queryClient.getQueryData(['live-session', sessionId]) || sessionQuery.data
+    const clearLb = Boolean(current?.leaderboard_enabled)
+    const clearSurvey = Boolean(current?.survey_results_enabled)
+    if (!clearLb && !clearSurvey) return null
+
+    const updated = await updateSessionApi(accessToken, sessionId, {
+      ...(clearLb ? { leaderboard_enabled: false } : {}),
+      ...(clearSurvey ? { survey_results_enabled: false } : {}),
+    })
+    if (updated) {
+      const patch = {
+        leaderboard_enabled: updated.leaderboard_enabled,
+        survey_results_enabled: updated.survey_results_enabled,
+      }
+      queryClient.setQueryData(['live-session', sessionId], (old) =>
+        old ? { ...old, ...updated, ...patch } : updated,
+      )
+      queryClient.setQueryData(['live-session', sessionId, 'host'], (old) =>
+        old ? { ...old, ...updated, ...patch } : old,
+      )
+    }
+    queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+    queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+    return updated
+  }, [accessToken, sessionId, queryClient, sessionQuery.data])
+
+  const deactivateAllLiveQuestions = useCallback(async () => {
+    const liveQuestions = mappedQuestions.filter((q) => q.isLive)
+    if (!liveQuestions.length) return
+    await Promise.all(
+      liveQuestions.map((q) => setQuestionLiveStateApi(accessToken, q.id, false)),
+    )
+    queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+  }, [accessToken, mappedQuestions, queryClient, sessionId])
+
   const sessionLeaderboardMutation = useMutation({
-    mutationFn: (enabled) =>
-      updateSessionApi(accessToken, sessionId, { leaderboard_enabled: enabled }),
+    mutationFn: async (enabled) => {
+      if (enabled) await deactivateAllLiveQuestions()
+      return updateSessionApi(accessToken, sessionId, { leaderboard_enabled: enabled })
+    },
     onSuccess: (updated) => {
       if (updated) {
         queryClient.setQueryData(['live-session', sessionId], (old) =>
@@ -393,6 +432,15 @@ function LivePage() {
                 leaderboard_enabled: updated.leaderboard_enabled,
               }
             : updated,
+        )
+        queryClient.setQueryData(['live-session', sessionId, 'host'], (old) =>
+          old
+            ? {
+                ...old,
+                ...updated,
+                leaderboard_enabled: updated.leaderboard_enabled,
+              }
+            : old,
         )
       }
       queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
@@ -416,8 +464,10 @@ function LivePage() {
   })
 
   const sessionSurveyResultsMutation = useMutation({
-    mutationFn: (enabled) =>
-      updateSessionApi(accessToken, sessionId, { survey_results_enabled: enabled }),
+    mutationFn: async (enabled) => {
+      if (enabled) await deactivateAllLiveQuestions()
+      return updateSessionApi(accessToken, sessionId, { survey_results_enabled: enabled })
+    },
     onSuccess: (updated) => {
       if (updated) {
         queryClient.setQueryData(['live-session', sessionId], (old) =>
@@ -428,6 +478,15 @@ function LivePage() {
                 survey_results_enabled: updated.survey_results_enabled,
               }
             : updated,
+        )
+        queryClient.setQueryData(['live-session', sessionId, 'host'], (old) =>
+          old
+            ? {
+                ...old,
+                ...updated,
+                survey_results_enabled: updated.survey_results_enabled,
+              }
+            : old,
         )
       }
       queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
@@ -464,6 +523,7 @@ function LivePage() {
     closeAllQuestions,
     activateAllQuestions,
   } = useHostQuestionMutations(accessToken, sessionId, {
+    clearEndingScreensOnActivate: clearSessionEndingScreens,
     onMutationError: (message) => setErrorMessage(message),
     onCloseQuestionSuccess: (questionText) => {
       setErrorMessage('')

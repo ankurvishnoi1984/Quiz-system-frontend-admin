@@ -12,6 +12,7 @@ import {
   getSessionSurveySummaryApi,
   listQaQuestionsApi,
   setPresentSlideApi,
+  setQuestionLiveStateApi,
   updateSessionApi,
 } from '../../services/liveApi'
 import {
@@ -102,9 +103,52 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
     [mappedQuestions, canEditLive, singleActiveQuestionMode],
   )
 
+  const clearSessionEndingScreens = useCallback(async () => {
+    if (readOnly || !hostAccessToken) return null
+    const current =
+      queryClient.getQueryData(['live-session', sessionId]) ||
+      queryClient.getQueryData(['live-session', sessionId, 'host']) ||
+      session
+    const clearLb = Boolean(current?.leaderboard_enabled)
+    const clearSurvey = Boolean(current?.survey_results_enabled)
+    if (!clearLb && !clearSurvey) return null
+
+    const updated = await updateSessionApi(hostAccessToken, sessionId, {
+      ...(clearLb ? { leaderboard_enabled: false } : {}),
+      ...(clearSurvey ? { survey_results_enabled: false } : {}),
+    })
+    if (updated) {
+      const patch = {
+        leaderboard_enabled: updated.leaderboard_enabled,
+        survey_results_enabled: updated.survey_results_enabled,
+      }
+      queryClient.setQueryData(['live-session', sessionId], (old) =>
+        old ? { ...old, ...updated, ...patch } : updated,
+      )
+      queryClient.setQueryData(['live-session', sessionId, 'host'], (old) =>
+        old ? { ...old, ...updated, ...patch } : old,
+      )
+    }
+    queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
+    queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+    return updated
+  }, [readOnly, hostAccessToken, queryClient, sessionId, session])
+
+  const deactivateAllLiveQuestions = useCallback(async () => {
+    if (readOnly || !hostAccessToken) return
+    const liveQuestions = mappedQuestions.filter((q) => q.isLive)
+    if (!liveQuestions.length) return
+    await Promise.all(
+      liveQuestions.map((q) => setQuestionLiveStateApi(hostAccessToken, q.id, false)),
+    )
+    queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
+  }, [readOnly, hostAccessToken, mappedQuestions, queryClient, sessionId])
+
   const sessionLeaderboardMutation = useMutation({
-    mutationFn: (enabled) =>
-      updateSessionApi(hostAccessToken, sessionId, { leaderboard_enabled: enabled }),
+    mutationFn: async (enabled) => {
+      if (enabled) await deactivateAllLiveQuestions()
+      return updateSessionApi(hostAccessToken, sessionId, { leaderboard_enabled: enabled })
+    },
     onSuccess: (updated) => {
       if (updated) {
         queryClient.setQueryData(['live-session', sessionId], (old) =>
@@ -115,6 +159,15 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
                 leaderboard_enabled: updated.leaderboard_enabled,
               }
             : updated,
+        )
+        queryClient.setQueryData(['live-session', sessionId, 'host'], (old) =>
+          old
+            ? {
+                ...old,
+                ...updated,
+                leaderboard_enabled: updated.leaderboard_enabled,
+              }
+            : old,
         )
       }
       queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
@@ -131,8 +184,10 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
   })
 
   const sessionSurveyResultsMutation = useMutation({
-    mutationFn: (enabled) =>
-      updateSessionApi(hostAccessToken, sessionId, { survey_results_enabled: enabled }),
+    mutationFn: async (enabled) => {
+      if (enabled) await deactivateAllLiveQuestions()
+      return updateSessionApi(hostAccessToken, sessionId, { survey_results_enabled: enabled })
+    },
     onSuccess: (updated) => {
       if (updated) {
         queryClient.setQueryData(['live-session', sessionId], (old) =>
@@ -143,6 +198,15 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
                 survey_results_enabled: updated.survey_results_enabled,
               }
             : updated,
+        )
+        queryClient.setQueryData(['live-session', sessionId, 'host'], (old) =>
+          old
+            ? {
+                ...old,
+                ...updated,
+                survey_results_enabled: updated.survey_results_enabled,
+              }
+            : old,
         )
       }
       queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
@@ -171,6 +235,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
     closeAllQuestions,
     activateAllQuestions,
   } = useHostQuestionMutations(hostAccessToken, sessionId, {
+    clearEndingScreensOnActivate: clearSessionEndingScreens,
     onCloseQuestionSuccess: (questionText) => {
       const preview = String(questionText || '').trim()
       setHostAlert({

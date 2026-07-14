@@ -22,6 +22,8 @@ export function useHostQuestionMutations(
     onActivateAllQuestionsSuccess,
     onActivateAllQuestionsError,
     onMutationError,
+    /** Clears overall rankings / survey results before activating questions */
+    clearEndingScreensOnActivate,
   } = {},
 ) {
   const queryClient = useQueryClient()
@@ -29,6 +31,11 @@ export function useHostQuestionMutations(
   const invalidateQuestions = () => {
     queryClient.invalidateQueries({ queryKey: ['live-questions', sessionId] })
     queryClient.invalidateQueries({ queryKey: ['live-question-results'] })
+  }
+
+  const ensureEndingScreensOff = async () => {
+    if (typeof clearEndingScreensOnActivate !== 'function') return
+    await clearEndingScreensOnActivate()
   }
 
   const questionLiveMutation = useMutation({
@@ -42,6 +49,7 @@ export function useHostQuestionMutations(
       isSurvey = false,
       supportsParticipantResults = false,
     }) => {
+      if (isLive) await ensureEndingScreensOff()
       const updated = await setQuestionLiveStateApi(accessToken, questionId, isLive)
       if (isLive) return updated
 
@@ -101,7 +109,10 @@ export function useHostQuestionMutations(
   })
 
   const activateAllQuestionsMutation = useMutation({
-    mutationFn: () => activateAllQuestionsApi(accessToken, sessionId),
+    mutationFn: async () => {
+      await ensureEndingScreensOff()
+      return activateAllQuestionsApi(accessToken, sessionId)
+    },
     onSuccess: (data) => {
       invalidateQuestions()
       onActivateAllQuestionsSuccess?.(data?.activated_count ?? 0)
@@ -112,7 +123,10 @@ export function useHostQuestionMutations(
   })
 
   const reattemptMutation = useMutation({
-    mutationFn: ({ questionId }) => openQuestionForReattemptApi(accessToken, questionId),
+    mutationFn: async ({ questionId }) => {
+      await ensureEndingScreensOff()
+      return openQuestionForReattemptApi(accessToken, questionId)
+    },
     onSuccess: (_data, { questionText }) => {
       invalidateQuestions()
       onReattemptSuccess?.(questionText)
