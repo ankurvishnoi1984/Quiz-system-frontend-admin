@@ -11,17 +11,29 @@ import { PreviewFullscreenButton, PreviewShell } from './PreviewShell'
 import { PreviewJoinSlide } from './PreviewJoinSlide'
 import { PreviewQuestionSlide } from './PreviewQuestionSlide'
 
+function resolveLiveQuestionTarget(questions) {
+  const liveIndex = (questions || []).findIndex((q) => q.isLive)
+  if (liveIndex < 0) return null
+  return {
+    screen: 'question',
+    questionId: questions[liveIndex].id,
+    questionIndex: liveIndex,
+  }
+}
+
 function PreviewModePage() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session') || ''
   const accessToken = useAuthStore((state) => state.accessToken)
 
-  const [screen, setScreen] = useState('join')
+  // null until first resolution — avoids flashing join before the live question is known
+  const [screen, setScreen] = useState(null)
   const [followQuestionId, setFollowQuestionId] = useState(null)
   const [followQuestionIndex, setFollowQuestionIndex] = useState(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const pendingFollowRef = useRef(null)
   const mappedQuestionsRef = useRef([])
+  const didBootstrapRef = useRef(false)
 
   const applyFollowPayload = useCallback((data, questions) => {
     if (data?.screen === 'question') {
@@ -63,6 +75,12 @@ function PreviewModePage() {
       const questions = mappedQuestionsRef.current
       const idx = Number(data?.slide_index)
       if (!Number.isFinite(idx) || idx <= 0) {
+        // Prefer an already-live question over Present's join slide after refresh.
+        const liveTarget = resolveLiveQuestionTarget(questions)
+        if (liveTarget) {
+          applyFollowPayload(liveTarget, questions)
+          return
+        }
         applyFollowPayload({ screen: 'join' }, questions)
         return
       }
@@ -76,7 +94,6 @@ function PreviewModePage() {
         return
       }
 
-      // Only leave the join slide when that Present slide’s question is actually live.
       const fromPresent = questions[questionIndex]
       if (fromPresent?.isLive) {
         applyFollowPayload(
@@ -86,16 +103,9 @@ function PreviewModePage() {
         return
       }
 
-      const liveIndex = questions.findIndex((q) => q.isLive)
-      if (liveIndex >= 0) {
-        applyFollowPayload(
-          {
-            screen: 'question',
-            questionId: questions[liveIndex].id,
-            questionIndex: liveIndex,
-          },
-          questions,
-        )
+      const liveTarget = resolveLiveQuestionTarget(questions)
+      if (liveTarget) {
+        applyFollowPayload(liveTarget, questions)
         return
       }
 
@@ -128,9 +138,22 @@ function PreviewModePage() {
     applyFollowPayload(pending, mappedQuestions)
   }, [mappedQuestions, applyFollowPayload])
 
-  // Session live with no active question → stay on join/QR (share link) slide.
+  // Bootstrap from live questions as soon as data is ready (no join → question flash on refresh).
   useEffect(() => {
-    if (!mappedQuestions.length) return
+    if (isLoading || !session || didBootstrapRef.current) return
+
+    const liveTarget = resolveLiveQuestionTarget(mappedQuestions)
+    if (liveTarget) {
+      applyFollowPayload(liveTarget, mappedQuestions)
+    } else {
+      applyFollowPayload({ screen: 'join' }, mappedQuestions)
+    }
+    didBootstrapRef.current = true
+  }, [isLoading, session, mappedQuestions, applyFollowPayload])
+
+  // If the last live question is closed, fall back to join without waiting for Live tab.
+  useEffect(() => {
+    if (!didBootstrapRef.current || !mappedQuestions.length) return
     const anyLive = mappedQuestions.some((q) => q.isLive)
     if (anyLive) return
     if (session?.status !== 'live' && session?.status !== 'paused') return
@@ -140,9 +163,9 @@ function PreviewModePage() {
     pendingFollowRef.current = null
   }, [mappedQuestions, session?.status])
 
-  // Catch up to Present Mode if it already advanced before Preview opened.
+  // Catch up to Present Mode if it already advanced (after bootstrap; live Q wins over join).
   useEffect(() => {
-    if (!sessionId || !accessToken || isLoading) return undefined
+    if (!sessionId || !accessToken || isLoading || !didBootstrapRef.current) return undefined
     let cancelled = false
     getPresentSlideApi(accessToken, sessionId)
       .then((data) => {
@@ -224,18 +247,18 @@ function PreviewModePage() {
     )
   }
 
-  if (isLoading) {
+  if (isError || (!isLoading && !session)) {
     return (
-      <div className="grid min-h-dvh place-items-center bg-linear-to-br from-slate-50 via-sky-50 to-blue-100/70">
-        <p className="text-lg font-medium text-slate-600">Loading preview…</p>
+      <div className="grid min-h-dvh place-items-center bg-linear-to-br from-slate-50 via-sky-50 to-blue-100/70 p-8">
+        <p className="text-center text-lg text-red-700">Session not found.</p>
       </div>
     )
   }
 
-  if (isError || !session) {
+  if (isLoading || screen == null) {
     return (
-      <div className="grid min-h-dvh place-items-center bg-linear-to-br from-slate-50 via-sky-50 to-blue-100/70 p-8">
-        <p className="text-center text-lg text-red-700">Session not found.</p>
+      <div className="grid min-h-dvh place-items-center bg-linear-to-br from-slate-50 via-sky-50 to-blue-100/70">
+        <p className="text-lg font-medium text-slate-600">Loading preview…</p>
       </div>
     )
   }
