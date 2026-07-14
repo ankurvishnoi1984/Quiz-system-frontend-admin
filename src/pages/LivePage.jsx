@@ -201,6 +201,18 @@ function LivePage() {
 
   const activeQuestion = mappedQuestions[questionIndex] || null
 
+  // Preview Mode: join/QR while nothing is live; follow an active (isLive) question only.
+  const livePreviewTarget = useMemo(() => {
+    if (activeQuestion?.isLive) {
+      return { question: activeQuestion, questionIndex }
+    }
+    const liveIndex = mappedQuestions.findIndex((q) => q.isLive)
+    if (liveIndex >= 0) {
+      return { question: mappedQuestions[liveIndex], questionIndex: liveIndex }
+    }
+    return null
+  }, [mappedQuestions, activeQuestion, questionIndex])
+
   const pushPreviewFollow = useCallback(
     (payload) => {
       if (!sessionId) return
@@ -211,16 +223,16 @@ function LivePage() {
 
   const pushCurrentPreviewFollow = useCallback(() => {
     if (!sessionId) return
-    if (activeQuestion?.id) {
+    if (livePreviewTarget?.question?.id) {
       pushPreviewFollow({
         screen: 'question',
-        questionId: activeQuestion.id,
-        questionIndex,
+        questionId: livePreviewTarget.question.id,
+        questionIndex: livePreviewTarget.questionIndex,
       })
       return
     }
     pushPreviewFollow({ screen: 'join' })
-  }, [sessionId, activeQuestion?.id, questionIndex, pushPreviewFollow])
+  }, [sessionId, livePreviewTarget, pushPreviewFollow])
 
   // Drive Preview Mode tab via BroadcastChannel (does not touch Present Mode).
   useEffect(() => {
@@ -893,11 +905,16 @@ function LivePage() {
                     type="button"
                     onClick={() => {
                       setQuestionIndex(idx)
-                      pushPreviewFollow({
-                        screen: 'question',
-                        questionId: q.id,
-                        questionIndex: idx,
-                      })
+                      // Preview only follows active (live) questions; otherwise keep/share join slide.
+                      if (q.isLive) {
+                        pushPreviewFollow({
+                          screen: 'question',
+                          questionId: q.id,
+                          questionIndex: idx,
+                        })
+                      } else if (!mappedQuestions.some((item) => item.isLive)) {
+                        pushPreviewFollow({ screen: 'join' })
+                      }
                     }}
                     className={`w-full rounded-2xl border p-3 text-left transition ${
                       isSelected

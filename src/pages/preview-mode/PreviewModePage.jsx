@@ -5,7 +5,6 @@ import { useLiveSession } from '../../hooks/useLiveSession'
 import { getPresentSlideApi } from '../../services/liveApi'
 import {
   broadcastPreviewReady,
-  mapPresentSlideToPreviewFollow,
   subscribePreviewFollow,
 } from '../../utils/previewFollow'
 import { PreviewFullscreenButton, PreviewShell } from './PreviewShell'
@@ -76,7 +75,31 @@ function PreviewModePage() {
         }
         return
       }
-      applyFollowPayload(mapPresentSlideToPreviewFollow(idx, questions.length), questions)
+
+      // Only leave the join slide when that Present slide’s question is actually live.
+      const fromPresent = questions[questionIndex]
+      if (fromPresent?.isLive) {
+        applyFollowPayload(
+          { screen: 'question', questionId: fromPresent.id, questionIndex },
+          questions,
+        )
+        return
+      }
+
+      const liveIndex = questions.findIndex((q) => q.isLive)
+      if (liveIndex >= 0) {
+        applyFollowPayload(
+          {
+            screen: 'question',
+            questionId: questions[liveIndex].id,
+            questionIndex: liveIndex,
+          },
+          questions,
+        )
+        return
+      }
+
+      applyFollowPayload({ screen: 'join' }, questions)
     },
     [applyFollowPayload],
   )
@@ -104,6 +127,18 @@ function PreviewModePage() {
     if (!pending || !mappedQuestions.length) return
     applyFollowPayload(pending, mappedQuestions)
   }, [mappedQuestions, applyFollowPayload])
+
+  // Session live with no active question → stay on join/QR (share link) slide.
+  useEffect(() => {
+    if (!mappedQuestions.length) return
+    const anyLive = mappedQuestions.some((q) => q.isLive)
+    if (anyLive) return
+    if (session?.status !== 'live' && session?.status !== 'paused') return
+    setScreen('join')
+    setFollowQuestionId(null)
+    setFollowQuestionIndex(null)
+    pendingFollowRef.current = null
+  }, [mappedQuestions, session?.status])
 
   // Catch up to Present Mode if it already advanced before Preview opened.
   useEffect(() => {
