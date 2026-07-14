@@ -71,7 +71,7 @@ function SessionFormModal({
     const autoEndDate = String(form.get('autoEndDate') ?? '').trim()
     const autoEndTime = String(form.get('autoEndTime') ?? '').trim()
 
-    if (mode === 'create' && autoEndEnabled) {
+    if (!liveSettingsOnly && autoEndEnabled) {
       if (!autoEndDate || !autoEndTime) {
         window.alert('Please enter both an end date and end time for automatic session end.')
         return
@@ -108,9 +108,9 @@ function SessionFormModal({
       quizTotalTimeEnabled: enableNavigation && quizTotalTimeEnabled,
       quizTotalTimeMinutes: enableNavigation && quizTotalTimeEnabled ? quizTotalTimeMinutes : null,
       overallLeaderboard,
-      autoEndEnabled: mode === 'create' ? autoEndEnabled : false,
-      autoEndDate: mode === 'create' && autoEndEnabled ? autoEndDate : '',
-      autoEndTime: mode === 'create' && autoEndEnabled ? autoEndTime : '',
+      autoEndEnabled: !liveSettingsOnly && autoEndEnabled,
+      autoEndDate: !liveSettingsOnly && autoEndEnabled ? autoEndDate : '',
+      autoEndTime: !liveSettingsOnly && autoEndEnabled ? autoEndTime : '',
     })
   }
 
@@ -187,7 +187,7 @@ function SessionFormModal({
                 placeholder="e.g., Friday live polling session"
               />
             </div>
-            {mode === 'create' ? (
+            {!liveSettingsOnly ? (
               <>
                 <div className="md:col-span-2">
                   <label className="flex items-center justify-between gap-3 rounded-xl border border-blue-200/70 bg-white px-3 py-3">

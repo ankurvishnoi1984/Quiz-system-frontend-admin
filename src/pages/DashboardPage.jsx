@@ -385,6 +385,9 @@ function DashboardPage() {
         Number(editSession.quiz_total_time_minutes) > 0,
       quizTotalTimeMinutes: Number(editSession.quiz_total_time_minutes) || 30,
       overallLeaderboard: Boolean(editSession.leaderboard_enabled),
+      autoEndEnabled: Boolean(editSession.auto_end_enabled),
+      autoEndDate: toDateInputValue(editSession.auto_end_date),
+      autoEndTime: toTimeInputValue(editSession.auto_end_time),
     }
   }, [editSession])
 
@@ -439,6 +442,9 @@ function DashboardPage() {
             ? Number(values.quizTotalTimeMinutes)
             : null,
         join_type: values.joinRequirement || 'name',
+        auto_end_enabled: Boolean(values.autoEndEnabled),
+        auto_end_date: values.autoEndEnabled ? values.autoEndDate || null : null,
+        auto_end_time: values.autoEndEnabled ? values.autoEndTime || null : null,
       })
     }
 
