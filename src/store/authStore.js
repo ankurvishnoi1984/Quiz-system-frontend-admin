@@ -17,13 +17,15 @@ function getPersistStorage() {
   return localStorage.getItem(REMEMBER_ME_KEY) === 'true' ? localStorage : sessionStorage
 }
 
-function isPresentModeHandoff() {
+/** New-tab handoff: Present uses ?present=1, Preview uses ?preview=1. */
+function isNewTabAuthHandoff() {
   if (typeof window === 'undefined') return false
-  return new URLSearchParams(window.location.search).get('present') === '1'
+  const params = new URLSearchParams(window.location.search)
+  return params.get('present') === '1' || params.get('preview') === '1'
 }
 
 /**
- * Copy auth into localStorage so a newly opened tab (e.g. /present) can read it.
+ * Copy auth into localStorage so a newly opened tab (e.g. /present, /preview) can read it.
  * sessionStorage is isolated per tab, so window.open would otherwise land on /login.
  */
 export function syncAuthForNewBrowserTab() {
@@ -40,8 +42,8 @@ const authPersistStorage = createJSONStorage(() => ({
   getItem: (name) => {
     const primary = getPersistStorage().getItem(name)
     if (primary) return primary
-    // Present mode opens in a new tab; read the short-lived mirror written before window.open.
-    if (name === AUTH_STORAGE_KEY && isPresentModeHandoff()) {
+    // Present/Preview open in a new tab; read the short-lived mirror written before window.open.
+    if (name === AUTH_STORAGE_KEY && isNewTabAuthHandoff()) {
       return localStorage.getItem(name)
     }
     return null

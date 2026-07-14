@@ -126,3 +126,7 @@ export async function setPresentSlideApi(accessToken, sessionId, { slideIndex, s
     }),
   })
 }
+
+export async function getPresentSlideApi(accessToken, sessionId) {
+  return authRequest(`/sessions/${sessionId}/present-slide`, accessToken)
+}

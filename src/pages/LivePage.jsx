@@ -12,9 +12,9 @@ import {
   YAxis,
 } from 'recharts'
 import {
-  Eye,
   BarChart3,
   Layers,
+  MonitorPlay,
   Play,
   Presentation,
   Rocket,
@@ -23,7 +23,7 @@ import {
   Trophy,
   Users,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import WordCloudChart from '../components/charts/WordCloudChart'
@@ -82,6 +82,11 @@ import {
   buildResponseCountByQuestionId,
   countResponseSubmissions,
 } from '../utils/livePresentation'
+import {
+  broadcastPreviewFollow,
+  buildPreviewModeUrl,
+  subscribePreviewFollow,
+} from '../utils/previewFollow'
 
 function LivePage() {
   const [searchParams] = useSearchParams()
@@ -96,7 +101,6 @@ function LivePage() {
 
 
   const [questionIndex, setQuestionIndex] = useState(0)
-  const [previewOpen, setPreviewOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [socketStatus, setSocketStatus] = useState('disconnected')
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
@@ -197,6 +201,50 @@ function LivePage() {
 
   const activeQuestion = mappedQuestions[questionIndex] || null
 
+  const pushPreviewFollow = useCallback(
+    (payload) => {
+      if (!sessionId) return
+      broadcastPreviewFollow(sessionId, payload)
+    },
+    [sessionId],
+  )
+
+  const pushCurrentPreviewFollow = useCallback(() => {
+    if (!sessionId) return
+    if (activeQuestion?.id) {
+      pushPreviewFollow({
+        screen: 'question',
+        questionId: activeQuestion.id,
+        questionIndex,
+      })
+      return
+    }
+    pushPreviewFollow({ screen: 'join' })
+  }, [sessionId, activeQuestion?.id, questionIndex, pushPreviewFollow])
+
+  // Drive Preview Mode tab via BroadcastChannel (does not touch Present Mode).
+  useEffect(() => {
+    pushCurrentPreviewFollow()
+  }, [pushCurrentPreviewFollow])
+
+  // When Preview tab loads, re-send current Live selection (messages sent earlier are lost).
+  useEffect(() => {
+    if (!sessionId) return undefined
+    return subscribePreviewFollow(sessionId, {
+      onReady: () => pushCurrentPreviewFollow(),
+    })
+  }, [sessionId, pushCurrentPreviewFollow])
+
+  const openPreviewMode = () => {
+    if (!sessionId) return
+    syncAuthForNewBrowserTab()
+    // Start on join; Preview will request a sync, and Live / Present navigation update it.
+    pushPreviewFollow({ screen: 'join' })
+    window.open(buildPreviewModeUrl(sessionId), '_blank', 'noopener,noreferrer')
+    // Re-assert current selection shortly after the new tab can subscribe.
+    window.setTimeout(() => pushCurrentPreviewFollow(), 500)
+    window.setTimeout(() => pushCurrentPreviewFollow(), 1400)
+  }
 
   const questionResultsQuery = useQuery({
     queryKey: ['live-question-results', activeQuestion?.id],
@@ -718,6 +766,17 @@ function LivePage() {
               Present
             </button>
           ) : null}
+          {canEditLive ? (
+            <button
+              type="button"
+              onClick={openPreviewMode}
+              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-sky-300/80 bg-sky-50/90 px-4 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-100"
+              title="Open fullscreen preview for Zoom/Meet screen share. Starts with join instructions and follows your selected question."
+            >
+              <MonitorPlay className="size-4" />
+              Preview Mode
+            </button>
+          ) : null}
           {canShareSession ? (
             <button
               type="button"
@@ -832,7 +891,14 @@ function LivePage() {
                   <button
                     key={q.id}
                     type="button"
-                    onClick={() => setQuestionIndex(idx)}
+                    onClick={() => {
+                      setQuestionIndex(idx)
+                      pushPreviewFollow({
+                        screen: 'question',
+                        questionId: q.id,
+                        questionIndex: idx,
+                      })
+                    }}
                     className={`w-full rounded-2xl border p-3 text-left transition ${
                       isSelected
                         ? 'border-navy-600 bg-linear-to-r from-navy-900 via-navy-800 to-navy-700 text-white shadow-md shadow-navy-900/20'
@@ -901,15 +967,6 @@ function LivePage() {
                 {activeQuestion ? `${questionIndex + 1} / ${mappedQuestions.length} • ${activeQuestion.type}` : '—'}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setPreviewOpen(true)}
-              disabled={!activeQuestion}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200/90 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-navy-200 hover:bg-slate-50 disabled:opacity-50"
-            >
-              <Eye className="size-3.5" />
-              Preview
-            </button>
           </div>
 
 
@@ -1178,13 +1235,6 @@ function LivePage() {
         )}
       </div>
 
-
-      <Modal open={previewOpen} title="Preview Participant View" onClose={() => setPreviewOpen(false)}>
-        <div className="rounded-xl border border-blue-200 bg-white p-4">
-          <h3 className="text-lg font-bold text-navy-900">{activeQuestion?.text || 'No question selected'}</h3>
-          <p className="mt-1 text-sm text-slate-600">Type: {activeQuestion?.type || '—'}</p>
-        </div>
-      </Modal>
 
       <Modal
         open={endSessionConfirmOpen}

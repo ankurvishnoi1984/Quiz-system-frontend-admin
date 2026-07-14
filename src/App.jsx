@@ -19,6 +19,7 @@ import WebSocketMonitorPage from './pages/WebSocketMonitorPage'
 import ParticipantSessionPage from './pages/participant-session'
 import PresentModePage from './pages/present-mode'
 import PresentViewPage from './pages/present-mode/PresentViewPage'
+import PreviewModePage from './pages/preview-mode'
 import { SessionsProvider } from './context/SessionsContext'
 import { useAuthStore } from './store/authStore'
 import HostLayout from './layouts/HostLayout'
@@ -84,6 +85,16 @@ function App() {
             element={
               user && !mustChangePassword ? (
                 <PresentModePage />
+              ) : (
+                <Navigate to={user ? '/change-password' : '/login'} replace />
+              )
+            }
+          />
+          <Route
+            path="/preview"
+            element={
+              user && !mustChangePassword ? (
+                <PreviewModePage />
               ) : (
                 <Navigate to={user ? '/change-password' : '/login'} replace />
               )

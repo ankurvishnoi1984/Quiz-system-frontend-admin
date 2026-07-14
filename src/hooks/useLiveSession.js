@@ -216,7 +216,8 @@ export function useLiveSession(accessToken, sessionId, options = {}) {
       invalidateStructural()
     })
     const offPresentSlide = client.on(RealtimeEvent.PRESENT_SLIDE_CHANGED, (data) => {
-      if (!isViewer) return
+      // Viewers always sync; hosts only when a callback is opted in (e.g. Preview Mode).
+      if (!isViewer && !onPresentSlideChangedRef.current) return
       onPresentSlideChangedRef.current?.(data)
     })
 

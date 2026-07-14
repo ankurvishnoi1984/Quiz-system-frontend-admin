@@ -42,6 +42,43 @@
     animation-play-state: paused;
   }
 
+  .preview-mode .preview-response-row {
+    animation: preview-response-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .preview-mode .preview-response-list:hover .preview-response-row {
+    animation-play-state: paused;
+  }
+
+  .preview-mode .preview-cloud-word {
+    animation: preview-cloud-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .preview-mode .preview-cloud-word--new {
+    animation: preview-cloud-pop 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .preview-mode .preview-answer-chip {
+    animation: preview-response-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .preview-mode .preview-answer-chip--new {
+    animation: preview-cloud-pop 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .preview-mode .preview-rank-row {
+    animation: preview-response-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .preview-mode .preview-rank-fill {
+    transform-origin: left center;
+    animation: preview-bar-grow 0.85s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .preview-mode .preview-deck-question {
+    animation: preview-deck-title 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
   .participant-next-highlight {
     animation: participant-next-attention 1.4s ease-in-out infinite;
     outline: 2px solid rgb(251 191 36);
@@ -57,6 +94,63 @@
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes preview-response-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes preview-cloud-in {
+  from {
+    opacity: 0;
+    transform: rotate(var(--preview-cloud-rotate, 0deg)) scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(var(--preview-cloud-rotate, 0deg)) scale(1);
+  }
+}
+
+@keyframes preview-cloud-pop {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--preview-cloud-rotate, 0deg)) scale(0.3);
+  }
+  55% {
+    opacity: 1;
+    transform: rotate(var(--preview-cloud-rotate, 0deg)) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(var(--preview-cloud-rotate, 0deg)) scale(1);
+  }
+}
+
+@keyframes preview-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes preview-deck-title {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
