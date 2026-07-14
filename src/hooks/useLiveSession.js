@@ -221,6 +221,36 @@ export function useLiveSession(accessToken, sessionId, options = {}) {
       onPresentSlideChangedRef.current?.(data)
     })
 
+    const offSessionSettings = client.on(RealtimeEvent.SESSION_SETTINGS_UPDATED, (data) => {
+      queryClient.setQueryData(['live-session', sessionId, mode], (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          leaderboard_enabled:
+            data.leaderboard_enabled !== undefined
+              ? Boolean(data.leaderboard_enabled)
+              : old.leaderboard_enabled,
+          survey_results_enabled:
+            data.survey_results_enabled !== undefined
+              ? Boolean(data.survey_results_enabled)
+              : old.survey_results_enabled,
+          participant_navigation_enabled:
+            data.participant_navigation_enabled !== undefined
+              ? data.participant_navigation_enabled
+              : old.participant_navigation_enabled,
+          allow_late_join:
+            data.allow_late_join !== undefined ? data.allow_late_join : old.allow_late_join,
+        }
+      })
+      if (data.leaderboard_enabled) {
+        queryClient.invalidateQueries({ queryKey: ['live-leaderboard', sessionId] })
+      }
+      if (data.survey_results_enabled) {
+        queryClient.invalidateQueries({ queryKey: ['preview-survey-summary', sessionId] })
+        queryClient.invalidateQueries({ queryKey: ['present-survey-summary', sessionId] })
+      }
+    })
+
     client.connect()
     return () => {
       if (joinInvalidateTimerRef.current) {
@@ -238,6 +268,7 @@ export function useLiveSession(accessToken, sessionId, options = {}) {
       offSessionProgress()
       offConnected()
       offPresentSlide()
+      offSessionSettings()
       client.disconnect()
     }
   }, [

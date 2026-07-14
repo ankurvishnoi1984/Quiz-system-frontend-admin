@@ -223,6 +223,14 @@ function LivePage() {
 
   const pushCurrentPreviewFollow = useCallback(() => {
     if (!sessionId) return
+    if (sessionQuery.data?.leaderboard_enabled) {
+      pushPreviewFollow({ screen: 'leaderboard' })
+      return
+    }
+    if (sessionQuery.data?.survey_results_enabled) {
+      pushPreviewFollow({ screen: 'surveyEnding' })
+      return
+    }
     if (livePreviewTarget?.question?.id) {
       pushPreviewFollow({
         screen: 'question',
@@ -232,7 +240,13 @@ function LivePage() {
       return
     }
     pushPreviewFollow({ screen: 'join' })
-  }, [sessionId, livePreviewTarget, pushPreviewFollow])
+  }, [
+    sessionId,
+    sessionQuery.data?.leaderboard_enabled,
+    sessionQuery.data?.survey_results_enabled,
+    livePreviewTarget,
+    pushPreviewFollow,
+  ])
 
   // Drive Preview Mode tab via BroadcastChannel (does not touch Present Mode).
   useEffect(() => {
@@ -383,6 +397,19 @@ function LivePage() {
       }
       queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
       queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+      if (updated?.leaderboard_enabled) {
+        pushPreviewFollow({ screen: 'leaderboard' })
+      } else if (sessionQuery.data?.survey_results_enabled) {
+        pushPreviewFollow({ screen: 'surveyEnding' })
+      } else if (livePreviewTarget?.question?.id) {
+        pushPreviewFollow({
+          screen: 'question',
+          questionId: livePreviewTarget.question.id,
+          questionIndex: livePreviewTarget.questionIndex,
+        })
+      } else {
+        pushPreviewFollow({ screen: 'join' })
+      }
     },
     onError: (error) =>
       setErrorMessage(error.message || 'Unable to update overall rankings setting'),
@@ -405,6 +432,19 @@ function LivePage() {
       }
       queryClient.invalidateQueries({ queryKey: ['live-session', sessionId] })
       queryClient.invalidateQueries({ queryKey: ['live-dept-sessions'] })
+      if (updated?.survey_results_enabled) {
+        pushPreviewFollow({ screen: 'surveyEnding' })
+      } else if (sessionQuery.data?.leaderboard_enabled) {
+        pushPreviewFollow({ screen: 'leaderboard' })
+      } else if (livePreviewTarget?.question?.id) {
+        pushPreviewFollow({
+          screen: 'question',
+          questionId: livePreviewTarget.question.id,
+          questionIndex: livePreviewTarget.questionIndex,
+        })
+      } else {
+        pushPreviewFollow({ screen: 'join' })
+      }
     },
     onError: (error) =>
       setErrorMessage(error.message || 'Unable to update survey results setting'),

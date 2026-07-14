@@ -19,7 +19,7 @@ export function buildPreviewModeUrl(sessionId) {
  * Map Present Mode slide index → Preview screen.
  * Present slides: 0 = participants/join, 1..N = questions, then optional ending.
  */
-export function mapPresentSlideToPreviewFollow(slideIndex, questionCount) {
+export function mapPresentSlideToPreviewFollow(slideIndex, questionCount, endingType = null) {
   const idx = Number(slideIndex)
   const count = Number(questionCount) || 0
   if (!Number.isFinite(idx) || idx <= 0) {
@@ -29,29 +29,36 @@ export function mapPresentSlideToPreviewFollow(slideIndex, questionCount) {
   if (questionIndex >= 0 && questionIndex < count) {
     return { screen: 'question', questionId: null, questionIndex }
   }
-  // Leaderboard / ending slides — stay on last question if any, else join.
+  if (endingType === 'leaderboard' || endingType === 'surveyEnding') {
+    return { screen: endingType, questionId: null, questionIndex: null }
+  }
+  // Unknown ending — stay on last question if any, else join.
   if (count > 0) {
     return { screen: 'question', questionId: null, questionIndex: count - 1 }
   }
   return { screen: 'join', questionId: null, questionIndex: null }
 }
 
-/** @typedef {{ type: 'preview_follow', sessionId: string, screen: 'join' | 'question', questionId: number | null, questionIndex: number | null }} PreviewFollowMessage */
+/** @typedef {'join' | 'question' | 'leaderboard' | 'surveyEnding'} PreviewScreen */
+/** @typedef {{ type: 'preview_follow', sessionId: string, screen: PreviewScreen, questionId: number | null, questionIndex: number | null }} PreviewFollowMessage */
 /** @typedef {{ type: 'preview_ready', sessionId: string }} PreviewReadyMessage */
+
+const PREVIEW_SCREENS = new Set(['join', 'question', 'leaderboard', 'surveyEnding'])
 
 /**
  * @param {string|number} sessionId
- * @param {{ screen?: 'join' | 'question', questionId?: number | null, questionIndex?: number | null }} payload
+ * @param {{ screen?: PreviewScreen, questionId?: number | null, questionIndex?: number | null }} payload
  */
 export function broadcastPreviewFollow(sessionId, payload = {}) {
   if (typeof BroadcastChannel === 'undefined' || !sessionId) return
   try {
     const channel = new BroadcastChannel(getPreviewFollowChannelName(sessionId))
+    const screen = PREVIEW_SCREENS.has(payload.screen) ? payload.screen : 'join'
     /** @type {PreviewFollowMessage} */
     const message = {
       type: PREVIEW_FOLLOW_MESSAGE,
       sessionId: String(sessionId),
-      screen: payload.screen === 'question' ? 'question' : 'join',
+      screen,
       questionId:
         payload.questionId != null && Number.isFinite(Number(payload.questionId))
           ? Number(payload.questionId)

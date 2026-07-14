@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../store/authStore'
 import { useLiveSession } from '../../hooks/useLiveSession'
-import { getPresentSlideApi } from '../../services/liveApi'
+import { getPresentSlideApi, getSessionSurveySummaryApi } from '../../services/liveApi'
 import {
   broadcastPreviewReady,
   subscribePreviewFollow,
 } from '../../utils/previewFollow'
+import { sessionSupportsSurveyEndingScreen } from '../../utils/livePresentation'
 import { PreviewFullscreenButton, PreviewShell } from './PreviewShell'
 import { PreviewJoinSlide } from './PreviewJoinSlide'
 import { PreviewQuestionSlide } from './PreviewQuestionSlide'
+import { PreviewRankingSlide } from './PreviewRankingSlide'
+import { PreviewSurveyEndingSlide } from './PreviewSurveyEndingSlide'
 
 function resolveLiveQuestionTarget(questions) {
   const liveIndex = (questions || []).findIndex((q) => q.isLive)
@@ -19,6 +23,12 @@ function resolveLiveQuestionTarget(questions) {
     questionId: questions[liveIndex].id,
     questionIndex: liveIndex,
   }
+}
+
+function resolveEndingScreen(session) {
+  if (session?.leaderboard_enabled) return 'leaderboard'
+  if (session?.survey_results_enabled) return 'surveyEnding'
+  return null
 }
 
 function PreviewModePage() {
@@ -34,8 +44,16 @@ function PreviewModePage() {
   const pendingFollowRef = useRef(null)
   const mappedQuestionsRef = useRef([])
   const didBootstrapRef = useRef(false)
+  const lastEndingScreenRef = useRef(null)
 
   const applyFollowPayload = useCallback((data, questions) => {
+    if (data?.screen === 'leaderboard' || data?.screen === 'surveyEnding') {
+      setScreen(data.screen)
+      setFollowQuestionId(null)
+      setFollowQuestionIndex(null)
+      pendingFollowRef.current = null
+      return
+    }
     if (data?.screen === 'question') {
       const byId =
         data.questionId != null
@@ -114,7 +132,7 @@ function PreviewModePage() {
     [applyFollowPayload],
   )
 
-  const { session, mappedQuestions, responses, isLoading, isError } = useLiveSession(
+  const { session, mappedQuestions, responses, leaderboard, isLoading, isError } = useLiveSession(
     accessToken,
     sessionId,
     {
@@ -124,6 +142,19 @@ function PreviewModePage() {
   )
 
   mappedQuestionsRef.current = mappedQuestions
+
+  const surveySummaryQuery = useQuery({
+    queryKey: ['preview-survey-summary', sessionId],
+    queryFn: () => getSessionSurveySummaryApi(accessToken, sessionId),
+    enabled: Boolean(
+      accessToken &&
+        sessionId &&
+        sessionSupportsSurveyEndingScreen(mappedQuestions) &&
+        (screen === 'surveyEnding' || session?.survey_results_enabled),
+    ),
+    staleTime: 5000,
+    refetchInterval: session?.status === 'live' || session?.status === 'paused' ? 5000 : false,
+  })
 
   useEffect(() => {
     if (!sessionId) return undefined
@@ -138,22 +169,56 @@ function PreviewModePage() {
     applyFollowPayload(pending, mappedQuestions)
   }, [mappedQuestions, applyFollowPayload])
 
-  // Bootstrap from live questions as soon as data is ready (no join → question flash on refresh).
+  // Bootstrap from ending flags / live questions (no join → question flash on refresh).
   useEffect(() => {
     if (isLoading || !session || didBootstrapRef.current) return
 
-    const liveTarget = resolveLiveQuestionTarget(mappedQuestions)
-    if (liveTarget) {
-      applyFollowPayload(liveTarget, mappedQuestions)
+    const ending = resolveEndingScreen(session)
+    if (ending) {
+      applyFollowPayload({ screen: ending }, mappedQuestions)
+      lastEndingScreenRef.current = ending
     } else {
-      applyFollowPayload({ screen: 'join' }, mappedQuestions)
+      const liveTarget = resolveLiveQuestionTarget(mappedQuestions)
+      if (liveTarget) {
+        applyFollowPayload(liveTarget, mappedQuestions)
+      } else {
+        applyFollowPayload({ screen: 'join' }, mappedQuestions)
+      }
+      lastEndingScreenRef.current = null
     }
     didBootstrapRef.current = true
   }, [isLoading, session, mappedQuestions, applyFollowPayload])
 
+  // React to Overall rankings / Survey results toggles from Live or Present.
+  useEffect(() => {
+    if (!didBootstrapRef.current || !session) return
+    const ending = resolveEndingScreen(session)
+    if (ending) {
+      if (lastEndingScreenRef.current !== ending || (screen !== 'leaderboard' && screen !== 'surveyEnding')) {
+        applyFollowPayload({ screen: ending }, mappedQuestions)
+      }
+      lastEndingScreenRef.current = ending
+      return
+    }
+    if (lastEndingScreenRef.current) {
+      lastEndingScreenRef.current = null
+      const liveTarget = resolveLiveQuestionTarget(mappedQuestions)
+      applyFollowPayload(liveTarget || { screen: 'join' }, mappedQuestions)
+    }
+  }, [
+    session?.leaderboard_enabled,
+    session?.survey_results_enabled,
+    session,
+    mappedQuestions,
+    applyFollowPayload,
+    screen,
+  ])
+
   // If the last live question is closed, fall back to join without waiting for Live tab.
   useEffect(() => {
     if (!didBootstrapRef.current || !mappedQuestions.length) return
+    if (screen === 'leaderboard' || screen === 'surveyEnding') return
+    if (resolveEndingScreen(session)) return
     const anyLive = mappedQuestions.some((q) => q.isLive)
     if (anyLive) return
     if (session?.status !== 'live' && session?.status !== 'paused') return
@@ -161,11 +226,12 @@ function PreviewModePage() {
     setFollowQuestionId(null)
     setFollowQuestionIndex(null)
     pendingFollowRef.current = null
-  }, [mappedQuestions, session?.status])
+  }, [mappedQuestions, session?.status, session, screen])
 
   // Catch up to Present Mode if it already advanced (after bootstrap; live Q wins over join).
   useEffect(() => {
     if (!sessionId || !accessToken || isLoading || !didBootstrapRef.current) return undefined
+    if (resolveEndingScreen(session)) return undefined
     let cancelled = false
     getPresentSlideApi(accessToken, sessionId)
       .then((data) => {
@@ -176,7 +242,7 @@ function PreviewModePage() {
     return () => {
       cancelled = true
     }
-  }, [sessionId, accessToken, isLoading, applyPresentSlide, mappedQuestions.length])
+  }, [sessionId, accessToken, isLoading, applyPresentSlide, mappedQuestions.length, session])
 
   useEffect(() => {
     if (!sessionId || isLoading) return undefined
@@ -263,6 +329,35 @@ function PreviewModePage() {
     )
   }
 
+  let body = null
+  if (screen === 'leaderboard') {
+    body = (
+      <PreviewRankingSlide
+        sessionTitle={session?.title || 'Live session'}
+        leaderboard={leaderboard}
+      />
+    )
+  } else if (screen === 'surveyEnding') {
+    body = (
+      <PreviewSurveyEndingSlide
+        sessionTitle={session?.title || 'Live session'}
+        summary={surveySummaryQuery.data}
+        isLoading={surveySummaryQuery.isLoading}
+      />
+    )
+  } else if (screen === 'join' || !activeQuestion) {
+    body = <PreviewJoinSlide session={session} />
+  } else {
+    body = (
+      <PreviewQuestionSlide
+        key={activeQuestion.id}
+        accessToken={accessToken}
+        question={activeQuestion}
+        allResponses={responses}
+      />
+    )
+  }
+
   return (
     <PreviewShell
       footer={
@@ -273,16 +368,7 @@ function PreviewModePage() {
         )
       }
     >
-      {screen === 'join' || !activeQuestion ? (
-        <PreviewJoinSlide session={session} />
-      ) : (
-        <PreviewQuestionSlide
-          key={activeQuestion.id}
-          accessToken={accessToken}
-          question={activeQuestion}
-          allResponses={responses}
-        />
-      )}
+      {body}
     </PreviewShell>
   )
 }
