@@ -116,7 +116,7 @@ function QuestionChartBody({ question, participantsJoined, chartView }) {
 
   if (chartType === 'word_cloud') {
     return (
-      <WordCloudChart words={question.wordCloud} className="h-full" emptyLabel="No words submitted yet" />
+      <WordCloudChart words={question.wordCloud} className="h-full" emptyLabel="No words submitted yet" size="md" />
     )
   }
 

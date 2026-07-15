@@ -225,6 +225,7 @@ export function QuestionSlide({
             words={wordCloudWords}
             className={compact ? 'min-h-0 flex-1' : 'h-full min-h-[40vh]'}
             emptyLabel="Waiting for words…"
+            size={compact ? 'md' : 'lg'}
           />
         </div>
       )

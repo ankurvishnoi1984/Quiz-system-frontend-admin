@@ -140,6 +140,8 @@ const SURVEY_SUB_TYPES = [
   { id: 'Word Cloud', label: 'Word Cloud' },
   { id: 'Text', label: 'Open Text' },
   { id: 'Ranking', label: 'Ranking' },
+  { id: 'True/False', label: 'True/False' },
+  { id: 'Emoji Reaction', label: 'Emoji Reaction' },
 ]
 
 function surveySubTypeLabel(subType) {
@@ -151,10 +153,25 @@ function isSurveyQuestionType(type) {
 }
 
 function surveySubTypeUsesOptions(subType) {
-  return subType === 'MCQ' || subType === 'Poll' || subType === 'Ranking'
+  return (
+    subType === 'MCQ' ||
+    subType === 'Poll' ||
+    subType === 'Ranking' ||
+    subType === 'True/False' ||
+    subType === 'Emoji Reaction'
+  )
 }
 
 function defaultOptionsForSurveySubType(subType) {
+  if (subType === 'True/False') {
+    return [
+      { id: uid('opt'), optionId: null, text: 'True', isCorrect: false },
+      { id: uid('opt'), optionId: null, text: 'False', isCorrect: false },
+    ]
+  }
+  if (subType === 'Emoji Reaction') {
+    return createDefaultEmojiReactionOptions(uid)
+  }
   if (subType === 'MCQ' || subType === 'Poll' || subType === 'Ranking') {
     return [
       { id: uid('opt'), optionId: null, text: 'Option 1', isCorrect: false },
@@ -193,6 +210,8 @@ function apiSurveySubTypeToUi(subType) {
     open_text: 'Text',
     word_cloud: 'Word Cloud',
     ranking: 'Ranking',
+    true_false: 'True/False',
+    emoji_reaction: 'Emoji Reaction',
   }
   return mapping[subType] || 'MCQ'
 }
@@ -381,7 +400,7 @@ function SortableRow({ id, children, className = '' }) {
   )
 }
 
-function TrueFalseOptionsEditor({ question, quizMode, onChange, structureLocked }) {
+function TrueFalseOptionsEditor({ question, quizMode, onChange, structureLocked, variant = 'quiz' }) {
   const options = normalizeTrueFalseOptions(
     (question.options || []).map((o) => ({
       option_id: o.optionId,
@@ -403,8 +422,14 @@ function TrueFalseOptionsEditor({ question, quizMode, onChange, structureLocked 
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-semibold text-navy-900">Answer key</p>
-      <p className="text-xs text-slate-600">True/False always has two fixed choices. Mark exactly one as correct.</p>
+      <p className="text-sm font-semibold text-navy-900">
+        {variant === 'survey' ? 'Choices' : 'Answer key'}
+      </p>
+      <p className="text-xs text-slate-600">
+        {variant === 'survey'
+          ? 'Participants choose True or False. Survey answers are unscored.'
+          : 'True/False always has two fixed choices. Mark exactly one as correct.'}
+      </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {options.map((opt) => (
           <button
@@ -425,7 +450,7 @@ function TrueFalseOptionsEditor({ question, quizMode, onChange, structureLocked 
           </button>
         ))}
       </div>
-      {!quizMode && (
+      {variant === 'quiz' && !quizMode && (
         <p className="text-xs text-amber-700">Enable Quiz mode to select the correct answer.</p>
       )}
     </div>
@@ -887,6 +912,27 @@ function SurveyQuestionConfig({ question, onChange, structureLocked }) {
           />
         </div>
       )}
+
+      {subType === 'True/False' && (
+        <div className="rounded-2xl border border-blue-200/70 bg-white/70 p-4">
+          <TrueFalseOptionsEditor
+            question={editorQuestion}
+            quizMode={false}
+            variant="survey"
+            onChange={(next) => onChange({ ...question, options: next.options })}
+            structureLocked={structureLocked}
+          />
+        </div>
+      )}
+
+      {subType === 'Emoji Reaction' && (
+        <EmojiReactionEditor
+          question={editorQuestion}
+          onChange={(next) => onChange({ ...question, options: next.options })}
+          structureLocked={structureLocked}
+          uid={uid}
+        />
+      )}
     </div>
   )
 }
@@ -1173,12 +1219,15 @@ function BuilderPage() {
     if (question.question_type === 'survey') {
       const surveySubType = apiSurveySubTypeToUi(question.survey_subtype)
       const apiOptions = question.question_options || question.QuestionOptions || []
-      const options = apiOptions.map((option) => ({
-        id: String(option.option_id),
-        optionId: option.option_id,
-        text: option.option_text,
-        isCorrect: false,
-      }))
+      const options =
+        surveySubType === 'True/False'
+          ? normalizeTrueFalseOptions(apiOptions)
+          : apiOptions.map((option) => ({
+              id: String(option.option_id),
+              optionId: option.option_id,
+              text: option.option_text,
+              isCorrect: false,
+            }))
 
       return {
         id: String(question.question_id),
@@ -1585,6 +1634,28 @@ function BuilderPage() {
             if (opts.length > 10) {
               throw new Error(
                 `Survey item "${question.text || 'Untitled'}" cannot have more than 10 ranking options.`,
+              )
+            }
+          }
+          if (st === 'True/False') {
+            const opts = normalizeTrueFalseOptions(
+              (question.options || []).map((o) => ({
+                option_id: o.optionId,
+                option_text: o.text,
+                is_correct: o.isCorrect,
+              })),
+            )
+            if (opts.length !== 2) {
+              throw new Error(
+                `Survey item "${question.text || 'Untitled'}" must be True/False with two options.`,
+              )
+            }
+          }
+          if (st === 'Emoji Reaction') {
+            const opts = (question.options || []).slice(0, 5)
+            if (opts.length !== 5 || opts.some((opt) => !String(opt.text || '').trim())) {
+              throw new Error(
+                `Survey item "${question.text || 'Untitled'}" must have exactly 5 emoji options.`,
               )
             }
           }

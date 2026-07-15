@@ -31,6 +31,8 @@ export function surveySubTypeLabel(subType) {
     open_text: 'Open Text',
     word_cloud: 'Word Cloud',
     ranking: 'Ranking',
+    true_false: 'True/False',
+    emoji_reaction: 'Emoji Reaction',
   }
   return labels[subType] || subType || '—'
 }

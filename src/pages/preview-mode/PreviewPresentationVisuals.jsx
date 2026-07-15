@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { getPresentOptionColor } from '../../utils/livePresentation'
-import { PreviewWordCloud } from './PreviewWordCloud'
-
-export { PreviewWordCloud }
 
 export function PreviewRankingBars({ rankings = [] }) {
   if (!rankings.length) {

@@ -50,20 +50,12 @@
     animation-play-state: paused;
   }
 
-  .preview-mode .preview-cloud-word {
-    animation: preview-cloud-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  }
-
-  .preview-mode .preview-cloud-word--new {
-    animation: preview-cloud-pop 0.85s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
   .preview-mode .preview-answer-chip {
     animation: preview-response-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
   .preview-mode .preview-answer-chip--new {
-    animation: preview-cloud-pop 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: word-cloud-pop 0.9s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .preview-mode .preview-rank-row {
@@ -86,6 +78,45 @@
   }
 }
 
+/* Shared Mentimeter-style live word cloud (Live / Present / Preview / Analytics) */
+.word-cloud__slot {
+  transition:
+    left 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: left, top, width, height;
+}
+
+.word-cloud__word {
+  display: inline-block;
+  transition:
+    font-size 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.45s ease,
+    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  will-change: font-size, transform;
+}
+
+.word-cloud__slot--new .word-cloud__word {
+  animation: word-cloud-pop 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes word-cloud-pop {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--word-cloud-rotate, 0deg)) scale(0.2);
+  }
+  55% {
+    opacity: 1;
+    transform: rotate(var(--word-cloud-rotate, 0deg)) scale(1.22);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(var(--word-cloud-rotate, 0deg)) scale(1);
+  }
+}
+
 @keyframes present-lb-in {
   from {
     opacity: 0;
@@ -105,32 +136,6 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes preview-cloud-in {
-  from {
-    opacity: 0;
-    transform: rotate(var(--preview-cloud-rotate, 0deg)) scale(0.55);
-  }
-  to {
-    opacity: 1;
-    transform: rotate(var(--preview-cloud-rotate, 0deg)) scale(1);
-  }
-}
-
-@keyframes preview-cloud-pop {
-  0% {
-    opacity: 0;
-    transform: rotate(var(--preview-cloud-rotate, 0deg)) scale(0.3);
-  }
-  55% {
-    opacity: 1;
-    transform: rotate(var(--preview-cloud-rotate, 0deg)) scale(1.2);
-  }
-  100% {
-    opacity: 1;
-    transform: rotate(var(--preview-cloud-rotate, 0deg)) scale(1);
   }
 }
 

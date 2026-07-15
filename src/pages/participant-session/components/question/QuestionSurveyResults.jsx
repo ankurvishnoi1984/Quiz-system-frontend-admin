@@ -1,5 +1,6 @@
 import { BarChart3 } from 'lucide-react'
 import { EmojiBarChart } from '../../../../components/emoji/EmojiBarChart'
+import WordCloudChart from '../../../../components/charts/WordCloudChart'
 import {
   buildParticipantSurveyResultsView,
   getParticipantResultsTitle,
@@ -82,6 +83,14 @@ export function QuestionSurveyResults({ question, results, isLoading }) {
               optionId: row.label,
             }))}
             total={view.totalResponses}
+            size="sm"
+          />
+        </div>
+      ) : view.kind === 'word_cloud' ? (
+        <div className="mt-4 h-56">
+          <WordCloudChart
+            words={view.rows.map((row) => ({ text: row.label, count: row.count }))}
+            emptyLabel="Results will appear here as more people respond."
             size="sm"
           />
         </div>

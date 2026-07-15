@@ -1217,7 +1217,7 @@ function LivePage() {
               {showEmojiReaction ? (
                 <EmojiBarChart rows={emojiBarData.rows} total={emojiBarData.total} size="md" className="h-full" />
               ) : showWordCloud ? (
-                <WordCloudChart words={wordCloudWords} className="h-full" />
+                <WordCloudChart words={wordCloudWords} className="h-full" size="md" />
               ) : (
                 showRankingBreakdown ? (
                   <RankingLiveChartPanel

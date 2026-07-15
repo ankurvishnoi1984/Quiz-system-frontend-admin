@@ -86,7 +86,7 @@ export function buildParticipantSurveyResultsView(question, results) {
   }
 
   if (effectiveType === 'word_cloud') {
-    const rows = (results.word_counts || []).slice(0, 12).map((row) => ({
+    const rows = (results.word_counts || []).slice(0, 60).map((row) => ({
       label: row.text,
       count: Number(row.count || 0),
       percent:

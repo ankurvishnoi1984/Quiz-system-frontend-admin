@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getQuestionResultsApi } from '../../services/liveApi'
 import { EmojiBarChart } from '../../components/emoji/EmojiBarChart'
+import WordCloudChart from '../../components/charts/WordCloudChart'
 import { buildEmojiBarData } from '../../utils/emojiReaction'
 import {
   buildOptionChartData,
@@ -16,11 +17,7 @@ import {
   questionUsesOptionChart,
 } from '../../utils/livePresentation'
 import { PreviewBarChart } from './PreviewBarChart'
-import {
-  PreviewAnswerStream,
-  PreviewRankingBars,
-  PreviewWordCloud,
-} from './PreviewPresentationVisuals'
+import { PreviewAnswerStream, PreviewRankingBars } from './PreviewPresentationVisuals'
 import { PresentQuestionMedia } from '../present-mode/PresentQuestionMedia'
 
 /**
@@ -92,8 +89,13 @@ export function PreviewQuestionSlide({
 
     if (showWordCloud) {
       return (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <PreviewWordCloud words={wordCloudWords} />
+        <div className="flex min-h-0 flex-1 flex-col px-[clamp(0.5rem,2vw,1.5rem)]">
+          <WordCloudChart
+            words={wordCloudWords}
+            className="min-h-0 flex-1"
+            emptyLabel="Waiting for answers…"
+            size="lg"
+          />
         </div>
       )
     }
