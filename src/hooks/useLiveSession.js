@@ -150,7 +150,51 @@ export function useLiveSession(accessToken, sessionId, options = {}) {
 
     const offResp = client.on('response_received', invalidateResponseFanout)
     const offSession = client.on('session_updated', invalidateStructural)
-    const offQuestion = client.on('question_changed', invalidateStructural)
+    const offQuestion = client.on('question_changed', (data) => {
+      // Optimistic is_live sync so Preview/Present update before the refetch lands.
+      if (data?.question_id != null) {
+        const qid = Number(data.question_id)
+        const patchQuestions = (old) => {
+          if (!Array.isArray(old)) return old
+          return old.map((q) => {
+            if (Number(q.question_id) !== qid) {
+              // Single-active sessions: another question becoming live deactivates others via separate events,
+              // but also apply is_live=false when this event says so.
+              return q
+            }
+            return {
+              ...q,
+              is_live: Boolean(data.is_live),
+              live_activated_at:
+                data.is_live && data.live_activated_at != null
+                  ? data.live_activated_at
+                  : data.is_live
+                    ? q.live_activated_at
+                    : null,
+              open_for_reattempt:
+                data.open_for_reattempt !== undefined
+                  ? Boolean(data.open_for_reattempt)
+                  : q.open_for_reattempt,
+              submissions_closed:
+                data.submissions_closed !== undefined
+                  ? Boolean(data.submissions_closed)
+                  : q.submissions_closed,
+              answer_revealed:
+                data.answer_revealed !== undefined
+                  ? Boolean(data.answer_revealed)
+                  : q.answer_revealed,
+              show_leaderboard:
+                data.show_leaderboard !== undefined
+                  ? Boolean(data.show_leaderboard)
+                  : q.show_leaderboard,
+            }
+          })
+        }
+        queryClient.setQueryData(['live-questions', sessionId, mode], patchQuestions)
+        queryClient.setQueryData(['live-questions', sessionId], patchQuestions)
+      }
+      invalidateStructural()
+    })
     const offAnswerReveal = client.on(RealtimeEvent.ANSWER_REVEALED, invalidateStructural)
     const offQuestionLb = client.on(RealtimeEvent.QUESTION_LEADERBOARD_VISIBILITY, invalidateStructural)
     const offLeaderboard = client.on(RealtimeEvent.LEADERBOARD_UPDATE, (data) => {

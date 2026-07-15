@@ -214,6 +214,30 @@ function PreviewModePage() {
     screen,
   ])
 
+  // Always mirror the currently live question (BroadcastChannel alone can lag / miss activates).
+  useEffect(() => {
+    if (!didBootstrapRef.current) return
+    if (resolveEndingScreen(session)) return
+    if (screen === 'leaderboard' || screen === 'surveyEnding') return
+
+    const liveTarget = resolveLiveQuestionTarget(mappedQuestions)
+    if (!liveTarget) return
+
+    const alreadyShowing =
+      screen === 'question' &&
+      followQuestionId != null &&
+      Number(followQuestionId) === Number(liveTarget.questionId)
+    if (alreadyShowing) return
+
+    applyFollowPayload(liveTarget, mappedQuestions)
+  }, [
+    mappedQuestions,
+    session,
+    screen,
+    followQuestionId,
+    applyFollowPayload,
+  ])
+
   // If the last live question is closed, fall back to join without waiting for Live tab.
   useEffect(() => {
     if (!didBootstrapRef.current || !mappedQuestions.length) return
@@ -285,6 +309,12 @@ function PreviewModePage() {
 
   const activeQuestion = useMemo(() => {
     if (screen !== 'question') return null
+    // Prefer the currently live question when available — follow payload can lag briefly.
+    const live = resolveLiveQuestionTarget(mappedQuestions)
+    if (live?.questionId != null) {
+      const liveQ = mappedQuestions.find((q) => Number(q.id) === Number(live.questionId))
+      if (liveQ) return liveQ
+    }
     if (followQuestionId != null) {
       const byId = mappedQuestions.find((q) => Number(q.id) === Number(followQuestionId))
       if (byId) return byId

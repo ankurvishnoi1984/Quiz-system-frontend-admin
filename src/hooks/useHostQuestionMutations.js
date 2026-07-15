@@ -24,6 +24,8 @@ export function useHostQuestionMutations(
     onMutationError,
     /** Clears overall rankings / survey results before activating questions */
     clearEndingScreensOnActivate,
+    /** Called after a successful activate/deactivate with the mutation variables */
+    onQuestionLiveSuccess,
   } = {},
 ) {
   const queryClient = useQueryClient()
@@ -65,7 +67,10 @@ export function useHostQuestionMutations(
       }
       return updated
     },
-    onSuccess: invalidateQuestions,
+    onSuccess: (_data, variables) => {
+      invalidateQuestions()
+      onQuestionLiveSuccess?.(variables)
+    },
     onError: (error) =>
       onMutationError?.(error.message || 'Unable to update question live state'),
   })

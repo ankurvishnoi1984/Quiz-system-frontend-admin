@@ -202,17 +202,16 @@ function LivePage() {
 
   const activeQuestion = mappedQuestions[questionIndex] || null
 
-  // Preview Mode: join/QR while nothing is live; follow an active (isLive) question only.
+  // Preview Mode follows the live question — never the host's selected (non-live) slide.
+  // Preferring `activeQuestion?.isLive` caused Preview to stick on Q2 after activating Q3
+  // while the host still had Q2 selected and the questions cache was briefly stale.
   const livePreviewTarget = useMemo(() => {
-    if (activeQuestion?.isLive) {
-      return { question: activeQuestion, questionIndex }
-    }
     const liveIndex = mappedQuestions.findIndex((q) => q.isLive)
     if (liveIndex >= 0) {
       return { question: mappedQuestions[liveIndex], questionIndex: liveIndex }
     }
     return null
-  }, [mappedQuestions, activeQuestion, questionIndex])
+  }, [mappedQuestions])
 
   const pushPreviewFollow = useCallback(
     (payload) => {
@@ -524,6 +523,41 @@ function LivePage() {
     activateAllQuestions,
   } = useHostQuestionMutations(accessToken, sessionId, {
     clearEndingScreensOnActivate: clearSessionEndingScreens,
+    onQuestionLiveSuccess: (variables) => {
+      if (!variables?.isLive || variables.questionId == null) {
+        // Deactivate → pushCurrentPreviewFollow once questions cache updates.
+        return
+      }
+      const activatedId = Number(variables.questionId)
+      // Optimistic cache update so Preview follow (and Live UI) do not briefly keep the old live Q.
+      queryClient.setQueryData(['live-questions', sessionId, 'host'], (old) => {
+        if (!Array.isArray(old)) return old
+        return old.map((q) => {
+          const id = Number(q.question_id)
+          if (id === activatedId) return { ...q, is_live: true }
+          if (q.is_live) return { ...q, is_live: false }
+          return q
+        })
+      })
+      queryClient.setQueryData(['live-questions', sessionId], (old) => {
+        if (!Array.isArray(old)) return old
+        return old.map((q) => {
+          const id = Number(q.question_id)
+          if (id === activatedId) return { ...q, is_live: true }
+          if (q.is_live) return { ...q, is_live: false }
+          return q
+        })
+      })
+      const idx = mappedQuestions.findIndex((q) => Number(q.id) === activatedId)
+      pushPreviewFollow({
+        screen: 'question',
+        questionId: activatedId,
+        questionIndex: idx >= 0 ? idx : null,
+      })
+    },
+    onActivateAllQuestionsSuccess: () => {
+      window.setTimeout(() => pushCurrentPreviewFollow(), 0)
+    },
     onMutationError: (message) => setErrorMessage(message),
     onCloseQuestionSuccess: (questionText) => {
       setErrorMessage('')

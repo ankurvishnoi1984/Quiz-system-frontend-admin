@@ -21,6 +21,7 @@ import {
   listPresentViewQaApi,
 } from '../../services/presentViewApi'
 import { canHostActivateAllQuestions, canHostCloseAllQuestions } from '../../utils/hostQuestionControls'
+import { broadcastPreviewFollow } from '../../utils/previewFollow'
 import { sessionSupportsOverallLeaderboard, sessionSupportsSurveyEndingScreen } from '../../utils/livePresentation'
 import { isSessionQuizTotalTimeEnabled } from '../../utils/sessionFlags'
 import { formatScheduledSessionForDisplay } from '../../utils/sessionSchedule'
@@ -236,6 +237,25 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
     activateAllQuestions,
   } = useHostQuestionMutations(hostAccessToken, sessionId, {
     clearEndingScreensOnActivate: clearSessionEndingScreens,
+    onQuestionLiveSuccess: (variables) => {
+      if (!variables?.isLive || variables.questionId == null || !sessionId) return
+      const activatedId = Number(variables.questionId)
+      queryClient.setQueryData(['live-questions', sessionId, 'host'], (old) => {
+        if (!Array.isArray(old)) return old
+        return old.map((q) => {
+          const id = Number(q.question_id)
+          if (id === activatedId) return { ...q, is_live: true }
+          if (q.is_live) return { ...q, is_live: false }
+          return q
+        })
+      })
+      const idx = mappedQuestions.findIndex((q) => Number(q.id) === activatedId)
+      broadcastPreviewFollow(sessionId, {
+        screen: 'question',
+        questionId: activatedId,
+        questionIndex: idx >= 0 ? idx : null,
+      })
+    },
     onCloseQuestionSuccess: (questionText) => {
       const preview = String(questionText || '').trim()
       setHostAlert({

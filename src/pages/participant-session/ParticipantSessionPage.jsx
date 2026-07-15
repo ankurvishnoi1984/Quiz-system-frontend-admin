@@ -261,11 +261,14 @@ function ParticipantSessionPage() {
     session?.status === 'completed' || session?.status === 'archived'
   const showOverallLeaderboard = Boolean(session?.leaderboard_enabled)
   const showOverallLeaderboardTab =
-    showOverallLeaderboard && sessionSupportsOverallLeaderboard(mappedQuestions)
+    showOverallLeaderboard &&
+    (sessionSupportsOverallLeaderboard(mappedQuestions) || mappedQuestions.length === 0)
   const showSurveyResultsEnabled = Boolean(session?.survey_results_enabled)
+  // Trust the host toggle: ending screen should show whenever results are enabled,
+  // even if question mapping briefly lags behind WS updates.
   const showSurveyEndingScreen =
-    sessionSupportsSurveyEndingScreen(mappedQuestions) &&
-    (isSessionEnded || showSurveyResultsEnabled)
+    (isSessionEnded || showSurveyResultsEnabled) &&
+    (sessionSupportsSurveyEndingScreen(mappedQuestions) || showSurveyResultsEnabled)
   const endingScreenOnlyMode = showOverallLeaderboardTab || showSurveyEndingScreen
   const navigationEnabled = session?.participant_navigation_enabled !== false
   const sessionQuizTotalTimeEnabled = useMemo(
@@ -898,6 +901,7 @@ function ParticipantSessionPage() {
           return 'leaderboard'
         })
         queryClient.invalidateQueries({ queryKey: ['participant-leaderboard', dbSessionId] })
+        queryClient.invalidateQueries({ queryKey: ['participant-session', effectiveSessionCode] })
       }
 
       if (wasLeaderboardEnabled && !isLeaderboardEnabled) {
@@ -910,6 +914,7 @@ function ParticipantSessionPage() {
           return 'surveyEnding'
         })
         queryClient.invalidateQueries({ queryKey: ['participant-survey-summary', dbSessionId] })
+        queryClient.invalidateQueries({ queryKey: ['participant-session', effectiveSessionCode] })
       }
 
       if (wasSurveyResultsEnabled && !isSurveyResultsEnabled) {
@@ -1326,6 +1331,13 @@ function ParticipantSessionPage() {
           step === 'surveyEnding'),
     ),
     staleTime: 5000,
+    retry: (failureCount, error) => {
+      // Host just enabled results — short retry window for read-after-write / WS race.
+      if (error?.status === 403 && failureCount < 4) return true
+      return failureCount < 1
+    },
+    retryDelay: (attempt) => Math.min(400 * 2 ** attempt, 2500),
+    refetchInterval: showSurveyEndingScreen ? 8000 : false,
   })
 
   useEffect(() => {

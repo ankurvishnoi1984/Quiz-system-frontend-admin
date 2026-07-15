@@ -35,6 +35,8 @@ export function mapSurveySubTypeToUi(subType) {
     open_text: 'Text',
     word_cloud: 'Word Cloud',
     ranking: 'Ranking',
+    true_false: 'True/False',
+    emoji_reaction: 'Emoji Reaction',
   }
   return map[subType] || 'MCQ'
 }
