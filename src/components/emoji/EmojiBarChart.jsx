@@ -60,7 +60,7 @@ export function EmojiBarChart({
           return (
             <div key={row.optionId ?? row.emoji} className="flex min-w-0 flex-col items-center gap-2">
               <div
-                className={`relative flex w-full flex-col justify-end overflow-hidden rounded-2xl border border-blue-100 bg-slate-50/80 ${styles.bar}`}
+                className={`relative flex w-full flex-col overflow-hidden rounded-2xl border border-blue-100 bg-slate-50/80 ${styles.bar}`}
               >
                 <div
                   className={`absolute inset-x-0 bottom-0 rounded-b-2xl bg-linear-to-t from-indigo-500/80 to-sky-400/70 transition-all duration-500 ease-out ${
@@ -68,7 +68,7 @@ export function EmojiBarChart({
                   }`}
                   style={{ height: `${fillHeight}%` }}
                 />
-                <div className="relative z-10 flex flex-1 items-end justify-center pb-2">
+                <div className="relative z-10 flex flex-1 items-center justify-center">
                   <span className={`leading-none ${styles.emoji} ${isLeader ? 'scale-110' : ''}`}>
                     {row.emoji}
                   </span>
