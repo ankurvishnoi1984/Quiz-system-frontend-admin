@@ -201,7 +201,7 @@ function ReportsPage() {
   const filtered = useMemo(() => {
     return sessions
       .filter((s) => (status === 'All' ? true : s.status === status))
-      .filter((s) => (debounced ? `${s.title} ${s.id}`.toLowerCase().includes(debounced) : true))
+      .filter((s) => (debounced ? String(s.title || '').toLowerCase().includes(debounced) : true))
       .filter((s) => {
         if (!fromDate && !toDate) return true
         const d = new Date(s.date ?? '').getTime()
@@ -324,7 +324,7 @@ function ReportsPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search title or session id..."
+              placeholder="Search by title…"
               className="h-11 w-72 rounded-2xl border border-blue-200/70 bg-white/90 pl-9 pr-3 text-sm text-slate-700 shadow-sm shadow-blue-900/5 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
             />
           </div>
@@ -365,7 +365,8 @@ function ReportsPage() {
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-navy-900">{s.title}</p>
               <p className="mt-1 text-xs text-slate-600">
-                {s.id} • {s.date ?? '—'} • {(s.tags ?? []).join(', ')}
+                {s.date ?? '—'}
+                {(s.tags ?? []).length ? ` • ${(s.tags ?? []).join(', ')}` : ''}
               </p>
             </div>
             <div>

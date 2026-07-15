@@ -568,7 +568,7 @@ function AnalyticsPage() {
           >
             {filteredSessions.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.title} ({s.id})
+                {s.title}
               </option>
             ))}
           </select>
