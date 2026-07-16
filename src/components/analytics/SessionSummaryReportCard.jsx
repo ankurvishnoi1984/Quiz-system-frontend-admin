@@ -36,8 +36,13 @@ export function SessionSummaryReportCard({ report, isLoading }) {
     )
   }
 
-  const { session, summary, qa_summary: qaSummary, quiz_stats: quizStats, response_timeline: timeline } =
-    report
+  const {
+    session,
+    summary,
+    // qa_summary: qaSummary, // Q&A feature disabled
+    quiz_stats: quizStats,
+    response_timeline: timeline,
+  } = report
 
   return (
     <div className="space-y-5 rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
@@ -73,11 +78,13 @@ export function SessionSummaryReportCard({ report, isLoading }) {
           value={summary.total_questions_activated}
           hint={`${summary.total_questions} total in session`}
         />
+        {/* Q&A feature disabled — re-enable when bringing Q&A back
         <StatTile
           label="Q&A"
           value={`${qaSummary.asked} asked`}
           hint={`${qaSummary.approved} approved · ${qaSummary.answered} answered`}
         />
+        */}
       </div>
 
       {quizStats?.has_quiz_mode ? (

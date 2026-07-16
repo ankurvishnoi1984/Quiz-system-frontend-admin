@@ -10,7 +10,7 @@ import { useHostQuestionMutations } from '../../hooks/useHostQuestionMutations'
 import { useLiveSession } from '../../hooks/useLiveSession'
 import {
   getSessionSurveySummaryApi,
-  listQaQuestionsApi,
+  // listQaQuestionsApi, // Q&A feature disabled
   setPresentSlideApi,
   setQuestionLiveStateApi,
   updateSessionApi,
@@ -18,7 +18,7 @@ import {
 import {
   getPresentViewSlideApi,
   getPresentViewSurveySummaryApi,
-  listPresentViewQaApi,
+  // listPresentViewQaApi, // Q&A feature disabled
 } from '../../services/presentViewApi'
 import { canHostActivateAllQuestions, canHostCloseAllQuestions } from '../../utils/hostQuestionControls'
 import { broadcastPreviewFollow } from '../../utils/previewFollow'
@@ -30,7 +30,7 @@ import { PresentSurveyEndingSlide } from './PresentSurveyEndingSlide'
 import { ParticipantsSlide } from './ParticipantsSlide'
 import { PresentNavButton, PresentShell, PresentSlideHeader } from './PresentShell'
 import { PresentParticipantsModal } from './PresentParticipantsModal'
-import { PresentQaModal } from './PresentQaModal'
+// import { PresentQaModal } from './PresentQaModal' // Q&A feature disabled
 import { QuestionSlide } from './QuestionSlide'
 
 function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride = '' } = {}) {
@@ -60,23 +60,24 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [hostAlert, setHostAlert] = useState(null)
   const [participantsModalOpen, setParticipantsModalOpen] = useState(false)
-  const [qaModalOpen, setQaModalOpen] = useState(false)
+  // Q&A feature disabled — re-enable when bringing Q&A back
+  // const [qaModalOpen, setQaModalOpen] = useState(false)
 
   const openParticipantsModal = useCallback(() => setParticipantsModalOpen(true), [])
-  const openQaModal = useCallback(() => setQaModalOpen(true), [])
+  // const openQaModal = useCallback(() => setQaModalOpen(true), [])
 
-  const qaQuery = useQuery({
-    queryKey: ['live-qa', sessionId, readOnly ? 'viewer' : 'host'],
-    queryFn: () =>
-      readOnly
-        ? listPresentViewQaApi(accessToken, sessionId)
-        : listQaQuestionsApi(accessToken, sessionId),
-    enabled: Boolean(accessToken && sessionId),
-    refetchInterval: session?.status === 'live' ? 5000 : false,
-  })
+  // const qaQuery = useQuery({
+  //   queryKey: ['live-qa', sessionId, readOnly ? 'viewer' : 'host'],
+  //   queryFn: () =>
+  //     readOnly
+  //       ? listPresentViewQaApi(accessToken, sessionId)
+  //       : listQaQuestionsApi(accessToken, sessionId),
+  //   enabled: Boolean(accessToken && sessionId),
+  //   refetchInterval: session?.status === 'live' ? 5000 : false,
+  // })
 
-  const qaQuestions = qaQuery.data || []
-  const qaCount = qaQuestions.length
+  // const qaQuestions = qaQuery.data || []
+  // const qaCount = qaQuestions.length
 
   const canEditLive = !readOnly && session?.status === 'live'
   const showSessionControls = !readOnly && (session?.status === 'live' || session?.status === 'paused')
@@ -652,10 +653,10 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
             <PresentSlideHeader
               sessionTitle={sessionTitle}
               participantCount={participantCount}
-              qaCount={qaCount}
+              // qaCount={qaCount} // Q&A feature disabled
               isSessionLive={false}
               onParticipantsClick={openParticipantsModal}
-              onQaClick={openQaModal}
+              // onQaClick={openQaModal} // Q&A feature disabled
               readOnly
             />
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-[clamp(1rem,4vw,3rem)] text-center">
@@ -684,10 +685,10 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
           <ParticipantsSlide
             session={session}
             participantCount={participantCount}
-            qaCount={qaCount}
+            // qaCount={qaCount} // Q&A feature disabled
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
-            onQaClick={openQaModal}
+            // onQaClick={openQaModal} // Q&A feature disabled
             readOnly={readOnly}
           />
         ) : null}
@@ -701,10 +702,10 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
             questionNumber={currentSlide.questionNumber}
             allResponses={responses}
             participantCount={participantCount}
-            qaCount={qaCount}
+            // qaCount={qaCount} // Q&A feature disabled
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
-            onQaClick={openQaModal}
+            // onQaClick={openQaModal} // Q&A feature disabled
             readOnly={readOnly}
           />
         ) : null}
@@ -714,10 +715,10 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
             sessionTitle={sessionTitle}
             leaderboard={leaderboard}
             participantCount={participantCount}
-            qaCount={qaCount}
+            // qaCount={qaCount} // Q&A feature disabled
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
-            onQaClick={openQaModal}
+            // onQaClick={openQaModal} // Q&A feature disabled
             readOnly={readOnly}
           />
         ) : null}
@@ -728,10 +729,10 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
             summary={surveySummaryQuery.data}
             isLoading={surveySummaryQuery.isLoading}
             participantCount={participantCount}
-            qaCount={qaCount}
+            // qaCount={qaCount} // Q&A feature disabled
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
-            onQaClick={openQaModal}
+            // onQaClick={openQaModal} // Q&A feature disabled
             readOnly={readOnly}
           />
         ) : null}
@@ -745,6 +746,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
         readOnly={readOnly}
       />
 
+      {/* Q&A feature disabled — re-enable when bringing Q&A back
       <PresentQaModal
         open={qaModalOpen}
         onClose={() => setQaModalOpen(false)}
@@ -752,7 +754,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
         isSessionLive={isSessionLive}
         readOnly={readOnly}
       />
-
+      */}
       {!readOnly ? (
         <HostAlertModal
           open={Boolean(hostAlert)}

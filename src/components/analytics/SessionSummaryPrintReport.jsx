@@ -11,8 +11,13 @@ function formatDate(value) {
 export function SessionSummaryPrintReport({ report }) {
   if (!report?.session) return null
 
-  const { session, summary, qa_summary: qaSummary, quiz_stats: quizStats, response_timeline: timeline } =
-    report
+  const {
+    session,
+    summary,
+    // qa_summary: qaSummary, // Q&A feature disabled
+    quiz_stats: quizStats,
+    response_timeline: timeline,
+  } = report
   const generatedAt = new Date().toLocaleString()
   const maxTimelineCount = Math.max(1, ...(timeline || []).map((row) => row.count))
 
@@ -36,9 +41,10 @@ export function SessionSummaryPrintReport({ report }) {
             ['Total responded', summary.total_responded.toLocaleString()],
             ['Avg engagement rate', `${summary.avg_engagement_rate_percent}%`],
             ['Questions activated', `${summary.total_questions_activated} / ${summary.total_questions}`],
-            ['Q&A asked', qaSummary.asked],
-            ['Q&A approved', qaSummary.approved],
-            ['Q&A answered', qaSummary.answered],
+            // Q&A feature disabled — re-enable when bringing Q&A back
+            // ['Q&A asked', qaSummary.asked],
+            // ['Q&A approved', qaSummary.approved],
+            // ['Q&A answered', qaSummary.answered],
           ].map(([label, value]) => (
             <div key={label} className="report-print-card">
               <p className="report-print-card-label">{label}</p>

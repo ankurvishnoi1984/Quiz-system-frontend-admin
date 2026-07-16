@@ -1,4 +1,5 @@
-import { Info, MessageSquare } from 'lucide-react'
+import { Info } from 'lucide-react'
+// import { Info, MessageSquare } from 'lucide-react' // MessageSquare was for Q&A tile
 
 export function PresentShell({ children, footer }) {
   return (
@@ -65,16 +66,17 @@ function PresentLiveIndicator({ isSessionLive }) {
 export function PresentSlideHeader({
   sessionTitle,
   participantCount = 0,
-  qaCount = 0,
+  // qaCount = 0, // Q&A feature disabled
   isSessionLive = false,
   onParticipantsClick,
-  onQaClick,
+  // onQaClick, // Q&A feature disabled
   readOnly = false,
 }) {
   const modeLabel = readOnly ? 'View display' : 'Present mode'
   const showParticipantsTile = Boolean(onParticipantsClick)
-  const showQaTile = Boolean(onQaClick)
-  const showStatTiles = showParticipantsTile || showQaTile
+  // const showQaTile = Boolean(onQaClick) // Q&A feature disabled
+  const showStatTiles = showParticipantsTile
+  // const showStatTiles = showParticipantsTile || showQaTile
 
   return (
     <header className="mb-[clamp(1rem,3vh,2rem)] flex shrink-0 flex-wrap items-end justify-between gap-4">
@@ -90,6 +92,7 @@ export function PresentSlideHeader({
 
       {showStatTiles ? (
         <div className="flex flex-wrap items-stretch justify-end gap-2">
+          {/* Q&A feature disabled — re-enable when bringing Q&A back
           {showQaTile ? (
             <PresentHeaderStatButton
               label="Q&A"
@@ -99,6 +102,7 @@ export function PresentSlideHeader({
               ariaLabel={`${qaCount} Q&A questions. View question list.`}
             />
           ) : null}
+          */}
           {showParticipantsTile ? (
             <PresentHeaderStatButton
               label="Participants"

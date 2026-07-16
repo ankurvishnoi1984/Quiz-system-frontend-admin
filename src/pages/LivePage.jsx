@@ -44,7 +44,8 @@ import { HostQuestionControls } from '../components/live/HostQuestionControls'
 import { LiveChartViewToggle } from '../components/live/LiveChartViewToggle'
 import { RankingLiveChartPanel } from '../components/live/RankingLiveChartPanel'
 import { useHostQuestionMutations } from '../hooks/useHostQuestionMutations'
-import { LiveQaPanel } from '../components/leaderboard/LiveQaPanel'
+// Q&A feature disabled — re-enable when bringing Q&A back
+// import { LiveQaPanel } from '../components/leaderboard/LiveQaPanel'
 import { QuestionLeaderboardModal } from '../components/leaderboard/QuestionLeaderboardModal'
 import { QuestionLeaderboardPanel } from '../components/leaderboard/QuestionLeaderboardPanel'
 import { QuestionMedia } from '../components/participant-session/QuestionMedia'
@@ -52,17 +53,17 @@ import { SessionLeaderboardModal } from '../components/leaderboard/SessionLeader
 import {
   buildQuestionLeaderboardForQuestion,
 } from '../utils/leaderboard'
-import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
-import { getSessionQaReportApi } from '../services/analyticsApi'
+// import { exportQaAnalyticsExcel } from '../utils/qaAnalyticsExcelExport'
+// import { getSessionQaReportApi } from '../services/analyticsApi'
 import { useAuthStore, syncAuthForNewBrowserTab } from '../store/authStore'
 import {
   getQuestionResultsApi,
   getSessionDetailApi,
   getSessionLeaderboardApi,
   getSessionResponsesApi,
-  listQaQuestionsApi,
+  // listQaQuestionsApi,
   listSessionQuestionsApi,
-  qaModerateApi,
+  // qaModerateApi, // Q&A feature disabled
   setQuestionLiveStateApi,
   transitionSessionApi,
   updateSessionApi,
@@ -111,7 +112,7 @@ function LivePage() {
   const [chartView, setChartView] = useState('bar')
   const [hostAlert, setHostAlert] = useState(null)
   const [endSessionConfirmOpen, setEndSessionConfirmOpen] = useState(false)
-  const [qaExporting, setQaExporting] = useState(false)
+  // const [qaExporting, setQaExporting] = useState(false) // Q&A feature disabled
 
 
   const sessionQuery = useQuery({
@@ -148,17 +149,18 @@ function LivePage() {
   })
 
 
-  const qaQuery = useQuery({
-    queryKey: ['live-qa', sessionId],
-    queryFn: () => listQaQuestionsApi(accessToken, sessionId),
-    enabled: Boolean(accessToken && sessionId),
-  })
+  // Q&A feature disabled — re-enable when bringing Q&A back
+  // const qaQuery = useQuery({
+  //   queryKey: ['live-qa', sessionId],
+  //   queryFn: () => listQaQuestionsApi(accessToken, sessionId),
+  //   enabled: Boolean(accessToken && sessionId),
+  // })
 
-  const qaReportQuery = useQuery({
-    queryKey: ['session-qa-report', sessionId],
-    queryFn: () => getSessionQaReportApi(accessToken, sessionId),
-    enabled: Boolean(accessToken && sessionId),
-  })
+  // const qaReportQuery = useQuery({
+  //   queryKey: ['session-qa-report', sessionId],
+  //   queryFn: () => getSessionQaReportApi(accessToken, sessionId),
+  //   enabled: Boolean(accessToken && sessionId),
+  // })
 
 
   useEffect(() => {
@@ -642,14 +644,15 @@ function LivePage() {
     },
   })
 
-  const qaMutation = useMutation({
-    mutationFn: ({ qaId, action, body }) => qaModerateApi(accessToken, qaId, action, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['live-qa', sessionId] })
-      queryClient.invalidateQueries({ queryKey: ['session-qa-report', sessionId] })
-    },
-    onError: (error) => setErrorMessage(error.message || 'Unable to update Q&A state'),
-  })
+  // Q&A feature disabled — re-enable when bringing Q&A back
+  // const qaMutation = useMutation({
+  //   mutationFn: ({ qaId, action, body }) => qaModerateApi(accessToken, qaId, action, body),
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: ['live-qa', sessionId] })
+  //     queryClient.invalidateQueries({ queryKey: ['session-qa-report', sessionId] })
+  //   },
+  //   onError: (error) => setErrorMessage(error.message || 'Unable to update Q&A state'),
+  // })
 
 
   const participants = useMemo(() => {
@@ -1348,28 +1351,27 @@ function LivePage() {
           ) : null}
 
           {/*
-            Q&A analytics (LiveQaPanel → QaAnalyticsReportCard): Anonymous vs named pie chart
-            is commented out in QaAnalyticsReportCard.jsx; text counts still shown.
+            Q&A feature disabled — re-enable when bringing Q&A back
+            <LiveQaPanel
+              questions={qaQuery.data}
+              report={qaReportQuery.data}
+              isReportLoading={qaReportQuery.isLoading}
+              isExporting={qaExporting}
+              onExportExcel={async () => {
+                try {
+                  setQaExporting(true)
+                  const report =
+                    qaReportQuery.data || (await getSessionQaReportApi(accessToken, sessionId))
+                  await exportQaAnalyticsExcel(report)
+                } catch (error) {
+                  setErrorMessage(error.message || 'Q&A export failed')
+                } finally {
+                  setQaExporting(false)
+                }
+              }}
+              onModerate={(qaId, action) => qaMutation.mutate({ qaId, action })}
+            />
           */}
-          <LiveQaPanel
-            questions={qaQuery.data}
-            report={qaReportQuery.data}
-            isReportLoading={qaReportQuery.isLoading}
-            isExporting={qaExporting}
-            onExportExcel={async () => {
-              try {
-                setQaExporting(true)
-                const report =
-                  qaReportQuery.data || (await getSessionQaReportApi(accessToken, sessionId))
-                await exportQaAnalyticsExcel(report)
-              } catch (error) {
-                setErrorMessage(error.message || 'Q&A export failed')
-              } finally {
-                setQaExporting(false)
-              }
-            }}
-            onModerate={(qaId, action) => qaMutation.mutate({ qaId, action })}
-          />
 
           <QuestionLeaderboardPanel
             activeQuestion={activeQuestion}

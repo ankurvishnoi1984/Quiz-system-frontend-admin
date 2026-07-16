@@ -42,8 +42,9 @@ export const SESSION_REPORT_VIEWS = [
     id: 'question-breakdown',
     label: 'Question Breakdown',
   },
-  {
-    id: 'qa-analytics',
-    label: 'Q&A Analytics',
-  },
+  // Q&A feature disabled — re-enable when bringing Q&A back
+  // {
+  //   id: 'qa-analytics',
+  //   label: 'Q&A Analytics',
+  // },
 ]

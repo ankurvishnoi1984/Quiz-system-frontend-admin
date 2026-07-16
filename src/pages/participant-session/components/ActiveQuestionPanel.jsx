@@ -258,7 +258,7 @@ export function ActiveQuestionPanel({
         <div
           className={`flex flex-wrap items-center gap-2 ${navigationEnabled ? 'justify-end' : 'justify-center'}`}
         >
-          {navigationEnabled && isLastDisplayedQuestion && submitted && !hasCountdown && (
+          {navigationEnabled && isLastDisplayedQuestion && submitted && !hasCountdown && onGoToQa ? (
             <button
               type="button"
               onClick={onGoToQa}
@@ -266,7 +266,8 @@ export function ActiveQuestionPanel({
             >
               Go to Q&A
             </button>
-          )}
+          ) : null}
+          {/* Q&A feature disabled — pass onGoToQa from parent to re-enable the button above */}
           {question.type !== 'Emoji Reaction' || hasFinalizePayload || useNextNav ? (
           <button
             type="button"

@@ -69,7 +69,7 @@ function PresentViewWaitingScreen({ session }) {
         <PresentSlideHeader
           sessionTitle={sessionTitle}
           participantCount={0}
-          qaCount={0}
+          // qaCount={0} // Q&A feature disabled
           isSessionLive={false}
           readOnly
         />

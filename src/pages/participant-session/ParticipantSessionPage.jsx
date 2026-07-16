@@ -3,16 +3,16 @@ import { useParams, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useShallow } from 'zustand/shallow'
 import {
-  askQaQuestionApi,
+  // askQaQuestionApi, // Q&A feature disabled
   getSessionLeaderboardApi,
   getParticipantSessionSurveySummaryApi,
   getParticipantSurveyQuestionResultsApi,
   joinSessionApi,
-  listQaQuestionsApi,
+  // listQaQuestionsApi, // Q&A feature disabled
   listSessionQuestionsApi,
   lookupSessionApi,
   submitResponseApi,
-  upvoteQaApi,
+  // upvoteQaApi, // Q&A feature disabled
 } from '../../services/participantApi'
 import { createRealtimeClient, RealtimeEvent } from '../../services/realtimeClient'
 import { useParticipantStore } from '../../store/participantStore'
@@ -36,7 +36,7 @@ import { JoinFormView } from './components/JoinFormView'
 import { SessionNotLiveView } from './components/SessionNotLiveView'
 import { PageCenteredShell } from './components/PageCenteredShell'
 import { ParticipantAlertModal } from './components/ParticipantAlertModal'
-import { QaPanel } from './components/QaPanel'
+// import { QaPanel } from './components/QaPanel' // Q&A feature disabled
 import { OverallLeaderboardPanel } from './components/OverallLeaderboardPanel'
 import { SurveySessionEndingPanel } from './components/SurveySessionEndingPanel'
 import { SessionHeader } from './components/SessionHeader'
@@ -155,10 +155,11 @@ function ParticipantSessionPage() {
   const [joinError, setJoinError] = useState('')
   const [transitioningLive, setTransitioningLive] = useState(false)
   const [tagsInput, setTagsInput] = useState('')
-  const [askText, setAskText] = useState('')
-  const [askAnonymous, setAskAnonymous] = useState(false)
-  const [upvotes, setUpvotes] = useState({})
-  const [ownQuestions, setOwnQuestions] = useState([])
+  // Q&A feature disabled — re-enable when bringing Q&A back
+  // const [askText, setAskText] = useState('')
+  // const [askAnonymous, setAskAnonymous] = useState(false)
+  // const [upvotes, setUpvotes] = useState({})
+  // const [ownQuestions, setOwnQuestions] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitModal, setSubmitModal] = useState(null)
   const [reattemptModal, setReattemptModal] = useState(null)
@@ -216,12 +217,13 @@ function ParticipantSessionPage() {
     refetchInterval: step === 'active' || step === 'waiting' ? 5000 : false,
   })
 
-  const qaQuery = useQuery({
-    queryKey: ['participant-qa', sessionQuery.data?.session_id, participantToken],
-    queryFn: () => listQaQuestionsApi(participantToken, sessionQuery.data?.session_id),
-    enabled: Boolean(participantToken && sessionQuery.data?.session_id),
-    refetchInterval: 10000,
-  })
+  // Q&A feature disabled — re-enable when bringing Q&A back
+  // const qaQuery = useQuery({
+  //   queryKey: ['participant-qa', sessionQuery.data?.session_id, participantToken],
+  //   queryFn: () => listQaQuestionsApi(participantToken, sessionQuery.data?.session_id),
+  //   enabled: Boolean(participantToken && sessionQuery.data?.session_id),
+  //   refetchInterval: 10000,
+  // })
 
   const mappedQuestions = useMemo(
     () => (questionsQuery.data || []).map(mapParticipantQuestion),
@@ -851,7 +853,7 @@ function ParticipantSessionPage() {
     })
 
     const offResp = client.on('response_received', () => {
-      queryClient.invalidateQueries({ queryKey: ['participant-qa', dbSessionId] })
+      // queryClient.invalidateQueries({ queryKey: ['participant-qa', dbSessionId] }) // Q&A feature disabled
       queryClient.invalidateQueries({ queryKey: ['participant-survey-results'] })
       queryClient.invalidateQueries({ queryKey: ['participant-survey-summary', dbSessionId] })
     })
@@ -1002,6 +1004,11 @@ function ParticipantSessionPage() {
       }
     }
   }, [showOverallLeaderboardTab, showSurveyEndingScreen, step])
+
+  // Q&A feature disabled — leave any stale 'qa' step
+  useEffect(() => {
+    if (step === 'qa') setStep('active')
+  }, [step])
 
   useEffect(() => {
     if (!activeQuestions.length) {
@@ -1296,10 +1303,11 @@ function ParticipantSessionPage() {
     }
   }, [session, step])
 
-  const approvedQa = useMemo(
-    () => (qaQuery.data || []).filter((q) => q.moderation_status === 'approved'),
-    [qaQuery.data],
-  )
+  // Q&A feature disabled
+  // const approvedQa = useMemo(
+  //   () => (qaQuery.data || []).filter((q) => q.moderation_status === 'approved'),
+  //   [qaQuery.data],
+  // )
 
   const hasAnyQuestionSaved = useMemo(
     () => Object.keys(quizSubmittedQuestionIds || {}).length > 0,
@@ -1630,7 +1638,8 @@ function ParticipantSessionPage() {
         variant: 'success',
         title: 'Submission successful',
         message:
-          'Your answers were submitted successfully. You can review questions or open Q&A, but answers can no longer be changed.',
+          'Your answers were submitted successfully. You can review questions, but answers can no longer be changed.',
+          // Q&A feature disabled — was: "...or open Q&A..."
         confirmLabel: 'Continue',
       })
     } else {
@@ -1819,38 +1828,39 @@ function ParticipantSessionPage() {
     }
   }
 
-  const allowAnonymousQa = session?.allow_anonymous_qa || false
+  // Q&A feature disabled — re-enable when bringing Q&A back
+  // const allowAnonymousQa = session?.allow_anonymous_qa || false
+  //
+  // const handleAskQuestion = async () => {
+  //   if (!dbSessionId || !askText.trim() || !participantToken) return
+  //
+  //   try {
+  //     const newQ = await askQaQuestionApi(participantToken, dbSessionId, {
+  //       question_text: askText.trim(),
+  //       is_anonymous: allowAnonymousQa ? askAnonymous : false,
+  //     })
+  //     if (newQ) {
+  //       setOwnQuestions((prev) => [
+  //         { id: newQ.qa_question_id, text: newQ.question_text, status: newQ.moderation_status },
+  //         ...prev,
+  //       ])
+  //     }
+  //     setAskText('')
+  //     setAskAnonymous(false)
+  //   } catch (err) {
+  //     console.error('Failed to ask question:', err)
+  //   }
+  // }
 
-  const handleAskQuestion = async () => {
-    if (!dbSessionId || !askText.trim() || !participantToken) return
-
-    try {
-      const newQ = await askQaQuestionApi(participantToken, dbSessionId, {
-        question_text: askText.trim(),
-        is_anonymous: allowAnonymousQa ? askAnonymous : false,
-      })
-      if (newQ) {
-        setOwnQuestions((prev) => [
-          { id: newQ.qa_question_id, text: newQ.question_text, status: newQ.moderation_status },
-          ...prev,
-        ])
-      }
-      setAskText('')
-      setAskAnonymous(false)
-    } catch (err) {
-      console.error('Failed to ask question:', err)
-    }
-  }
-
-  const handleUpvote = async (qaId) => {
-    if (!participantToken) return
-    try {
-      await upvoteQaApi(participantToken, qaId)
-      setUpvotes((prev) => ({ ...prev, [qaId]: (prev[qaId] || 0) + 1 }))
-    } catch (err) {
-      console.error('Failed to upvote:', err)
-    }
-  }
+  // const handleUpvote = async (qaId) => {
+  //   if (!participantToken) return
+  //   try {
+  //     await upvoteQaApi(participantToken, qaId)
+  //     setUpvotes((prev) => ({ ...prev, [qaId]: (prev[qaId] || 0) + 1 }))
+  //   } catch (err) {
+  //     console.error('Failed to upvote:', err)
+  //   }
+  // }
 
   const updateResponse = useCallback(
     (questionId, patch) => {
@@ -2063,7 +2073,8 @@ function ParticipantSessionPage() {
               <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
                 <h2 className="text-xl font-bold text-navy-900">Session ended</h2>
                 <p className="text-sm text-slate-600">
-                  The host has ended this session. Switch to Q&amp;A to review past activity.
+                  The host has ended this session.
+                  {/* Q&A feature disabled — was: Switch to Q&A to review past activity. */}
                 </p>
               </section>
             )}
@@ -2118,10 +2129,11 @@ function ParticipantSessionPage() {
             }
             onPrevious={handlePrevious}
             onNextOrSubmit={handleNextOrSubmit}
-            onGoToQa={() => setStep('qa')}
+            // onGoToQa={() => setStep('qa')} // Q&A feature disabled
           />
             )}
 
+            {/* Q&A feature disabled — re-enable when bringing Q&A back
             {step === 'qa' && (
               <QaPanel
                 askText={askText}
@@ -2136,6 +2148,7 @@ function ParticipantSessionPage() {
                 onUpvote={handleUpvote}
               />
             )}
+            */}
           </>
         )}
       </div>

@@ -8,8 +8,9 @@ import { AnalyticsQuestionInsights } from '../components/analytics/AnalyticsQues
 import { AnalyticsPrintReport } from '../components/analytics/AnalyticsPrintReport'
 import { SessionSummaryPrintReport } from '../components/analytics/SessionSummaryPrintReport'
 import { SessionSummaryReportCard } from '../components/analytics/SessionSummaryReportCard'
-import { QaAnalyticsPrintReport } from '../components/analytics/QaAnalyticsPrintReport'
-import { QaAnalyticsReportCard } from '../components/analytics/QaAnalyticsReportCard'
+// Q&A feature disabled — re-enable when bringing Q&A back
+// import { QaAnalyticsPrintReport } from '../components/analytics/QaAnalyticsPrintReport'
+// import { QaAnalyticsReportCard } from '../components/analytics/QaAnalyticsReportCard'
 import { ParticipantLeaderboardTable } from '../components/analytics/ParticipantLeaderboardTable'
 import { PerQuestionReportDetails } from '../components/analytics/PerQuestionReportDetails'
 import { SESSION_REPORT_VIEWS } from '../constants/sessionReportTypes'
@@ -25,7 +26,7 @@ import { useDepartmentSessionsList, getPreferredAnalyticsSessionId } from '../ho
 import {
   getSessionParticipantsReportApi,
   getSessionQuestionsReportApi,
-  getSessionQaReportApi,
+  // getSessionQaReportApi, // Q&A feature disabled
   getSessionReportApi,
   getSessionSummaryReportApi,
 } from '../services/analyticsApi'
@@ -165,11 +166,12 @@ function AnalyticsPage() {
     enabled: Boolean(accessToken && numericSessionId),
   })
 
-  const qaReportQuery = useQuery({
-    queryKey: ['session-qa-report', numericSessionId],
-    queryFn: () => getSessionQaReportApi(accessToken, numericSessionId),
-    enabled: Boolean(accessToken && numericSessionId),
-  })
+  // Q&A feature disabled — re-enable when bringing Q&A back
+  // const qaReportQuery = useQuery({
+  //   queryKey: ['session-qa-report', numericSessionId],
+  //   queryFn: () => getSessionQaReportApi(accessToken, numericSessionId),
+  //   enabled: Boolean(accessToken && numericSessionId),
+  // })
 
   const questionsQuery = useQuery({
     queryKey: ['analytics-session-questions', numericSessionId],
@@ -460,8 +462,9 @@ function AnalyticsPage() {
   const questionsReportLoading = questionsReportQuery.isLoading
   const participantsReport = participantsReportQuery.data
   const participantsReportLoading = participantsReportQuery.isLoading
-  const qaReport = qaReportQuery.data
-  const qaReportLoading = qaReportQuery.isLoading
+  // Q&A feature disabled
+  // const qaReport = qaReportQuery.data
+  // const qaReportLoading = qaReportQuery.isLoading
 
   const openPdfPreview = async () => {
     if (activeReportView === 'summary' && !summaryReport && accessToken && numericSessionId) {
@@ -470,35 +473,41 @@ function AnalyticsPage() {
     if (activeReportView === 'question-breakdown' && !questionsReport && accessToken && numericSessionId) {
       await questionsReportQuery.refetch()
     }
-    if (activeReportView === 'qa-analytics' && !qaReport && accessToken && numericSessionId) {
-      await qaReportQuery.refetch()
-    }
+    // if (activeReportView === 'qa-analytics' && !qaReport && accessToken && numericSessionId) {
+    //   await qaReportQuery.refetch()
+    // }
 
     setPdfPreviewOpen(true)
   }
 
-  const reportSlug =
-    activeReportView === 'summary'
-      ? 'summary'
-      : activeReportView === 'qa-analytics'
-        ? 'qa-analytics'
-        : 'analytics'
+  const reportSlug = activeReportView === 'summary' ? 'summary' : 'analytics'
+  // Q&A feature disabled — was also 'qa-analytics'
+  // const reportSlug =
+  //   activeReportView === 'summary'
+  //     ? 'summary'
+  //     : activeReportView === 'qa-analytics'
+  //       ? 'qa-analytics'
+  //       : 'analytics'
 
   const pdfFilename = `session-${sessionMeta?.id || numericSessionId}-${reportSlug}-report.pdf`
 
   const pdfPreviewTitle =
-    activeReportView === 'summary'
-      ? 'Session summary report'
-      : activeReportView === 'qa-analytics'
-        ? 'Q&A analytics report'
-        : 'Session analytics report'
+    activeReportView === 'summary' ? 'Session summary report' : 'Session analytics report'
+  // Q&A feature disabled
+  // const pdfPreviewTitle =
+  //   activeReportView === 'summary'
+  //     ? 'Session summary report'
+  //     : activeReportView === 'qa-analytics'
+  //       ? 'Q&A analytics report'
+  //       : 'Session analytics report'
 
   const pdfPreviewContent =
     activeReportView === 'summary' ? (
       <SessionSummaryPrintReport report={summaryReport} />
-    ) : activeReportView === 'qa-analytics' ? (
-      <QaAnalyticsPrintReport report={qaReport} />
     ) : (
+      // Q&A feature disabled — was QaAnalyticsPrintReport for 'qa-analytics'
+      // ) : activeReportView === 'qa-analytics' ? (
+      //   <QaAnalyticsPrintReport report={qaReport} />
       <AnalyticsPrintReport
         sessionMeta={sessionMeta}
         summary={summary}
@@ -512,8 +521,8 @@ function AnalyticsPage() {
     questionsQuery.error ||
     summaryReportQuery.error ||
     questionsReportQuery.error ||
-    participantsReportQuery.error ||
-    qaReportQuery.error
+    participantsReportQuery.error
+  // || qaReportQuery.error // Q&A feature disabled
 
   if (!activeSessionId || !sessionMeta) {
     return (
@@ -655,10 +664,11 @@ function AnalyticsPage() {
 
       {activeReportView === 'summary' ? (
         <SessionSummaryReportCard report={summaryReport} isLoading={summaryReportLoading} />
-      ) : activeReportView === 'qa-analytics' ? (
-        // Q&A analytics: Anonymous vs named pie chart disabled in QaAnalyticsReportCard
-        <QaAnalyticsReportCard report={qaReport} isLoading={qaReportLoading} />
       ) : (
+      // Q&A feature disabled — re-enable when bringing Q&A back
+      // ) : activeReportView === 'qa-analytics' ? (
+      //   <QaAnalyticsReportCard report={qaReport} isLoading={qaReportLoading} />
+      // ) : (
       <>
       <div className="rounded-2xl border border-blue-200/70 bg-white/90 p-5 shadow-sm shadow-blue-900/5 backdrop-blur">
         <div className="flex items-center justify-between gap-3">

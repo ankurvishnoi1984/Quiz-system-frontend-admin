@@ -54,9 +54,10 @@ export async function exportSessionSummaryExcel(report) {
     ['Total responded', report.summary.total_responded],
     ['Avg engagement rate', `${report.summary.avg_engagement_rate_percent}%`],
     ['Questions activated', report.summary.total_questions_activated],
-    ['Q&A asked', report.qa_summary.asked],
-    ['Q&A approved', report.qa_summary.approved],
-    ['Q&A answered', report.qa_summary.answered],
+    // Q&A feature disabled — re-enable when bringing Q&A back
+    // ['Q&A asked', report.qa_summary.asked],
+    // ['Q&A approved', report.qa_summary.approved],
+    // ['Q&A answered', report.qa_summary.answered],
   ])
 
   if (report.quiz_stats?.has_quiz_mode) {

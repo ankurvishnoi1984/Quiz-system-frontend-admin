@@ -27,6 +27,7 @@ export function SessionHeader({
           >
             Questions
           </button>
+          {/* Q&A feature disabled — re-enable when bringing Q&A back
           <button
             type="button"
             onClick={() => onStepChange('qa')}
@@ -34,6 +35,7 @@ export function SessionHeader({
           >
             Q&amp;A
           </button>
+          */}
         </div>
       ) : null}
     </div>
