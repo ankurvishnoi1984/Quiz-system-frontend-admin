@@ -9,6 +9,7 @@ import {
   Cloud,
   Eye,
   EyeOff,
+  FileUp,
   GripVertical,
   ListChecks,
   MessageSquareText,
@@ -26,6 +27,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { HostQuestionActionButton } from '../components/live/HostQuestionActionButton'
 import { QuestionMediaUpload } from '../components/builder/QuestionMediaUpload'
+import { QuestionImportModal } from '../components/builder/QuestionImportModal'
 import { QuestionMedia } from '../components/participant-session/QuestionMedia'
 import Modal from '../components/ui/Modal'
 import { useAuthStore } from '../store/authStore'
@@ -1101,6 +1103,7 @@ function BuilderPage() {
 
   const [selectedId, setSelectedId] = useState(null)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [questionImportOpen, setQuestionImportOpen] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -1918,6 +1921,23 @@ function BuilderPage() {
 
           <button
             type="button"
+            onClick={() => setQuestionImportOpen(true)}
+            disabled={!isDraftSession || dirty}
+            title={
+              !isDraftSession
+                ? 'Question upload is available only for draft sessions.'
+                : dirty
+                  ? 'Save or discard your unsaved changes before importing questions.'
+                  : 'Upload questions from an Excel workbook'
+            }
+            className="inline-flex items-center gap-2 rounded-2xl border border-blue-200/70 bg-white/90 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm shadow-blue-900/5 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileUp className="size-4" />
+            Upload questions
+          </button>
+
+          <button
+            type="button"
             onClick={() => {
               saveMutation.mutate()
             }}
@@ -2543,6 +2563,29 @@ function BuilderPage() {
           </div>
         </aside>
       </div>
+
+      <QuestionImportModal
+        open={questionImportOpen}
+        onClose={() => setQuestionImportOpen(false)}
+        accessToken={accessToken}
+        sessionId={sessionId}
+        existingQuestionCount={questions.length}
+        onImported={async (result) => {
+          if (Array.isArray(result?.questions)) {
+            queryClient.setQueryData(['builder-questions', sessionId], result.questions)
+          }
+          await queryClient.invalidateQueries({ queryKey: ['builder-questions', sessionId] })
+          setSaveError('')
+          setSaveSuccess(
+            `${result?.created_count || 0} question${
+              result?.created_count === 1 ? '' : 's'
+            } imported successfully`,
+          )
+          setLastSavedLabel(
+            new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          )
+        }}
+      />
 
       <Modal open={previewOpen} title="Preview Participant View" onClose={() => setPreviewOpen(false)}>
         {selected ? (

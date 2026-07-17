@@ -22,6 +22,29 @@ export async function createQuestionApi(accessToken, sessionId, payload) {
   return data?.question || null
 }
 
+export async function previewQuestionImportApi(
+  accessToken,
+  sessionId,
+  { filename, rows },
+  mode = 'append',
+) {
+  return authRequest(`/sessions/${sessionId}/questions/import/preview`, accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ filename, rows, mode }),
+  })
+}
+
+export async function importQuestionsApi(
+  accessToken,
+  sessionId,
+  { mode = 'append', questions = [] },
+) {
+  return authRequest(`/sessions/${sessionId}/questions/import`, accessToken, {
+    method: 'POST',
+    body: JSON.stringify({ mode, questions }),
+  })
+}
+
 export async function updateQuestionApi(accessToken, questionId, payload) {
   const data = await authRequest(`/questions/${questionId}`, accessToken, {
     method: 'PUT',
