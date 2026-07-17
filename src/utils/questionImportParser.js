@@ -86,17 +86,6 @@ function correctOptionIndexes(value) {
   )
 }
 
-function inferMediaType(url) {
-  const normalized = String(url || '').toLowerCase().split('?')[0]
-  if (!normalized) return null
-  if (/\.(gif)$/.test(normalized)) return 'gif'
-  if (/\.(png|jpe?g|webp|svg)$/.test(normalized)) return 'image'
-  if (/\.(mp3|wav|ogg|m4a|aac)$/.test(normalized)) return 'audio_file'
-  if (/\.(mp4|webm|mov|m4v)$/.test(normalized)) return 'video_file'
-  if (/youtu\.?be|youtube\.com|vimeo\.com/.test(normalized)) return 'video_embed'
-  return null
-}
-
 function usesOptions(type, subtype) {
   const effectiveType = type === 'survey' ? subtype : type
   return ['mcq', 'poll', 'true_false', 'ranking', 'emoji_reaction'].includes(effectiveType)
@@ -107,7 +96,6 @@ function parseRow(values, rowNumber, questionType) {
   const questionText = cellText(values.question_text)
   const nonScored = ['poll', 'survey', 'emoji_reaction'].includes(questionType)
   const correctIndexes = correctOptionIndexes(values.correct_option)
-  const mediaUrl = cellText(values.media_url) || null
   const optionTexts = OPTION_COLUMNS.map((column) => cellText(values[column])).filter(Boolean)
   const options = usesOptions(questionType, surveySubtype)
     ? optionTexts.map((optionText, index) => ({
@@ -116,6 +104,7 @@ function parseRow(values, rowNumber, questionType) {
         display_order: index + 1,
       }))
     : []
+  const displayOrder = Math.max(1, rowNumber - 1)
 
   const payload = {
     question_type: questionType,
@@ -138,12 +127,9 @@ function parseRow(values, rowNumber, questionType) {
     rating_max: Math.round(optionalNumber(values.rating_max) ?? 10),
     rating_min_label: cellText(values.rating_min_label) || null,
     rating_max_label: cellText(values.rating_max_label) || null,
-    media_url: mediaUrl,
-    media_type: mediaUrl ? inferMediaType(mediaUrl) : null,
-    display_order: Math.max(
-      1,
-      Math.round(optionalNumber(values.question_number) ?? rowNumber - 1),
-    ),
+    media_url: null,
+    media_type: null,
+    display_order: displayOrder,
   }
 
   const errors = []
@@ -156,9 +142,6 @@ function parseRow(values, rowNumber, questionType) {
     (!surveySubtype || !ALLOWED_SURVEY_SUBTYPES.has(surveySubtype))
   ) {
     errors.push('survey_subtype is required and must be supported')
-  }
-  if (mediaUrl && !payload.media_type) {
-    errors.push('media_url format is not supported')
   }
   if (payload.rating_min >= payload.rating_max) {
     errors.push('rating_min must be less than rating_max')
@@ -173,7 +156,7 @@ function parseRow(values, rowNumber, questionType) {
 
   return {
     row: rowNumber,
-    question_number: payload.display_order,
+    question_number: displayOrder,
     question_text: questionText,
     question_type: questionType,
     survey_subtype: surveySubtype,
@@ -210,7 +193,10 @@ export async function parseQuestionImportFile(file, { questionType } = {}) {
   const headers = new Map()
   worksheet.getRow(1).eachCell({ includeEmpty: false }, (cell, columnNumber) => {
     const header = normalizeHeader(cell.value)
-    if (header) headers.set(columnNumber, header)
+    // Ignore legacy columns removed from the template.
+    if (header && header !== 'question_number' && header !== 'media_url' && header !== 'question_type') {
+      headers.set(columnNumber, header)
+    }
   })
   if (![...headers.values()].includes('question_text')) {
     throw new Error('Questions sheet must include a question_text column.')
@@ -231,7 +217,5 @@ export async function parseQuestionImportFile(file, { questionType } = {}) {
   }
   if (!rows.length) throw new Error('No question rows were found in the workbook.')
 
-  return rows.sort(
-    (a, b) => Number(a.question_number || a.row) - Number(b.question_number || b.row),
-  )
+  return rows.sort((a, b) => a.row - b.row)
 }

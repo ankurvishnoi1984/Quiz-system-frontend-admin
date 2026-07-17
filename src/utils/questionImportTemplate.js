@@ -1,7 +1,6 @@
 import ExcelJS from 'exceljs'
 
 const HEADERS = [
-  'question_number',
   'survey_subtype',
   'question_text',
   ...Array.from({ length: 10 }, (_, index) => `option_${index + 1}`),
@@ -13,12 +12,10 @@ const HEADERS = [
   'rating_max',
   'rating_min_label',
   'rating_max_label',
-  'media_url',
 ]
 
 const SAMPLE_ROWS = [
   [
-    1,
     '',
     'Which planet is known as the Red Planet?',
     'Earth',
@@ -39,10 +36,8 @@ const SAMPLE_ROWS = [
     '',
     '',
     '',
-    '',
   ],
   [
-    2,
     '',
     'What is 2 + 2?',
     '3',
@@ -59,7 +54,6 @@ const SAMPLE_ROWS = [
     10,
     15,
     false,
-    '',
     '',
     '',
     '',
@@ -102,7 +96,11 @@ export async function downloadQuestionImportTemplate({ includeExamples = false }
       'Question upload template',
       'Choose the question type in the Upload questions modal. Keep all Excel rows consistent with that type. Survey rows may mix survey_subtype values.',
     ],
-    ['Required columns', 'question_number, question_text'],
+    ['Required columns', 'question_text'],
+    [
+      'Question order',
+      'Question numbers are assigned from the Excel row order (row 2 = question 1, row 3 = question 2, and so on). Do not add a question_number column.',
+    ],
     [
       'Question type',
       'Selected in the upload modal (not in this workbook): MCQ, Poll, Survey, Word Cloud, Rating, Text, True/False, Ranking, Emoji Reaction.',
@@ -120,12 +118,8 @@ export async function downloadQuestionImportTemplate({ includeExamples = false }
       'MCQ/Poll need at least 2; True-False exactly 2; Ranking 2–10; Emoji Reaction exactly 5.',
     ],
     [
-      'Media',
-      'media_url may point to a supported image, audio, video, YouTube, or Vimeo URL. Embedded files are not supported.',
-    ],
-    [
       'Limits',
-      'Maximum 500 questions and 5MB per import. Upload is available only for draft sessions.',
+      'Maximum 500 questions and 5MB per import. Upload is available only for draft sessions. Media is not imported from Excel.',
     ],
   ]
   instructions.addRows(instructionRows)
