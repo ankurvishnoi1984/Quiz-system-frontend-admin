@@ -2,7 +2,6 @@ import ExcelJS from 'exceljs'
 
 const HEADERS = [
   'question_number',
-  'question_type',
   'survey_subtype',
   'question_text',
   ...Array.from({ length: 10 }, (_, index) => `option_${index + 1}`),
@@ -18,8 +17,54 @@ const HEADERS = [
 ]
 
 const SAMPLE_ROWS = [
-  [1, 'mcq', '', 'Which planet is known as the Red Planet?', 'Earth', 'Mars', 'Venus', 'Jupiter', '', '', '', '', '', '', 2, 10, 30, false, '', '', '', '', ''],
-  [2, 'mcq', '', 'What is 2 + 2?', '3', '4', '5', '6', '', '', '', '', '', '', 2, 10, 15, false, '', '', '', '', ''],
+  [
+    1,
+    '',
+    'Which planet is known as the Red Planet?',
+    'Earth',
+    'Mars',
+    'Venus',
+    'Jupiter',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    2,
+    10,
+    30,
+    false,
+    '',
+    '',
+    '',
+    '',
+    '',
+  ],
+  [
+    2,
+    '',
+    'What is 2 + 2?',
+    '3',
+    '4',
+    '5',
+    '6',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    2,
+    10,
+    15,
+    false,
+    '',
+    '',
+    '',
+    '',
+    '',
+  ],
 ]
 
 function downloadBlob(buffer, filename) {
@@ -53,14 +98,35 @@ export async function downloadQuestionImportTemplate({ includeExamples = false }
   const instructions = workbook.addWorksheet('Instructions')
   instructions.columns = [{ width: 24 }, { width: 100 }]
   const instructionRows = [
-    ['Question upload template', 'Keep all questions in one top-level type. Survey rows may mix survey_subtype values.'],
-    ['Required columns', 'question_number, question_type, question_text'],
-    ['Supported question_type', 'mcq, poll, survey, word_cloud, rating, open_text, true_false, ranking, emoji_reaction'],
-    ['Survey subtypes', 'mcq, poll, rating, open_text, word_cloud, ranking, true_false, emoji_reaction'],
-    ['Correct answer', 'For quiz MCQ/True-False, put the correct option number in correct_option (example: 2).'],
-    ['Options', 'MCQ/Poll need at least 2; True-False exactly 2; Ranking 2–10; Emoji Reaction exactly 5.'],
-    ['Media', 'media_url may point to a supported image, audio, video, YouTube, or Vimeo URL. Embedded files are not supported.'],
-    ['Limits', 'Maximum 500 questions and 5MB per import. Upload is available only for draft sessions.'],
+    [
+      'Question upload template',
+      'Choose the question type in the Upload questions modal. Keep all Excel rows consistent with that type. Survey rows may mix survey_subtype values.',
+    ],
+    ['Required columns', 'question_number, question_text'],
+    [
+      'Question type',
+      'Selected in the upload modal (not in this workbook): MCQ, Poll, Survey, Word Cloud, Rating, Text, True/False, Ranking, Emoji Reaction.',
+    ],
+    [
+      'Survey subtypes',
+      'When modal type is Survey, fill survey_subtype: mcq, poll, rating, open_text, word_cloud, ranking, true_false, emoji_reaction. Leave blank for other types.',
+    ],
+    [
+      'Correct answer',
+      'For quiz MCQ/True-False, put the correct option number in correct_option (example: 2).',
+    ],
+    [
+      'Options',
+      'MCQ/Poll need at least 2; True-False exactly 2; Ranking 2–10; Emoji Reaction exactly 5.',
+    ],
+    [
+      'Media',
+      'media_url may point to a supported image, audio, video, YouTube, or Vimeo URL. Embedded files are not supported.',
+    ],
+    [
+      'Limits',
+      'Maximum 500 questions and 5MB per import. Upload is available only for draft sessions.',
+    ],
   ]
   instructions.addRows(instructionRows)
   instructions.getRow(1).font = { bold: true, size: 16, color: { argb: 'FF173B57' } }
@@ -85,15 +151,9 @@ export async function downloadQuestionImportTemplate({ includeExamples = false }
     to: { row: 1, column: HEADERS.length },
   }
 
-  const typeColumn = HEADERS.indexOf('question_type') + 1
   const subtypeColumn = HEADERS.indexOf('survey_subtype') + 1
   const multipleColumn = HEADERS.indexOf('allow_multiple_select') + 1
   for (let row = 2; row <= 501; row += 1) {
-    questions.getCell(row, typeColumn).dataValidation = {
-      type: 'list',
-      allowBlank: false,
-      formulae: ['"mcq,poll,survey,word_cloud,rating,open_text,true_false,ranking,emoji_reaction"'],
-    }
     questions.getCell(row, subtypeColumn).dataValidation = {
       type: 'list',
       allowBlank: true,
@@ -112,4 +172,3 @@ export async function downloadQuestionImportTemplate({ includeExamples = false }
     includeExamples ? 'question-import-sample.xlsx' : 'question-import-template.xlsx',
   )
 }
-

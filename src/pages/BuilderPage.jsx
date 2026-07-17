@@ -2570,6 +2570,7 @@ function BuilderPage() {
         accessToken={accessToken}
         sessionId={sessionId}
         existingQuestionCount={questions.length}
+        sessionQuestionType={sessionQuestionType}
         onImported={async (result) => {
           if (Array.isArray(result?.questions)) {
             queryClient.setQueryData(['builder-questions', sessionId], result.questions)

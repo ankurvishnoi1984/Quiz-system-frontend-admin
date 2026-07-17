@@ -102,8 +102,7 @@ function usesOptions(type, subtype) {
   return ['mcq', 'poll', 'true_false', 'ranking', 'emoji_reaction'].includes(effectiveType)
 }
 
-function parseRow(values, rowNumber) {
-  const questionType = normalizeType(values.question_type)
+function parseRow(values, rowNumber, questionType) {
   const surveySubtype = questionType === 'survey' ? normalizeType(values.survey_subtype) : null
   const questionText = cellText(values.question_text)
   const nonScored = ['poll', 'survey', 'emoji_reaction'].includes(questionType)
@@ -184,13 +183,18 @@ function parseRow(values, rowNumber) {
   }
 }
 
-export async function parseQuestionImportFile(file) {
+export async function parseQuestionImportFile(file, { questionType } = {}) {
   if (!file) throw new Error('Choose an Excel workbook.')
   if (!file.name?.toLowerCase().endsWith('.xlsx')) {
     throw new Error('Only .xlsx Excel files are supported.')
   }
   if (file.size > MAX_FILE_BYTES) {
     throw new Error('Excel file size exceeds the 5MB limit.')
+  }
+
+  const normalizedType = normalizeType(questionType)
+  if (!ALLOWED_TYPES.has(normalizedType)) {
+    throw new Error('Select a question type before uploading the workbook.')
   }
 
   const workbook = new ExcelJS.Workbook()
@@ -220,7 +224,7 @@ export async function parseQuestionImportFile(file) {
       values[header] = row.getCell(columnNumber).value
     })
     if (!Object.values(values).some((value) => cellText(value))) continue
-    rows.push(parseRow(values, rowNumber))
+    rows.push(parseRow(values, rowNumber, normalizedType))
     if (rows.length > MAX_IMPORT_ROWS) {
       throw new Error(`A workbook can contain at most ${MAX_IMPORT_ROWS} questions.`)
     }
@@ -231,4 +235,3 @@ export async function parseQuestionImportFile(file) {
     (a, b) => Number(a.question_number || a.row) - Number(b.question_number || b.row),
   )
 }
-

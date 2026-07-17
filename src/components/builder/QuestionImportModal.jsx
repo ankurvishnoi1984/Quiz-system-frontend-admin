@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, Upload } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '../ui/Modal'
 import {
   importQuestionsApi,
@@ -8,25 +8,68 @@ import {
 import { parseQuestionImportFile } from '../../utils/questionImportParser'
 import { downloadQuestionImportTemplate } from '../../utils/questionImportTemplate'
 
+const IMPORT_QUESTION_TYPES = [
+  { value: 'mcq', label: 'MCQ' },
+  { value: 'poll', label: 'Poll' },
+  { value: 'survey', label: 'Survey' },
+  { value: 'word_cloud', label: 'Word Cloud' },
+  { value: 'emoji_reaction', label: 'Emoji Reaction' },
+  { value: 'rating', label: 'Rating' },
+  { value: 'open_text', label: 'Text' },
+  { value: 'true_false', label: 'True/False' },
+  { value: 'ranking', label: 'Ranking' },
+]
+
+const UI_TO_API_TYPE = {
+  MCQ: 'mcq',
+  Poll: 'poll',
+  Survey: 'survey',
+  'Word Cloud': 'word_cloud',
+  'Emoji Reaction': 'emoji_reaction',
+  Rating: 'rating',
+  Text: 'open_text',
+  'True/False': 'true_false',
+  Ranking: 'ranking',
+}
+
+function resolveLockedApiType(sessionQuestionType) {
+  if (!sessionQuestionType) return ''
+  return UI_TO_API_TYPE[sessionQuestionType] || ''
+}
+
 export function QuestionImportModal({
   open,
   onClose,
   accessToken,
   sessionId,
   existingQuestionCount = 0,
+  sessionQuestionType = null,
   onImported,
 }) {
   const inputRef = useRef(null)
+  const lockedApiType = useMemo(
+    () => resolveLockedApiType(sessionQuestionType),
+    [sessionQuestionType],
+  )
   const [file, setFile] = useState(null)
   const [mode, setMode] = useState('append')
+  const [questionType, setQuestionType] = useState(lockedApiType)
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState('')
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
 
+  const typeLocked = Boolean(lockedApiType && mode === 'append' && existingQuestionCount > 0)
+
+  useEffect(() => {
+    if (!open) return
+    setQuestionType(lockedApiType || '')
+  }, [open, lockedApiType])
+
   const reset = () => {
     setFile(null)
     setMode('append')
+    setQuestionType(lockedApiType || '')
     setPreview(null)
     setError('')
     if (inputRef.current) inputRef.current.value = ''
@@ -38,12 +81,21 @@ export function QuestionImportModal({
     onClose()
   }
 
-  const generatePreview = async (nextFile = file, nextMode = mode) => {
+  const generatePreview = async (
+    nextFile = file,
+    nextMode = mode,
+    nextQuestionType = questionType,
+  ) => {
     if (!nextFile) return
+    if (!nextQuestionType) {
+      setPreview(null)
+      setError('Select a question type before uploading the workbook.')
+      return
+    }
     setIsPreviewing(true)
     setError('')
     try {
-      const rows = await parseQuestionImportFile(nextFile)
+      const rows = await parseQuestionImportFile(nextFile, { questionType: nextQuestionType })
       const data = await previewQuestionImportApi(
         accessToken,
         sessionId,
@@ -63,14 +115,25 @@ export function QuestionImportModal({
     setFile(nextFile || null)
     setPreview(null)
     setError('')
-    if (nextFile) generatePreview(nextFile, mode)
+    if (nextFile) generatePreview(nextFile, mode, questionType)
   }
 
   const handleMode = (nextMode) => {
     setMode(nextMode)
     setPreview(null)
     setError('')
-    if (file) generatePreview(file, nextMode)
+    const nextLocked = Boolean(lockedApiType && nextMode === 'append' && existingQuestionCount > 0)
+    const nextType = nextLocked ? lockedApiType : questionType || lockedApiType || ''
+    if (nextLocked) setQuestionType(lockedApiType)
+    if (file) generatePreview(file, nextMode, nextType)
+  }
+
+  const handleQuestionType = (nextType) => {
+    if (typeLocked) return
+    setQuestionType(nextType)
+    setPreview(null)
+    setError('')
+    if (file && nextType) generatePreview(file, mode, nextType)
   }
 
   const handleImport = async () => {
@@ -108,8 +171,8 @@ export function QuestionImportModal({
             <div>
               <p className="text-sm font-semibold text-navy-900">Use the provided .xlsx format</p>
               <p className="mt-1 text-xs leading-5 text-slate-600">
-                Maximum 500 questions and 5MB. All rows must use one top-level question type;
-                Survey rows may mix survey formats.
+                Choose the question type below, then upload the workbook. Maximum 500 questions and
+                5MB. Survey workbooks may mix survey_subtype formats.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -130,6 +193,33 @@ export function QuestionImportModal({
             </div>
           </div>
         </div>
+
+        <label className="block space-y-2">
+          <span className="text-sm font-semibold text-slate-700">Question type</span>
+          <select
+            value={questionType}
+            disabled={isPreviewing || isImporting || typeLocked}
+            onChange={(event) => handleQuestionType(event.target.value)}
+            className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm font-medium text-navy-900 shadow-sm outline-none focus:border-navy-500 focus:ring-2 focus:ring-navy-200 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70"
+          >
+            <option value="">Select question type</option>
+            {IMPORT_QUESTION_TYPES.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
+            ))}
+          </select>
+          {typeLocked ? (
+            <span className="block text-xs text-slate-500">
+              Locked to the existing session type ({sessionQuestionType}). Switch to Replace to
+              change it.
+            </span>
+          ) : questionType === 'survey' ? (
+            <span className="block text-xs text-slate-500">
+              For Survey, fill survey_subtype on each Excel row (mcq, poll, rating, etc.).
+            </span>
+          ) : null}
+        </label>
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-slate-700">Import behavior</legend>
@@ -182,7 +272,7 @@ export function QuestionImportModal({
             ref={inputRef}
             type="file"
             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            disabled={isPreviewing || isImporting}
+            disabled={isPreviewing || isImporting || !questionType}
             onChange={(event) => handleFile(event.target.files?.[0])}
             className="sr-only"
           />
@@ -292,4 +382,3 @@ export function QuestionImportModal({
     </Modal>
   )
 }
-
