@@ -21,6 +21,7 @@ import {
   Trash2,
   Vote,
   X,
+  Sparkles,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -28,6 +29,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { HostQuestionActionButton } from '../components/live/HostQuestionActionButton'
 import { QuestionMediaUpload } from '../components/builder/QuestionMediaUpload'
 import { QuestionImportModal } from '../components/builder/QuestionImportModal'
+import { AiGenerateQuestionsModal } from '../components/builder/AiGenerateQuestionsModal'
 import { QuestionMedia } from '../components/participant-session/QuestionMedia'
 import Modal from '../components/ui/Modal'
 import { useAuthStore } from '../store/authStore'
@@ -1104,6 +1106,7 @@ function BuilderPage() {
   const [selectedId, setSelectedId] = useState(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [questionImportOpen, setQuestionImportOpen] = useState(false)
+  const [aiGenerateOpen, setAiGenerateOpen] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -1568,6 +1571,66 @@ function BuilderPage() {
     setSelectedId(q.id)
   }
 
+  const addAiGeneratedQuestions = (generatedList) => {
+    if (!session || session.rawStatus !== 'draft') return
+    if (!Array.isArray(generatedList) || generatedList.length === 0) return
+
+    const firstType = generatedList[0]?.type
+    if (sessionQuestionType && firstType && sessionQuestionType !== firstType) {
+      setSaveError(
+        `Only one question type is allowed per session. This session is using ${sessionQuestionType}.`,
+      )
+      return
+    }
+
+    const defaultTime = sessionQuizTotalTimeEnabled
+      ? 0
+      : resolveDefaultTimeLimitForNewQuestion(questions)
+
+    const mapped = generatedList.map((item) => {
+      const type = item.type || firstType || 'MCQ'
+      const options = Array.isArray(item.options)
+        ? item.options.map((opt) => ({
+            id: uid('opt'),
+            optionId: null,
+            text: opt.text || 'Option',
+            isCorrect: Boolean(opt.isCorrect),
+          }))
+        : []
+
+      return {
+        id: uid('q'),
+        questionId: null,
+        type,
+        text: item.text || '',
+        media: null,
+        points: type === 'Poll' ? 0 : 10,
+        timeLimitSeconds: defaultTime,
+        ...(type === 'Rating'
+          ? {
+              ...createRatingQuestionDefaults(),
+              ratingMin: Number(item.ratingMin) || DEFAULT_RATING_MIN,
+              ratingMax: Number(item.ratingMax) || DEFAULT_RATING_MAX,
+            }
+          : {}),
+        options:
+          type === 'True/False'
+            ? createTrueFalseOptions(
+                options.find((o) => o.text.toLowerCase() === 'true')?.isCorrect !== false,
+              )
+            : options,
+      }
+    })
+
+    setSaveError('')
+    setDirty(true)
+    setQuestions((prev) => [...prev, ...mapped])
+    setSelectedId(mapped[0]?.id || null)
+    setSaveSuccess(
+      `${mapped.length} AI question${mapped.length === 1 ? '' : 's'} added — save the session to keep them.`,
+    )
+  }
+
   const handleQuickAddQuestion = () => {
     if (!sessionQuestionType) return
     addQuestion(sessionQuestionType)
@@ -1934,6 +1997,21 @@ function BuilderPage() {
           >
             <FileUp className="size-4" />
             Upload questions
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAiGenerateOpen(true)}
+            disabled={!isDraftSession}
+            title={
+              !isDraftSession
+                ? 'AI generate is available only for draft sessions.'
+                : 'Generate questions with Cursor AI'
+            }
+            className="inline-flex items-center gap-2 rounded-2xl border border-violet-200/80 bg-violet-50/90 px-4 py-3 text-sm font-semibold text-violet-900 shadow-sm shadow-violet-900/5 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Sparkles className="size-4" />
+            Generate with AI
           </button>
 
           <button
@@ -2586,6 +2664,14 @@ function BuilderPage() {
             new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           )
         }}
+      />
+
+      <AiGenerateQuestionsModal
+        open={aiGenerateOpen}
+        onClose={() => setAiGenerateOpen(false)}
+        accessToken={accessToken}
+        lockedType={sessionQuestionType}
+        onAddSelected={addAiGeneratedQuestions}
       />
 
       <Modal open={previewOpen} title="Preview Participant View" onClose={() => setPreviewOpen(false)}>
