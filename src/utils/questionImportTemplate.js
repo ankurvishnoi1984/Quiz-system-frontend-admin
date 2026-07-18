@@ -28,7 +28,7 @@ const SAMPLE_ROWS = [
     '',
     '',
     '',
-    2,
+    'Mars',
     10,
     30,
     false,
@@ -50,7 +50,7 @@ const SAMPLE_ROWS = [
     '',
     '',
     '',
-    2,
+    '4',
     10,
     15,
     false,
@@ -111,11 +111,11 @@ export async function downloadQuestionImportTemplate({ includeExamples = false }
     ],
     [
       'Correct answer',
-      'For quiz MCQ/True-False, put the correct option number in correct_option (example: 2).',
+      'For quiz MCQ/True-False, correct_option must contain the exact text of one available option (example: Mars). Matching is case-insensitive.',
     ],
     [
       'Options',
-      'MCQ/Poll need at least 2; True-False exactly 2; Ranking 2–10; Emoji Reaction exactly 5.',
+      'Option text values must be unique within each question (case-insensitive). MCQ/Poll need at least 2; True-False exactly 2; Ranking 2–10; Emoji Reaction exactly 5.',
     ],
     [
       'Limits',

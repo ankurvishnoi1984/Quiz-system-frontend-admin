@@ -77,13 +77,8 @@ function booleanValue(value, fallback = false) {
   return fallback
 }
 
-function correctOptionIndexes(value) {
-  return new Set(
-    cellText(value)
-      .split(/[,\s;|]+/)
-      .map(Number)
-      .filter((number) => Number.isInteger(number) && number > 0),
-  )
+function comparableOptionText(value) {
+  return cellText(value).toLocaleLowerCase()
 }
 
 function usesOptions(type, subtype) {
@@ -95,12 +90,15 @@ function parseRow(values, rowNumber, questionType) {
   const surveySubtype = questionType === 'survey' ? normalizeType(values.survey_subtype) : null
   const questionText = cellText(values.question_text)
   const nonScored = ['poll', 'survey', 'emoji_reaction'].includes(questionType)
-  const correctIndexes = correctOptionIndexes(values.correct_option)
+  const correctOptionText = cellText(values.correct_option)
+  const comparableCorrectOption = comparableOptionText(correctOptionText)
   const optionTexts = OPTION_COLUMNS.map((column) => cellText(values[column])).filter(Boolean)
+  const comparableOptionTexts = optionTexts.map(comparableOptionText)
+  const matchingCorrectOptionIndex = comparableOptionTexts.indexOf(comparableCorrectOption)
   const options = usesOptions(questionType, surveySubtype)
     ? optionTexts.map((optionText, index) => ({
         option_text: optionText,
-        is_correct: nonScored ? false : correctIndexes.has(index + 1),
+        is_correct: nonScored ? false : index === matchingCorrectOptionIndex,
         display_order: index + 1,
       }))
     : []
@@ -143,14 +141,20 @@ function parseRow(values, rowNumber, questionType) {
   ) {
     errors.push('survey_subtype is required and must be supported')
   }
+  if (
+    usesOptions(questionType, surveySubtype) &&
+    new Set(comparableOptionTexts).size !== comparableOptionTexts.length
+  ) {
+    errors.push('option text values must be unique')
+  }
   if (payload.rating_min >= payload.rating_max) {
     errors.push('rating_min must be less than rating_max')
   }
   if (payload.is_quiz_mode && ['mcq', 'true_false'].includes(questionType)) {
-    if (correctIndexes.size !== 1) {
-      errors.push('correct_option must contain exactly one option number')
-    } else if ([...correctIndexes].some((index) => index > options.length)) {
-      errors.push('correct_option points to a missing option')
+    if (!correctOptionText) {
+      errors.push('correct_option must contain the text of the correct option')
+    } else if (matchingCorrectOptionIndex < 0) {
+      errors.push('correct_option must match one of the available option text values')
     }
   }
 
