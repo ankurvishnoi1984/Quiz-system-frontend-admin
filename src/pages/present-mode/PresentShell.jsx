@@ -1,5 +1,5 @@
-import { Info } from 'lucide-react'
-// import { Info, MessageSquare } from 'lucide-react' // MessageSquare was for Q&A tile
+import { Info, Trophy } from 'lucide-react'
+// import { Info, MessageSquare, Trophy } from 'lucide-react' // MessageSquare was for Q&A tile
 
 export function PresentShell({ children, footer }) {
   return (
@@ -26,26 +26,53 @@ function PresentHeaderStatButton({
   onClick,
   ariaLabel,
   icon: Icon = Info,
+  active = false,
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group cursor-pointer rounded-2xl border border-blue-200/80 bg-white/90 px-4 py-2.5 text-right shadow-sm transition hover:border-sky-300 hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+      className={`group cursor-pointer rounded-2xl border px-4 py-2.5 text-right shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 ${
+        active
+          ? 'border-amber-300 bg-amber-50 hover:border-amber-400 hover:bg-amber-50 hover:shadow-md'
+          : 'border-blue-200/80 bg-white/90 hover:border-sky-300 hover:bg-white hover:shadow-md'
+      }`}
       aria-label={ariaLabel}
     >
       <div className="flex items-center justify-end gap-2">
         <Icon
-          className="size-[clamp(0.9rem,1.6vw,1.1rem)] shrink-0 text-sky-600 transition group-hover:text-sky-700"
+          className={`size-[clamp(0.9rem,1.6vw,1.1rem)] shrink-0 transition ${
+            active
+              ? 'text-amber-600 group-hover:text-amber-700'
+              : 'text-sky-600 group-hover:text-sky-700'
+          }`}
           aria-hidden
         />
-        <p className="text-[clamp(0.7rem,1.3vw,0.85rem)] font-semibold uppercase tracking-wider text-slate-500">
+        <p
+          className={`text-[clamp(0.7rem,1.3vw,0.85rem)] font-semibold uppercase tracking-wider ${
+            active ? 'text-amber-800' : 'text-slate-500'
+          }`}
+        >
           {label}
         </p>
       </div>
-      <p className="mt-1 text-[clamp(1.25rem,2.4vw,1.75rem)] font-bold tabular-nums text-navy-700">
-        {count}
-      </p>
+      {count != null ? (
+        <p
+          className={`mt-1 text-[clamp(1.25rem,2.4vw,1.75rem)] font-bold tabular-nums ${
+            active ? 'text-amber-900' : 'text-navy-700'
+          }`}
+        >
+          {count}
+        </p>
+      ) : (
+        <p
+          className={`mt-1 text-[clamp(0.85rem,1.6vw,1rem)] font-semibold ${
+            active ? 'text-amber-800' : 'text-navy-700'
+          }`}
+        >
+          View
+        </p>
+      )}
     </button>
   )
 }
@@ -69,13 +96,16 @@ export function PresentSlideHeader({
   // qaCount = 0, // Q&A feature disabled
   isSessionLive = false,
   onParticipantsClick,
+  onOverallRankingsClick,
+  overallRankingsActive = false,
   // onQaClick, // Q&A feature disabled
   readOnly = false,
 }) {
   const modeLabel = readOnly ? 'View display' : 'Present mode'
   const showParticipantsTile = Boolean(onParticipantsClick)
+  const showOverallRankingsTile = Boolean(onOverallRankingsClick)
   // const showQaTile = Boolean(onQaClick) // Q&A feature disabled
-  const showStatTiles = showParticipantsTile
+  const showStatTiles = showParticipantsTile || showOverallRankingsTile
   // const showStatTiles = showParticipantsTile || showQaTile
 
   return (
@@ -103,6 +133,15 @@ export function PresentSlideHeader({
             />
           ) : null}
           */}
+          {showOverallRankingsTile ? (
+            <PresentHeaderStatButton
+              label="Overall rankings"
+              onClick={onOverallRankingsClick}
+              icon={Trophy}
+              active={overallRankingsActive}
+              ariaLabel="View overall rankings for host only"
+            />
+          ) : null}
           {showParticipantsTile ? (
             <PresentHeaderStatButton
               label="Participants"

@@ -9,6 +9,8 @@ export function LeaderboardSlide({
   qaCount,
   isSessionLive,
   onParticipantsClick,
+  onOverallRankingsClick,
+  overallRankingsActive = false,
   onQaClick,
   readOnly = false,
 }) {
@@ -20,6 +22,8 @@ export function LeaderboardSlide({
         qaCount={qaCount}
         isSessionLive={isSessionLive}
         onParticipantsClick={onParticipantsClick}
+        onOverallRankingsClick={onOverallRankingsClick}
+        overallRankingsActive={overallRankingsActive}
         onQaClick={onQaClick}
         readOnly={readOnly}
       />

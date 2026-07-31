@@ -5,10 +5,12 @@ import { BarChart3, Layers, Maximize2, Minimize2, Play, Trophy } from 'lucide-re
 import { HostAlertModal } from '../../components/live/HostAlertModal'
 import { HostQuestionActionButton } from '../../components/live/HostQuestionActionButton'
 import { HostQuestionControls } from '../../components/live/HostQuestionControls'
+import { SessionLeaderboardModal } from '../../components/leaderboard/SessionLeaderboardModal'
 import { useAuthStore } from '../../store/authStore'
 import { useHostQuestionMutations } from '../../hooks/useHostQuestionMutations'
 import { useLiveSession } from '../../hooks/useLiveSession'
 import {
+  getSessionLeaderboardApi,
   getSessionSurveySummaryApi,
   // listQaQuestionsApi, // Q&A feature disabled
   setPresentSlideApi,
@@ -23,6 +25,7 @@ import {
 import { canHostActivateAllQuestions, canHostCloseAllQuestions } from '../../utils/hostQuestionControls'
 import { broadcastPreviewFollow } from '../../utils/previewFollow'
 import { sessionSupportsOverallLeaderboard, sessionSupportsSurveyEndingScreen } from '../../utils/livePresentation'
+import { SESSION_LEADERBOARD_TOP_N } from '../../utils/leaderboard'
 import { isSessionQuizTotalTimeEnabled } from '../../utils/sessionFlags'
 import { getLastActivatedLiveQuestion } from '../participant-session/utils/questionUtils'
 import { formatScheduledSessionForDisplay } from '../../utils/sessionSchedule'
@@ -42,6 +45,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
   const queryClient = useQueryClient()
   const slideTotalRef = useRef(1)
   const didBootstrapSlideRef = useRef(false)
+  const prevLeaderboardEnabledRef = useRef(undefined)
   const [slideIndex, setSlideIndex] = useState(0)
 
   const applySyncedSlide = useCallback((data) => {
@@ -62,10 +66,13 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [hostAlert, setHostAlert] = useState(null)
   const [participantsModalOpen, setParticipantsModalOpen] = useState(false)
+  const [hostLeaderboardOpen, setHostLeaderboardOpen] = useState(false)
+  const [hostLeaderboardLimit, setHostLeaderboardLimit] = useState(SESSION_LEADERBOARD_TOP_N)
   // Q&A feature disabled — re-enable when bringing Q&A back
   // const [qaModalOpen, setQaModalOpen] = useState(false)
 
   const openParticipantsModal = useCallback(() => setParticipantsModalOpen(true), [])
+  const openHostLeaderboardModal = useCallback(() => setHostLeaderboardOpen(true), [])
   // const openQaModal = useCallback(() => setQaModalOpen(true), [])
 
   // const qaQuery = useQuery({
@@ -106,6 +113,20 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
       }),
     [mappedQuestions, canEditLive, singleActiveQuestionMode],
   )
+
+  const canViewHostOverallRankings = !readOnly && canToggleOverallLeaderboard
+  const hostLeaderboardQuery = useQuery({
+    queryKey: ['live-leaderboard', sessionId, 'present-host-modal', hostLeaderboardLimit],
+    queryFn: () =>
+      getSessionLeaderboardApi(hostAccessToken, sessionId, { limit: hostLeaderboardLimit }),
+    enabled: Boolean(
+      canViewHostOverallRankings && hostAccessToken && sessionId && hostLeaderboardOpen,
+    ),
+    refetchInterval:
+      hostLeaderboardOpen && (session?.status === 'live' || session?.status === 'paused')
+        ? 4000
+        : false,
+  })
 
   const clearSessionEndingScreens = useCallback(async () => {
     if (readOnly || !hostAccessToken) return null
@@ -388,16 +409,27 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
 
   useEffect(() => {
     didBootstrapSlideRef.current = false
+    prevLeaderboardEnabledRef.current = undefined
     setSlideIndex(0)
+    setHostLeaderboardOpen(false)
   }, [sessionId])
 
-  // Host open: land on the question currently live for participants (latest activated if several).
-  // Host can still move to previous slides afterward.
+  // Host open: prefer survey ending if enabled, else latest live question.
+  // Overall rankings for the host uses a modal, not the rankings slide.
   useEffect(() => {
     if (readOnly || isViewWaiting || isLoading || !session || !sessionId) return
     if (didBootstrapSlideRef.current) return
 
     didBootstrapSlideRef.current = true
+    prevLeaderboardEnabledRef.current = Boolean(session.leaderboard_enabled)
+
+    if (session.survey_results_enabled) {
+      const surveyIndex = slides.findIndex((slide) => slide.type === 'surveyEnding')
+      if (surveyIndex >= 0) {
+        setSlideIndex(surveyIndex)
+        return
+      }
+    }
 
     const liveQuestions = mappedQuestions.filter((question) => question.isLive)
     const target =
@@ -417,6 +449,67 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
     isLoading,
     session,
     sessionId,
+    mappedQuestions,
+    slides,
+  ])
+
+  // When overall rankings is toggled on: open host modal + sync Preview for participants.
+  // Do not jump Present to the rankings slide.
+  useEffect(() => {
+    if (readOnly || isViewWaiting || isLoading || !session || !sessionId) return
+    if (!didBootstrapSlideRef.current) return
+
+    const enabled = Boolean(session.leaderboard_enabled)
+    const previous = prevLeaderboardEnabledRef.current
+    if (previous === undefined || previous === enabled) {
+      prevLeaderboardEnabledRef.current = enabled
+      return
+    }
+    prevLeaderboardEnabledRef.current = enabled
+
+    if (enabled) {
+      setHostLeaderboardOpen(true)
+      broadcastPreviewFollow(sessionId, { screen: 'leaderboard' })
+      return
+    }
+
+    setHostLeaderboardOpen(false)
+
+    const liveQuestions = mappedQuestions.filter((question) => question.isLive)
+    const liveTarget =
+      liveQuestions.length > 0
+        ? getLastActivatedLiveQuestion(liveQuestions) || liveQuestions[0]
+        : null
+    const questionIndex =
+      liveTarget != null
+        ? slides.findIndex(
+            (slide) =>
+              slide.type === 'question' && Number(slide.question.id) === Number(liveTarget.id),
+          )
+        : slides.findIndex((slide) => slide.type === 'question')
+
+    if (questionIndex >= 0) {
+      const question = slides[questionIndex].question
+      setSlideIndex((current) =>
+        slides[current]?.type === 'leaderboard' ? questionIndex : current,
+      )
+      broadcastPreviewFollow(sessionId, {
+        screen: 'question',
+        questionId: question.id,
+        questionIndex: Math.max(0, Number(slides[questionIndex].questionNumber || 1) - 1),
+      })
+      return
+    }
+
+    setSlideIndex((current) => (slides[current]?.type === 'leaderboard' ? 0 : current))
+    broadcastPreviewFollow(sessionId, { screen: 'join' })
+  }, [
+    readOnly,
+    isViewWaiting,
+    isLoading,
+    session,
+    sessionId,
+    session?.leaderboard_enabled,
     mappedQuestions,
     slides,
   ])
@@ -529,6 +622,12 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
     session?.scheduled_date,
     session?.scheduled_time,
   )
+  const headerRankingsProps = canViewHostOverallRankings
+    ? {
+        onOverallRankingsClick: openHostLeaderboardModal,
+        overallRankingsActive: hostLeaderboardOpen,
+      }
+    : {}
 
   const renderFooterNav = () => {
     if (isViewWaiting || readOnly) {
@@ -579,8 +678,8 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
               }
               title={
                 session?.leaderboard_enabled
-                  ? 'Hide session-wide rankings from participants'
-                  : 'Show session-wide rankings to participants on its own tab'
+                  ? 'Hide overall rankings from participants'
+                  : 'Show overall rankings to participants and open the host rankings modal'
               }
               active={Boolean(session?.leaderboard_enabled)}
               tone="amber"
@@ -698,6 +797,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
               // qaCount={qaCount} // Q&A feature disabled
               isSessionLive={false}
               onParticipantsClick={openParticipantsModal}
+              {...headerRankingsProps}
               // onQaClick={openQaModal} // Q&A feature disabled
               readOnly
             />
@@ -730,6 +830,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
             // qaCount={qaCount} // Q&A feature disabled
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
+            {...headerRankingsProps}
             // onQaClick={openQaModal} // Q&A feature disabled
             readOnly={readOnly}
           />
@@ -747,6 +848,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
             // qaCount={qaCount} // Q&A feature disabled
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
+            {...headerRankingsProps}
             // onQaClick={openQaModal} // Q&A feature disabled
             readOnly={readOnly}
             singleActiveQuestionMode={singleActiveQuestionMode}
@@ -761,6 +863,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
             // qaCount={qaCount} // Q&A feature disabled
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
+            {...headerRankingsProps}
             // onQaClick={openQaModal} // Q&A feature disabled
             readOnly={readOnly}
           />
@@ -775,6 +878,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
             // qaCount={qaCount} // Q&A feature disabled
             isSessionLive={isSessionLive}
             onParticipantsClick={openParticipantsModal}
+            {...headerRankingsProps}
             // onQaClick={openQaModal} // Q&A feature disabled
             readOnly={readOnly}
           />
@@ -788,6 +892,16 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
         isSessionLive={isSessionLive}
         readOnly={readOnly}
       />
+
+      {!readOnly ? (
+        <SessionLeaderboardModal
+          open={hostLeaderboardOpen}
+          onClose={() => setHostLeaderboardOpen(false)}
+          entries={hostLeaderboardQuery.data || []}
+          limit={hostLeaderboardLimit}
+          onLimitChange={setHostLeaderboardLimit}
+        />
+      ) : null}
 
       {/* Q&A feature disabled — re-enable when bringing Q&A back
       <PresentQaModal

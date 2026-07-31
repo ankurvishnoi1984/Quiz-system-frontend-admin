@@ -10,6 +10,8 @@ export function PresentSurveyEndingSlide({
   qaCount,
   isSessionLive,
   onParticipantsClick,
+  onOverallRankingsClick,
+  overallRankingsActive = false,
   onQaClick,
   readOnly = false,
 }) {
@@ -21,6 +23,8 @@ export function PresentSurveyEndingSlide({
         qaCount={qaCount}
         isSessionLive={isSessionLive}
         onParticipantsClick={onParticipantsClick}
+        onOverallRankingsClick={onOverallRankingsClick}
+        overallRankingsActive={overallRankingsActive}
         onQaClick={onQaClick}
         readOnly={readOnly}
       />

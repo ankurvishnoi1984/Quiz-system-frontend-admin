@@ -106,6 +106,8 @@ export function QuestionSlide({
   qaCount,
   isSessionLive,
   onParticipantsClick,
+  onOverallRankingsClick,
+  overallRankingsActive = false,
   onQaClick,
   readOnly = false,
   singleActiveQuestionMode = false,
@@ -315,6 +317,8 @@ export function QuestionSlide({
         qaCount={qaCount}
         isSessionLive={isSessionLive}
         onParticipantsClick={onParticipantsClick}
+        onOverallRankingsClick={onOverallRankingsClick}
+        overallRankingsActive={overallRankingsActive}
         onQaClick={onQaClick}
         readOnly={readOnly}
       />

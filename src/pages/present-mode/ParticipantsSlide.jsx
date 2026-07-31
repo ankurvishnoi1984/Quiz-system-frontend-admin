@@ -29,6 +29,8 @@ export function ParticipantsSlide({
   qaCount,
   isSessionLive,
   onParticipantsClick,
+  onOverallRankingsClick,
+  overallRankingsActive = false,
   onQaClick,
   readOnly = false,
 }) {
@@ -49,6 +51,8 @@ export function ParticipantsSlide({
         qaCount={qaCount}
         isSessionLive={isSessionLive}
         onParticipantsClick={onParticipantsClick}
+        onOverallRankingsClick={onOverallRankingsClick}
+        overallRankingsActive={overallRankingsActive}
         onQaClick={onQaClick}
         readOnly={readOnly}
       />
