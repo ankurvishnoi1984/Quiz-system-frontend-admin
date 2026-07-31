@@ -157,6 +157,7 @@ export function mapLiveQuestions(questions) {
       surveySubType: isSurvey ? q.survey_subtype : null,
       isLive: Boolean(q.is_live),
       timeLimit: isSurvey ? 0 : Number(q.time_limit_seconds) || 0,
+      liveActivatedAt: q.live_activated_at || null,
       submissionsClosed: Boolean(q.submissions_closed),
       isQuizMode:
         rawType === 'poll' || rawType === 'emoji_reaction' || isSurvey

@@ -19,6 +19,8 @@ import {
 import { PreviewBarChart } from './PreviewBarChart'
 import { PreviewAnswerStream, PreviewRankingBars } from './PreviewPresentationVisuals'
 import { PresentQuestionMedia } from '../present-mode/PresentQuestionMedia'
+import { HostQuestionTimer } from '../../components/live/HostQuestionTimer'
+import { shouldShowHostQuestionTimer } from '../../hooks/useHostQuestionCountdown'
 
 /**
  * PPT / Mentimeter-style slide: question + full-screen answers only.
@@ -28,7 +30,9 @@ export function PreviewQuestionSlide({
   accessToken,
   question,
   allResponses,
+  singleActiveQuestionMode = false,
 }) {
+  const showQuestionTimer = shouldShowHostQuestionTimer(question, { singleActiveQuestionMode })
   const currentResponses = filterResponsesForQuestion(allResponses, question.id)
 
   const questionResultsQuery = useQuery({
@@ -134,6 +138,14 @@ export function PreviewQuestionSlide({
   return (
     <div className="preview-deck flex min-h-0 flex-1 flex-col">
       <header className="preview-deck-question relative z-20 shrink-0 px-[clamp(0.5rem,2vw,1rem)] pt-[clamp(0.25rem,1vh,0.75rem)]">
+        {showQuestionTimer ? (
+          <HostQuestionTimer
+            question={question}
+            singleActiveQuestionMode={singleActiveQuestionMode}
+            variant="compact"
+            className="absolute right-[clamp(0.5rem,2vw,1rem)] top-[clamp(0.25rem,1vh,0.75rem)] z-30"
+          />
+        ) : null}
         <div
           className={
             question.media?.url
@@ -144,8 +156,8 @@ export function PreviewQuestionSlide({
           <h2
             className={`min-w-0 font-bold leading-[1.12] tracking-tight text-navy-900 ${
               question.media?.url
-                ? 'flex-1 text-center text-[clamp(1.75rem,5.5vw,3.75rem)] lg:text-left'
-                : 'mx-auto max-w-[22ch] text-[clamp(2rem,6.5vw,4.25rem)] sm:max-w-[28ch]'
+                ? `flex-1 text-center text-[clamp(1.75rem,5.5vw,3.75rem)] lg:text-left ${showQuestionTimer ? 'lg:pr-40' : ''}`
+                : `mx-auto max-w-[22ch] text-[clamp(2rem,6.5vw,4.25rem)] sm:max-w-[28ch] ${showQuestionTimer ? 'pt-14 sm:pt-4 sm:pr-36' : ''}`
             }`}
           >
             {question.text || 'Untitled question'}

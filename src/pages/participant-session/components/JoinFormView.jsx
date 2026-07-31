@@ -23,7 +23,7 @@ export function JoinFormView({
     <PageCenteredShell maxWidth="max-w-lg">
       <form onSubmit={onSubmit} className="space-y-4 text-left">
         <div className="text-center">
-          <img src="/logo.svg" alt="Logo" className="mx-auto mb-4 h-12 w-42" />
+          <img src="/log5.png" alt="Company logo" className="mx-auto mb-4 h-15 w-42" />
           <h1 className="text-2xl font-bold text-navy-900">
             {showJoinDetails ? session.title : 'Join a session'}
           </h1>

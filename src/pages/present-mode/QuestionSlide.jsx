@@ -29,6 +29,7 @@ import {
 } from './PresentAnswerReveal'
 import { PresentLeaderboardList } from './PresentLeaderboardList'
 import { PresentQuestionMedia } from './PresentQuestionMedia'
+import { HostQuestionTimer } from '../../components/live/HostQuestionTimer'
 import { PresentResponsesList } from './PresentResponsesList'
 import { PresentSlideHeader } from './PresentShell'
 import { PresentViewSwitcher } from './PresentViewSwitcher'
@@ -107,6 +108,7 @@ export function QuestionSlide({
   onParticipantsClick,
   onQaClick,
   readOnly = false,
+  singleActiveQuestionMode = false,
 }) {
   const [viewMode, setViewMode] = useState('overview')
 
@@ -323,6 +325,12 @@ export function QuestionSlide({
           <span className="text-[clamp(0.9rem,1.6vw,1.1rem)] font-semibold text-slate-500">
             {responseSubmissionCount} response{responseSubmissionCount === 1 ? '' : 's'}
           </span>
+          <HostQuestionTimer
+            question={question}
+            singleActiveQuestionMode={singleActiveQuestionMode}
+            variant="compact"
+            className="ml-auto"
+          />
         </div>
         <div
           className={`mt-[clamp(0.75rem,2vh,1.25rem)] ${

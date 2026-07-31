@@ -384,6 +384,7 @@ function PreviewModePage() {
         accessToken={accessToken}
         question={activeQuestion}
         allResponses={responses}
+        singleActiveQuestionMode={session?.participant_navigation_enabled === false}
       />
     )
   }

@@ -43,7 +43,7 @@ export function SessionNotLiveView({
     <PageCenteredShell maxWidth="max-w-lg">
       <div className="space-y-5">
         <div className="text-center">
-          <img src="/logo.svg" alt="Logo" className="mx-auto mb-4 h-12 w-42" />
+          <img src="/log5.png" alt="Company logo" className="mx-auto mb-4 h-15 w-42" />
           <div
             className={`mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full ${tone.iconWrap}`}
           >

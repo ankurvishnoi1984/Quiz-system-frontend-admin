@@ -40,6 +40,7 @@ import { HostNoSessionsEmpty } from '../components/layout/HostNoSessionsEmpty'
 import { useHostNavSessions, getLivePresenterSessionId } from '../hooks/useHostNavSessions'
 import { useShell } from '../context/ShellContext'
 import { HostQuestionControls } from '../components/live/HostQuestionControls'
+import { HostQuestionTimer } from '../components/live/HostQuestionTimer'
 import { LiveChartViewToggle } from '../components/live/LiveChartViewToggle'
 import { RankingLiveChartPanel } from '../components/live/RankingLiveChartPanel'
 import { useHostQuestionMutations } from '../hooks/useHostQuestionMutations'
@@ -533,19 +534,37 @@ function LivePage() {
       // Optimistic cache update so Preview follow (and Live UI) do not briefly keep the old live Q.
       queryClient.setQueryData(['live-questions', sessionId, 'host'], (old) => {
         if (!Array.isArray(old)) return old
+        const activatedAt = new Date().toISOString()
         return old.map((q) => {
           const id = Number(q.question_id)
-          if (id === activatedId) return { ...q, is_live: true }
-          if (q.is_live) return { ...q, is_live: false }
+          if (id === activatedId) {
+            return {
+              ...q,
+              is_live: true,
+              live_activated_at: activatedAt,
+              submissions_closed: false,
+              open_for_reattempt: false,
+            }
+          }
+          if (q.is_live) return { ...q, is_live: false, live_activated_at: null }
           return q
         })
       })
       queryClient.setQueryData(['live-questions', sessionId], (old) => {
         if (!Array.isArray(old)) return old
+        const activatedAt = new Date().toISOString()
         return old.map((q) => {
           const id = Number(q.question_id)
-          if (id === activatedId) return { ...q, is_live: true }
-          if (q.is_live) return { ...q, is_live: false }
+          if (id === activatedId) {
+            return {
+              ...q,
+              is_live: true,
+              live_activated_at: activatedAt,
+              submissions_closed: false,
+              open_for_reattempt: false,
+            }
+          }
+          if (q.is_live) return { ...q, is_live: false, live_activated_at: null }
           return q
         })
       })
@@ -1097,7 +1116,7 @@ function LivePage() {
 
             <div className="space-y-4">
               <div className="space-y-4 rounded-2xl border border-blue-200/70 bg-white/70 p-5">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wider text-navy-700">Current question</p>
               <h3 className="mt-1 text-xl font-bold text-navy-900">{activeQuestion?.text || 'No question selected'}</h3>
@@ -1105,6 +1124,11 @@ function LivePage() {
                 {activeQuestion ? `${questionIndex + 1} / ${mappedQuestions.length} • ${activeQuestion.type}` : '—'}
               </p>
             </div>
+            <HostQuestionTimer
+              question={activeQuestion}
+              singleActiveQuestionMode={singleActiveQuestionMode}
+              className="shrink-0"
+            />
           </div>
 
 

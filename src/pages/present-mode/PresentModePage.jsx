@@ -243,10 +243,19 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
       const activatedId = Number(variables.questionId)
       queryClient.setQueryData(['live-questions', sessionId, 'host'], (old) => {
         if (!Array.isArray(old)) return old
+        const activatedAt = new Date().toISOString()
         return old.map((q) => {
           const id = Number(q.question_id)
-          if (id === activatedId) return { ...q, is_live: true }
-          if (q.is_live) return { ...q, is_live: false }
+          if (id === activatedId) {
+            return {
+              ...q,
+              is_live: true,
+              live_activated_at: activatedAt,
+              submissions_closed: false,
+              open_for_reattempt: false,
+            }
+          }
+          if (q.is_live) return { ...q, is_live: false, live_activated_at: null }
           return q
         })
       })
@@ -707,6 +716,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
             onParticipantsClick={openParticipantsModal}
             // onQaClick={openQaModal} // Q&A feature disabled
             readOnly={readOnly}
+            singleActiveQuestionMode={singleActiveQuestionMode}
           />
         ) : null}
 
