@@ -40,7 +40,7 @@ import { ParticipantAlertModal } from './components/ParticipantAlertModal'
 import { OverallLeaderboardPanel } from './components/OverallLeaderboardPanel'
 import { SurveySessionEndingPanel } from './components/SurveySessionEndingPanel'
 import { SessionHeader } from './components/SessionHeader'
-import { SessionEndedBanner } from './components/SessionEndedBanner'
+import { SessionEndedBanner, SessionEndedPanel } from './components/SessionEndedBanner'
 import { WaitingForQuestion } from './components/WaitingForQuestion'
 import { WaitingView } from './components/WaitingView'
 import { isParticipantChoiceCorrect } from '../../utils/answerReveal'
@@ -2045,7 +2045,7 @@ function ParticipantSessionPage() {
           rankingsOnlyMode={endingScreenOnlyMode}
         />
 
-        {isSessionEnded ? <SessionEndedBanner /> : null}
+        {isSessionEnded && endingScreenOnlyMode ? <SessionEndedBanner /> : null}
 
         {showOverallLeaderboardTab ? (
           <OverallLeaderboardPanel
@@ -2067,19 +2067,11 @@ function ParticipantSessionPage() {
           />
         ) : (
           <>
+            {step === 'active' && isSessionEnded ? <SessionEndedPanel /> : null}
+
             {step === 'active' && !question && !isSessionEnded && <WaitingForQuestion />}
 
-            {step === 'active' && !question && isSessionEnded && (
-              <section className="space-y-4 rounded-2xl border border-blue-200/70 bg-white p-8 text-center shadow-sm">
-                <h2 className="text-xl font-bold text-navy-900">Session ended</h2>
-                <p className="text-sm text-slate-600">
-                  The host has ended this session.
-                  {/* Q&A feature disabled — was: Switch to Q&A to review past activity. */}
-                </p>
-              </section>
-            )}
-
-            {step === 'active' && question && (
+            {step === 'active' && question && !isSessionEnded && (
               <ActiveQuestionPanel
             question={question}
             activeQuestions={activeQuestions}
@@ -2193,7 +2185,7 @@ function ParticipantSessionPage() {
         open={sessionEndedModal}
         variant="info"
         title="Session ended"
-        message="The host has ended this session. You can review your answers but can no longer submit new responses. Thank you for participating!"
+        message="The host has ended this session. Thank you for participating!"
         confirmLabel="OK"
         onClose={() => setSessionEndedModal(false)}
       />
