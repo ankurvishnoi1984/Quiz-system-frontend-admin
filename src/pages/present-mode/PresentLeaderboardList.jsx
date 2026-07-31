@@ -84,6 +84,9 @@ export function PresentLeaderboardList({
 }) {
   const rows = normalizeLeaderboardEntries(entries)
   const maxScore = rows.length ? Math.max(...rows.map((r) => r.score), 1) : 1
+  const noCorrectAnswers =
+    /no one gave a correct answer/i.test(String(emptyMessage || '')) ||
+    /no one has given a correct answer/i.test(String(emptyMessage || ''))
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-blue-200/70 bg-white/90 shadow-xl shadow-navy-900/10">
@@ -97,7 +100,11 @@ export function PresentLeaderboardList({
               {title}
             </p>
             <p className="text-[clamp(0.95rem,1.8vw,1.1rem)] font-semibold text-navy-800">
-              {rows.length} participant{rows.length === 1 ? '' : 's'} ranked
+              {rows.length > 0
+                ? `${rows.length} participant${rows.length === 1 ? '' : 's'} ranked`
+                : noCorrectAnswers
+                  ? 'No correct answers yet'
+                  : 'Waiting for scores'}
             </p>
           </div>
         </div>
@@ -116,9 +123,22 @@ export function PresentLeaderboardList({
           ))}
         </ul>
       ) : (
-        <p className="flex flex-1 items-center justify-center p-8 text-center text-[clamp(1rem,2vw,1.25rem)] text-slate-500">
-          {emptyMessage}
-        </p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+          <p
+            className={`max-w-md font-semibold ${
+              noCorrectAnswers
+                ? 'text-[clamp(1.25rem,3vw,2rem)] text-navy-800'
+                : 'text-[clamp(1rem,2vw,1.25rem)] text-slate-500'
+            }`}
+          >
+            {emptyMessage}
+          </p>
+          {noCorrectAnswers ? (
+            <p className="max-w-sm text-[clamp(0.9rem,1.6vw,1.05rem)] text-slate-500">
+              Participants answered, but nobody scored points on this question.
+            </p>
+          ) : null}
+        </div>
       )}
     </div>
   )

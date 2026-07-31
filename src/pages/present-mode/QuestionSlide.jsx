@@ -139,6 +139,19 @@ export function QuestionSlide({
     () => buildQuestionLeaderboardForQuestion(allResponses, question.id, 30),
     [allResponses, question.id],
   )
+  const questionLeaderboardDisplay = useMemo(() => {
+    const hasCorrect = questionLeaderboard.some((entry) => Number(entry.score) > 0)
+    if (!hasCorrect && questionLeaderboard.length > 0) {
+      return {
+        entries: [],
+        emptyMessage: 'No one gave a correct answer',
+      }
+    }
+    return {
+      entries: questionLeaderboard.filter((entry) => Number(entry.score) > 0),
+      emptyMessage: 'Rankings will appear as participants answer this question.',
+    }
+  }, [questionLeaderboard])
 
   const chartRawType = question.chartRawType ?? getQuestionChartRawType(question)
   const usesOptionChart = questionUsesOptionChart(chartRawType)
@@ -360,9 +373,9 @@ export function QuestionSlide({
       <div className="flex min-h-0 flex-1 flex-col">
         {viewMode === 'leaderboard' ? (
           <PresentLeaderboardList
-            entries={questionLeaderboard}
+            entries={questionLeaderboardDisplay.entries}
             title="Question rankings"
-            emptyMessage="Rankings will appear as participants answer this question."
+            emptyMessage={questionLeaderboardDisplay.emptyMessage}
           />
         ) : showSplitLayout ? (
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2 lg:grid-rows-1">
