@@ -1,4 +1,4 @@
-import { BarChart3, Eye, EyeOff, Lock, Play, RotateCcw, Square, Trophy } from 'lucide-react'
+import { BarChart3, Eye, EyeOff, Lock, Medal, Play, RotateCcw, Square } from 'lucide-react'
 import { questionSupportsAnswerReveal } from '../../utils/answerReveal'
 import {
   questionSupportsLeaderboard,
@@ -111,17 +111,17 @@ export function HostQuestionControls({
                 visible: !question.showLeaderboard,
               })
             }
-            icon={Trophy}
-            label="Rankings"
+            icon={Medal}
+            label="Question rankings"
             title={
               !isActiveQuestion
                 ? 'Activate this question before showing its rankings'
                 : question.showLeaderboard
-                  ? 'Hide ranking for this question'
+                  ? 'Hide ranking for this question only'
                   : 'Show ranking for this question only'
             }
             active={question.showLeaderboard}
-            tone="amber"
+            tone="indigo"
             size={size}
           />
         ) : null}

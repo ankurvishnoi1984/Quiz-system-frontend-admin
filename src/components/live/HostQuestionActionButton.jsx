@@ -29,6 +29,14 @@ const HOST_ACTION_TONES = {
     idleIcon: 'bg-amber-200/80 text-amber-800',
     dot: 'bg-amber-600',
   },
+  indigo: {
+    active:
+      'border-indigo-500 bg-indigo-100 text-indigo-950 shadow-sm shadow-indigo-200/60 ring-1 ring-indigo-300/70',
+    activeIcon: 'bg-indigo-600 text-white',
+    idle: 'border-indigo-200/90 bg-indigo-50/90 text-indigo-800 hover:border-indigo-400 hover:bg-indigo-100',
+    idleIcon: 'bg-indigo-200/80 text-indigo-700',
+    dot: 'bg-indigo-600',
+  },
   sky: {
     active: 'border-sky-500 bg-sky-100 text-sky-950 shadow-sm shadow-sky-200/60 ring-1 ring-sky-300/70',
     activeIcon: 'bg-sky-600 text-white',
