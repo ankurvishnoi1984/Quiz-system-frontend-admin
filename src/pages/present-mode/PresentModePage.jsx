@@ -24,6 +24,7 @@ import { canHostActivateAllQuestions, canHostCloseAllQuestions } from '../../uti
 import { broadcastPreviewFollow } from '../../utils/previewFollow'
 import { sessionSupportsOverallLeaderboard, sessionSupportsSurveyEndingScreen } from '../../utils/livePresentation'
 import { isSessionQuizTotalTimeEnabled } from '../../utils/sessionFlags'
+import { getLastActivatedLiveQuestion } from '../participant-session/utils/questionUtils'
 import { formatScheduledSessionForDisplay } from '../../utils/sessionSchedule'
 import { LeaderboardSlide } from './LeaderboardSlide'
 import { PresentSurveyEndingSlide } from './PresentSurveyEndingSlide'
@@ -40,6 +41,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
   const accessToken = readOnly ? viewerToken : hostAccessToken
   const queryClient = useQueryClient()
   const slideTotalRef = useRef(1)
+  const didBootstrapSlideRef = useRef(false)
   const [slideIndex, setSlideIndex] = useState(0)
 
   const applySyncedSlide = useCallback((data) => {
@@ -385,8 +387,39 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
   }, [slideTotal])
 
   useEffect(() => {
+    didBootstrapSlideRef.current = false
     setSlideIndex(0)
   }, [sessionId])
+
+  // Host open: land on the question currently live for participants (latest activated if several).
+  // Host can still move to previous slides afterward.
+  useEffect(() => {
+    if (readOnly || isViewWaiting || isLoading || !session || !sessionId) return
+    if (didBootstrapSlideRef.current) return
+
+    didBootstrapSlideRef.current = true
+
+    const liveQuestions = mappedQuestions.filter((question) => question.isLive)
+    const target =
+      liveQuestions.length > 0
+        ? getLastActivatedLiveQuestion(liveQuestions) || liveQuestions[0]
+        : null
+    if (!target) return
+
+    const targetIndex = slides.findIndex(
+      (slide) =>
+        slide.type === 'question' && Number(slide.question.id) === Number(target.id),
+    )
+    if (targetIndex >= 0) setSlideIndex(targetIndex)
+  }, [
+    readOnly,
+    isViewWaiting,
+    isLoading,
+    session,
+    sessionId,
+    mappedQuestions,
+    slides,
+  ])
 
   useEffect(() => {
     setSlideIndex((index) => Math.min(index, Math.max(0, slideTotal - 1)))
