@@ -19,7 +19,6 @@ import {
   Presentation,
   Rocket,
   Share2,
-  Square,
   Trophy,
   Users,
 } from 'lucide-react'
@@ -828,29 +827,14 @@ function LivePage() {
             ))}
           </select>
           {showSessionControls ? (
-            <>
-              <button
-                type="button"
-                onClick={() =>
-                  transitionMutation.mutate({
-                    action: session.status === 'live' ? 'pause' : 'resume',
-                  })
-                }
-                disabled={transitionMutation.isPending}
-                className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-60"
-              >
-                {session.status === 'live' ? <Square className="size-4" /> : <Play className="size-4" />}
-                {session.status === 'live' ? 'Pause' : 'Resume'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEndSessionConfirmOpen(true)}
-                disabled={transitionMutation.isPending}
-                className="h-11 rounded-2xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 disabled:opacity-60"
-              >
-                End Session
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => setEndSessionConfirmOpen(true)}
+              disabled={transitionMutation.isPending}
+              className="h-11 rounded-2xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 disabled:opacity-60"
+            >
+              End Session
+            </button>
           ) : null}
           <span className="inline-flex h-11 items-center gap-2 rounded-2xl bg-linear-to-r from-navy-900 via-navy-700 to-navy-600 px-4 text-sm font-semibold text-white">
             <Users className="size-4" />
