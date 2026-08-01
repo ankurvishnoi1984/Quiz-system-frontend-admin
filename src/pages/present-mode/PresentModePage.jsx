@@ -33,6 +33,7 @@ import { LeaderboardSlide } from './LeaderboardSlide'
 import { PresentSurveyEndingSlide } from './PresentSurveyEndingSlide'
 import { ParticipantsSlide } from './ParticipantsSlide'
 import { PresentNavButton, PresentShell, PresentSlideHeader } from './PresentShell'
+import { PresentJoinBar } from './PresentJoinInfo'
 import { PresentParticipantsModal } from './PresentParticipantsModal'
 // import { PresentQaModal } from './PresentQaModal' // Q&A feature disabled
 import { QuestionSlide } from './QuestionSlide'
@@ -622,6 +623,10 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
     session?.scheduled_date,
     session?.scheduled_time,
   )
+  // Join info sits under Responses on question slides; keep top bar elsewhere (not on join slide).
+  const showPersistentJoinBar =
+    isViewWaiting ||
+    (currentSlide?.type !== 'participants' && currentSlide?.type !== 'question')
   const headerRankingsProps = canViewHostOverallRankings
     ? {
         onOverallRankingsClick: openHostLeaderboardModal,
@@ -788,7 +793,13 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
         </footer>
       }
     >
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
+        {showPersistentJoinBar ? (
+          <div className="mb-[clamp(0.65rem,1.5vh,1rem)] min-w-0 shrink-0">
+            <PresentJoinBar session={session} />
+          </div>
+        ) : null}
+
         {isViewWaiting ? (
           <div className="flex min-h-0 flex-1 flex-col">
             <PresentSlideHeader
@@ -840,6 +851,7 @@ function PresentModePage({ readOnly = false, viewerToken = '', sessionIdOverride
           <QuestionSlide
             key={currentSlide.question.id}
             accessToken={accessToken}
+            session={session}
             sessionTitle={sessionTitle}
             question={currentSlide.question}
             questionNumber={currentSlide.questionNumber}

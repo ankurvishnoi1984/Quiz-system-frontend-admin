@@ -12,7 +12,7 @@ export function PresentShell({ children, footer }) {
             'radial-gradient(circle at 20% 20%, rgba(27, 75, 107, 0.12) 0%, transparent 45%), radial-gradient(circle at 80% 80%, rgba(79, 70, 229, 0.08) 0%, transparent 40%)',
         }}
       />
-      <main className="relative z-10 flex min-h-0 flex-1 flex-col px-[clamp(1.5rem,4vw,4rem)] py-[clamp(1.25rem,3vh,2.5rem)]">
+      <main className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden px-[clamp(1rem,3vw,3rem)] py-[clamp(1rem,2.5vh,2rem)]">
         {children}
       </main>
       {footer}

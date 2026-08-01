@@ -30,6 +30,7 @@ import {
 import { PresentLeaderboardList } from './PresentLeaderboardList'
 import { PresentQuestionMedia } from './PresentQuestionMedia'
 import { HostQuestionTimer } from '../../components/live/HostQuestionTimer'
+import { PresentJoinBar } from './PresentJoinInfo'
 import { PresentResponsesList } from './PresentResponsesList'
 import { PresentSlideHeader } from './PresentShell'
 import { PresentViewSwitcher } from './PresentViewSwitcher'
@@ -98,6 +99,7 @@ function PresentResponsesPanel({
 
 export function QuestionSlide({
   accessToken,
+  session,
   sessionTitle,
   question,
   questionNumber,
@@ -356,7 +358,7 @@ export function QuestionSlide({
               : ''
           }`}
         >
-          <h2 className="min-w-0 flex-1 text-[clamp(1.75rem,5vw,3.5rem)] font-bold leading-tight text-navy-900">
+          <h2 className="min-w-0 flex-1 text-[clamp(1.1rem,2.4vw,1.85rem)] font-bold leading-snug text-navy-900">
             {question.text || 'Untitled question'}
           </h2>
           {question.media?.url ? (
@@ -374,19 +376,26 @@ export function QuestionSlide({
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
         {viewMode === 'leaderboard' ? (
-          <PresentLeaderboardList
-            entries={questionLeaderboardDisplay.entries}
-            title="Question rankings"
-            emptyMessage={questionLeaderboardDisplay.emptyMessage}
-          />
+          <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
+            <div className="min-h-0 min-w-0 lg:col-span-2 lg:max-h-[min(56vh,560px)]">
+              <PresentLeaderboardList
+                entries={questionLeaderboardDisplay.entries}
+                title="Question rankings"
+                emptyMessage={questionLeaderboardDisplay.emptyMessage}
+              />
+            </div>
+            <div className="flex min-h-0 min-w-0 flex-col lg:max-h-[min(56vh,560px)]">
+              <PresentJoinBar session={session} placement="column" />
+            </div>
+          </div>
         ) : showSplitLayout ? (
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2 lg:grid-rows-1">
-            <div className="flex min-h-0 min-w-0 flex-col lg:max-h-[min(52vh,520px)]">
+          <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12 lg:items-stretch">
+            <div className="flex min-h-0 min-w-0 flex-col lg:col-span-5 lg:max-h-[min(56vh,560px)]">
               {renderResultsPanel({ compact: true })}
             </div>
-            <div className="flex min-h-0 min-w-0 flex-col lg:max-h-[min(52vh,520px)]">
+            <div className="flex min-h-0 min-w-0 flex-col lg:col-span-4 lg:max-h-[min(56vh,560px)]">
               <PresentResponsesPanel
                 key={question.id}
                 responseRows={responseRows}
@@ -394,18 +403,33 @@ export function QuestionSlide({
                 correctLabels={correctLabels}
               />
             </div>
+            <div className="flex min-h-0 min-w-0 flex-col md:col-span-2 lg:col-span-3 lg:max-h-[min(56vh,560px)]">
+              <PresentJoinBar session={session} placement="column" />
+            </div>
           </div>
         ) : showTextList ? (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:max-h-[min(52vh,560px)]">
-            <PresentResponsesPanel
-              key={question.id}
-              responseRows={responseRows}
-              showRevealUi={showRevealUi}
-              correctLabels={correctLabels}
-            />
+          <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
+            <div className="flex min-h-0 min-w-0 flex-col lg:col-span-2 lg:max-h-[min(56vh,560px)]">
+              <PresentResponsesPanel
+                key={question.id}
+                responseRows={responseRows}
+                showRevealUi={showRevealUi}
+                correctLabels={correctLabels}
+              />
+            </div>
+            <div className="flex min-h-0 min-w-0 flex-col lg:max-h-[min(56vh,560px)]">
+              <PresentJoinBar session={session} placement="column" />
+            </div>
           </div>
         ) : (
-          renderResultsPanel()
+          <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-3 lg:items-stretch">
+            <div className="min-h-0 min-w-0 lg:col-span-2 lg:max-h-[min(56vh,560px)]">
+              {renderResultsPanel()}
+            </div>
+            <div className="flex min-h-0 min-w-0 flex-col lg:max-h-[min(56vh,560px)]">
+              <PresentJoinBar session={session} placement="column" />
+            </div>
+          </div>
         )}
       </div>
     </div>
