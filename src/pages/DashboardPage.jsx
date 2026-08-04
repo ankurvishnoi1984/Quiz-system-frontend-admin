@@ -19,6 +19,7 @@ import {
   createSessionApi,
   duplicateSessionApi,
   listDepartmentSessionsApi,
+  resetSessionResponsesApi,
   transitionSessionApi,
   updateSessionApi,
 } from '../services/dashboardApi'
@@ -41,6 +42,7 @@ function DashboardPage() {
   const [shareSession, setShareSession] = useState(null)
   const [sessionAlert, setSessionAlert] = useState(null)
   const [deleteConfirmSession, setDeleteConfirmSession] = useState(null)
+  const [resetConfirmSession, setResetConfirmSession] = useState(null)
   const [dashboardError, setDashboardError] = useState('')
   const [liveSessionMetrics, setLiveSessionMetrics] = useState({})
 
@@ -104,6 +106,44 @@ function DashboardPage() {
         message: variables?.title
           ? `Failed to delete "${variables.title}". ${error.message || 'Please try again.'}`
           : error.message || 'Unable to delete session. Please try again.',
+        confirmLabel: 'Close',
+      })
+    },
+  })
+
+  const resetResponsesMutation = useMutation({
+    mutationFn: ({ sessionId }) => resetSessionResponsesApi(accessToken, sessionId),
+    onSuccess: (result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] })
+      setLiveSessionMetrics((prev) => {
+        const next = { ...prev }
+        delete next[variables.sessionId]
+        return next
+      })
+      setDashboardError('')
+      setResetConfirmSession(null)
+      const clearedParticipants = Number(result?.participants_cleared || 0)
+      const clearedResponses = Number(result?.responses_cleared || 0)
+      setSessionAlert({
+        variant: 'success',
+        title: 'Responses reset',
+        message: variables?.title
+          ? `"${variables.title}" was reset. Cleared ${clearedParticipants} participant${
+              clearedParticipants === 1 ? '' : 's'
+            } and ${clearedResponses} response${clearedResponses === 1 ? '' : 's'}.`
+          : `Cleared ${clearedParticipants} participant${
+              clearedParticipants === 1 ? '' : 's'
+            } and ${clearedResponses} response${clearedResponses === 1 ? '' : 's'}.`,
+        confirmLabel: 'OK',
+      })
+    },
+    onError: (error, variables) => {
+      setSessionAlert({
+        variant: 'error',
+        title: 'Could not reset responses',
+        message: variables?.title
+          ? `Failed to reset "${variables.title}". ${error.message || 'Please try again.'}`
+          : error.message || 'Unable to reset session responses. Please try again.',
         confirmLabel: 'Close',
       })
     },
@@ -274,6 +314,10 @@ function DashboardPage() {
     if (action === 'delete') {
       if (session.status === 'Live') return
       setDeleteConfirmSession(session)
+      return
+    }
+    if (action === 'reset-responses') {
+      setResetConfirmSession(session)
       return
     }
     if (action === 'duplicate') {
@@ -642,6 +686,52 @@ function DashboardPage() {
             className="h-11 rounded-2xl border border-red-200 bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
           >
             {archiveMutation.isPending ? 'Deleting…' : 'Delete session'}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(resetConfirmSession)}
+        title="Reset responses?"
+        onClose={() => {
+          if (!resetResponsesMutation.isPending) setResetConfirmSession(null)
+        }}
+      >
+        <p className="text-sm leading-relaxed text-slate-600">
+          Clear all participant responses for{' '}
+          <span className="font-semibold text-navy-900">
+            {resetConfirmSession?.title || 'this session'}
+          </span>
+          ? Participants will also be removed from the live count so they can join again. Question
+          content is kept. This uses a soft delete and can be recovered from the database if needed.
+        </p>
+        {resetConfirmSession?.status === 'Live' ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+            This session is currently live. Connected participants may need to refresh or rejoin.
+          </p>
+        ) : null}
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            disabled={resetResponsesMutation.isPending}
+            onClick={() => setResetConfirmSession(null)}
+            className="h-11 rounded-2xl border border-blue-200/70 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={resetResponsesMutation.isPending}
+            onClick={() => {
+              if (!resetConfirmSession) return
+              resetResponsesMutation.mutate({
+                sessionId: resetConfirmSession.id,
+                title: resetConfirmSession.title,
+              })
+            }}
+            className="h-11 rounded-2xl border border-amber-200 bg-amber-600 px-4 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60"
+          >
+            {resetResponsesMutation.isPending ? 'Resetting…' : 'Reset responses'}
           </button>
         </div>
       </Modal>

@@ -51,6 +51,12 @@ export async function archiveSessionApi(accessToken, sessionId) {
   return data?.session
 }
 
+export async function resetSessionResponsesApi(accessToken, sessionId) {
+  return authRequest(`/sessions/${sessionId}/reset-responses`, accessToken, {
+    method: 'POST',
+  })
+}
+
 export async function transitionSessionApi(accessToken, sessionId, action) {
   const data = await authRequest(`/sessions/${sessionId}/${action}`, accessToken, {
     method: 'POST',

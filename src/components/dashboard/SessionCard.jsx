@@ -1,4 +1,4 @@
-import { BarChart3, Copy, LayoutList, Pencil, Rocket, Share2, Trash2 } from 'lucide-react'
+import { BarChart3, Copy, LayoutList, Pencil, Rocket, RotateCcw, Share2, Trash2 } from 'lucide-react'
 import { useMemo } from 'react'
 import KebabMenu from '../ui/KebabMenu'
 
@@ -58,6 +58,12 @@ function SessionCard({ session, onAction }) {
       },
       { id: 'analytics', label: 'Analytics', icon: BarChart3, onClick: () => onAction('analytics', session) },
       { id: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onAction('duplicate', session) },
+      {
+        id: 'reset-responses',
+        label: 'Reset responses',
+        icon: RotateCcw,
+        onClick: () => onAction('reset-responses', session),
+      },
     ]
     if (!isCompleted) {
       items.unshift({
