@@ -30,8 +30,8 @@ function Navbar() {
   const shellFiltersDisabled = isShellFilterDisabled(pathname)
   const canSwitchDepartment = canSwitchShellDepartment(user?.role)
   const departmentLabel =
-    department ||
     departments.find((d) => String(d.dept_id) === String(departmentId))?.name ||
+    department ||
     'Department'
 
   const initials = user?.full_name
@@ -82,6 +82,8 @@ function Navbar() {
                     if (selectedClient) {
                       setClientId(String(selectedClient.client_id))
                       setClient(selectedClient.name)
+                      setDepartmentId('')
+                      setDepartment('')
                     }
                   }}
                   className="h-9 min-w-32 rounded-lg border border-blue-200/70 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"

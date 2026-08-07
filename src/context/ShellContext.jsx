@@ -5,6 +5,11 @@ import { listClientsApi, listDepartmentsApi } from '../services/dashboardApi'
 
 const ShellContext = createContext(null)
 
+function findDepartment(departments, deptId) {
+  if (!deptId || !departments?.length) return null
+  return departments.find((d) => String(d.dept_id) === String(deptId)) || null
+}
+
 export function ShellProvider({ children }) {
   const accessToken = useAuthStore((state) => state.accessToken)
   const user = useAuthStore((state) => state.user)
@@ -42,30 +47,43 @@ export function ShellProvider({ children }) {
   }, [isSuperAdmin, clientId, clientsQuery.data])
 
   useEffect(() => {
-    if (!departmentsQuery.data?.length) return
-    const isValidDept =
-      departmentId && departmentsQuery.data.some((d) => String(d.dept_id) === String(departmentId))
-    if (!isValidDept) {
-      const firstDept = departmentsQuery.data[0]
-      setDepartmentId(String(firstDept.dept_id))
-      setDepartment(firstDept.name)
-    }
-  }, [departmentsQuery.data, departmentId])
-
-  useEffect(() => {
     if (isSuperAdmin) return
     if (!clientId && user?.client_id) {
       setClientId(String(user.client_id))
     }
-    if (!departmentId && user?.dept_id) {
-      const matchesClient = departmentsQuery.data?.some(
-        (d) => String(d.dept_id) === String(user.dept_id),
-      )
-      if (!departmentsQuery.data?.length || matchesClient) {
-        setDepartmentId(String(user.dept_id))
-      }
+  }, [isSuperAdmin, clientId, user?.client_id])
+
+  // Keep selected department id + name aligned with the loaded department list.
+  useEffect(() => {
+    const departments = departmentsQuery.data || []
+    if (!departments.length) return
+
+    const selected = findDepartment(departments, departmentId)
+    if (selected) {
+      const nextName = selected.name || ''
+      if (department !== nextName) setDepartment(nextName)
+      return
     }
-  }, [user?.client_id, user?.dept_id, isSuperAdmin, clientId, departmentId, departmentsQuery.data])
+
+    // Prefer the signed-in user's department when it belongs to this client list.
+    const userDept = !isSuperAdmin ? findDepartment(departments, user?.dept_id) : null
+    const fallback = userDept || departments[0]
+    if (!fallback) return
+
+    setDepartmentId(String(fallback.dept_id))
+    setDepartment(fallback.name || '')
+  }, [departmentsQuery.data, departmentId, department, user?.dept_id, isSuperAdmin])
+
+  // When super admin switches client, drop a department that no longer exists.
+  useEffect(() => {
+    if (!isSuperAdmin) return
+    const departments = departmentsQuery.data
+    if (!departments) return
+    if (!departmentId) return
+    if (findDepartment(departments, departmentId)) return
+    setDepartmentId('')
+    setDepartment('')
+  }, [isSuperAdmin, clientId, departmentsQuery.data, departmentId])
 
   const value = useMemo(
     () => ({
